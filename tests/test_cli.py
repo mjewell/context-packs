@@ -152,6 +152,12 @@ class SyncTests(SyncCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn(f'context-packs: {missing} is not a folder', result.stderr)
 
+    def test_usage_errors_name_the_tool(self):
+        result = self.sync('publish')
+
+        self.assertEqual(result.returncode, 2)
+        self.assertTrue(result.stderr.startswith('usage: context-packs '), result.stderr)
+
     def test_folder_that_is_not_a_repo_root_stops_the_sync_untouched(self):
         shutil.rmtree(self.repo / '.git')
 

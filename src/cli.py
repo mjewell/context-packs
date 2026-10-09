@@ -76,7 +76,7 @@ def show(sources, picked):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(prog='context-packs', description=__doc__)
     parser.add_argument('repo', type=Path)
     parser.add_argument('--workspace', action='store_true',
                         help='sync the folder above the repos, which gets no CLAUDE.md and needs no git repo')
