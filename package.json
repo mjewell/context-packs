@@ -2,6 +2,7 @@
   "name": "context-packs",
   "version": "0.1.0",
   "description": "Sync shared agent rules and docs into each repo's AGENTS.md",
+  "license": "MIT",
   "bin": {
     "context-packs": "bin/context-packs.js"
   },
