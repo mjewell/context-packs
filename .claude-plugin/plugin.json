@@ -1,0 +1,9 @@
+{
+  "name": "context-packs",
+  "version": "0.1.0",
+  "description": "Sync shared agent rules and docs into each repo's AGENTS.md",
+  "author": {
+    "name": "mjewell"
+  },
+  "repository": "https://github.com/mjewell/context-packs"
+}

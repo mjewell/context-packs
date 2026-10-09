@@ -1,0 +1,16 @@
+{
+  "name": "context-packs",
+  "version": "0.1.0",
+  "description": "Sync shared agent rules and docs into each repo's AGENTS.md",
+  "bin": {
+    "context-packs": "bin/context-packs.js"
+  },
+  "files": [
+    "bin",
+    "src/*.py"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": "github:mjewell/context-packs"
+}
