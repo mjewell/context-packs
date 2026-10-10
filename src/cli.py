@@ -11,6 +11,7 @@ import shutil
 import sys
 
 import origins
+import report
 from blocks import HEADER, HEADER_RULES, HEADER_START, block, region, snapshot
 from packs import LOCAL, PACKS, Pack, Source, fetch
 
@@ -139,23 +140,26 @@ def main():
         for gone in {p.name for p in found.packs} - {p.name for p in packs}:
             if (repo / PACKS / gone).exists():
                 shutil.rmtree(repo / PACKS / gone)
-        blocks = [block(HEADER_START, HEADER_RULES)]
+        blocks = {HEADER: block(HEADER_START, HEADER_RULES)}
         for source in sources:
             if source.pack.local:
-                blocks.append(block(starts[source.pack.name], bodies[source.pack.name]))
+                blocks[source.pack.name] = block(starts[source.pack.name], bodies[source.pack.name])
                 continue
             synced = repo / source.pack.synced
             if synced.exists():
                 shutil.rmtree(synced)
             for name in chosen[source.pack.name]:
                 source.copy(name, synced)
-            blocks.append(block(starts[source.pack.name], bodies[source.pack.name], snapshot(synced)))
+            blocks[source.pack.name] = block(starts[source.pack.name], bodies[source.pack.name], snapshot(synced))
         if (repo / PACKS).is_dir() and not any((repo / PACKS).iterdir()):
             (repo / PACKS).rmdir()
-        text = found.text[:found.start] + '\n'.join(blocks) + found.text[found.end:]
+        text = found.text[:found.start] + '\n'.join(blocks.values()) + found.text[found.end:]
+        created = not (repo / 'AGENTS.md').exists()
         (repo / 'AGENTS.md').write_bytes(text.encode('utf-8'))
         if not linked:
             claude_md.symlink_to('AGENTS.md')
+        for line in report.changes(found, packs, chosen, blocks, created, linked):
+            print(line)
 
 
 if __name__ == '__main__':

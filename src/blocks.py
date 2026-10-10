@@ -19,10 +19,12 @@ BLOCK = re.compile(r'^<!-- context-packs:start (\S+)((?: \S+)*) -->\n(.*?)'
 
 
 class Region(NamedTuple):
-    """Where AGENTS.md's context-packs blocks sit, the packs they hold, and the doc sets each installed."""
+    """Where AGENTS.md's context-packs blocks sit, each block's text by name, the packs they hold, and the doc sets
+    each installed."""
     text: str
     start: int
     end: int
+    blocks: Dict[str, str]
     packs: List[Pack]
     installed: Dict[str, List[str]]
 
@@ -110,4 +112,5 @@ def region(repo):
             sys.exit(f'context-packs: {agents_md}: the {name} block or a doc in {PACKS / name} was edited since '
                      'the last sync. Move the change into its context pack or outside them, revert it, '
                      'then sync again.')
-    return Region(text, blocks[0].start(), blocks[-1].end(), packs, current)
+    return Region(text, blocks[0].start(), blocks[-1].end(), {m.group(1): m.group(0) for m in blocks}, packs,
+                  current)
