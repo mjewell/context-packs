@@ -12,8 +12,8 @@ HEADER_RULES = (
     '## Context Packs\n\n'
     'Context packs bring shared rules and docs in from elsewhere. Each pack has a block in this file holding its rules '
     "and a table of its context docs. Before starting work that a row in a pack's table matches, read its doc. "
-    f"A pack's block and its folder under `{PACKS.as_posix()}/` are copied from the `from` and `path` in the block's "
-    'start marker: change them there, never here.\n')
+    f"A pack's block, and any of its docs under `{PACKS.as_posix()}/`, are copied from the `from` and `path` in the "
+    "block's start marker: change them there, never here.\n")
 BLOCK = re.compile(r'^<!-- context-packs:start (\S+)((?: \S+)*) -->\n(.*?)'
                    r'^<!-- context-packs:end sha256:([0-9a-f]{12}) -->\n?', re.MULTILINE | re.DOTALL)
 
