@@ -60,7 +60,7 @@ class SyncCase(unittest.TestCase):
         return git(checkout, 'rev-parse', 'HEAD')
 
     def share(self, instructions):
-        return self.publish({'agents.md': instructions})
+        return self.publish({'pack.md': instructions})
 
     def doc_set(self, name, files):
         return self.publish({f'{name}/{path}': text for path, text in files.items()})
@@ -307,7 +307,7 @@ class AddRemoveTests(SyncCase):
 
     def test_add_of_a_pack_in_the_repo_itself_syncs_its_working_tree(self):
         (self.repo / 'team-rules').mkdir()
-        (self.repo / 'team-rules' / 'agents.md').write_text('Use pnpm.\n')
+        (self.repo / 'team-rules' / 'pack.md').write_text('Use pnpm.\n')
 
         result = self.sync('add', 'team', '.', '--path', 'team-rules')
 
@@ -414,6 +414,17 @@ class PackShapeTests(SyncCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn('billing', result.stderr)
+        self.assertFalse((self.repo / 'AGENTS.md').exists())
+
+    def test_rules_in_agents_md_stop_the_sync_and_say_to_rename_it(self):
+        self.publish({'agents.md': 'Prefer small PRs.\n'})
+
+        result = self.add()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('context/agents.md', result.stderr)
+        self.assertIn('pack.md', result.stderr)
+        self.assertIn('update', result.stderr)
         self.assertFalse((self.repo / 'AGENTS.md').exists())
 
 
@@ -531,7 +542,7 @@ class SeveralPacksTests(SyncCase):
         self.add()
         self.acme_origin, self.acme = self.remote('acme')
         self.acme_ref = self.publish({
-            'agents.md': 'Use acme.\n',
+            'pack.md': 'Use acme.\n',
             'deploy/index.md': '---\nwhen: Deploying\ntier: required\n---\nShip it.\n',
             'billing/index.md': '---\nwhen: Editing billing\n---\nCharge once.\n',
         }, checkout=self.acme, folder='plugins/x')
@@ -557,7 +568,7 @@ class SeveralPacksTests(SyncCase):
     def test_update_moves_every_pinned_pack(self):
         self.add_acme()
         latest = self.share('Prefer small PRs.\nWrite tests first.\n')
-        acme_latest = self.publish({'agents.md': 'Use acme v2.\n'}, checkout=self.acme, folder='plugins/x')
+        acme_latest = self.publish({'pack.md': 'Use acme v2.\n'}, checkout=self.acme, folder='plugins/x')
 
         result = self.sync('update')
 
@@ -569,7 +580,7 @@ class SeveralPacksTests(SyncCase):
     def test_update_by_name_moves_only_that_pack(self):
         self.add_acme()
         self.share('Prefer small PRs.\nWrite tests first.\n')
-        acme_latest = self.publish({'agents.md': 'Use acme v2.\n'}, checkout=self.acme, folder='plugins/x')
+        acme_latest = self.publish({'pack.md': 'Use acme v2.\n'}, checkout=self.acme, folder='plugins/x')
 
         result = self.sync('update', 'acme')
 

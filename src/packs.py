@@ -42,14 +42,18 @@ class Pack(NamedTuple):
 
 
 class Source(NamedTuple):
-    """A pack's content, fetched into a folder holding its agents.md and doc sets."""
+    """A pack's content, fetched into a folder holding its pack.md and doc sets."""
     pack: Pack
     folder: Path
 
     def available(self):
-        """The pack's doc sets: each a folder holding an index.md, or a single .md file other than agents.md."""
+        """The pack's doc sets: each a folder holding an index.md, or a single .md file other than pack.md."""
+        if (self.folder / 'agents.md').is_file():
+            sys.exit(f'context-packs: {(Path(self.pack.path) / "agents.md").as_posix()} in {self.pack.origin} holds '
+                     'rules under the name packs used before 0.2.0. Rename it to pack.md in the pack, or run update '
+                     'to move to a version of the pack that has one.')
         folders = {p.name for p in self.folder.iterdir() if p.is_dir() and not p.name.startswith('.')}
-        files = {p.stem for p in self.folder.glob('*.md') if p.name != 'agents.md'}
+        files = {p.stem for p in self.folder.glob('*.md') if p.name != 'pack.md'}
         for name in sorted(folders & files):
             sys.exit(f'context-packs: {self.pack.origin} has both {name}.md and {name}/ in '
                      f'{self.pack.path or "its root"}, so the doc set {name} is ambiguous. Keep one.')
@@ -85,7 +89,7 @@ class Source(NamedTuple):
             shutil.copy2(self.folder / f'{name}.md', synced / f'{name}.md')
 
     def body(self, names):
-        rules_file = self.folder / 'agents.md'
+        rules_file = self.folder / 'pack.md'
         rules = rules_file.read_text(encoding='utf-8') if rules_file.is_file() else ''
         # The end marker has to start its own line, or the next sync can't find the block.
         if rules and not rules.endswith('\n'):

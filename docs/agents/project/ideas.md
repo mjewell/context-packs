@@ -9,4 +9,4 @@ Instead of optional doc sets within a pack, optional docs could ship as packs of
 
 ## A folder of packs
 
-A repo could add a folder holding several packs, such as `context/` holding `core/` and `typescript/`, to get all of them at once, while another repo adds just `context/core`. The tool would need to tell a folder of packs from a pack whose doc sets are folders, which their contents alone can't settle: a pack with no `agents.md` and only folders looks like either. It would also need to decide whether the parent folder becomes one block or one per pack inside it.
+A repo could add a folder holding several packs, such as `context/` holding `core/` and `typescript/`, to get all of them at once, while another repo adds just `context/core`. The tool would need to tell a folder of packs from a pack whose doc sets are folders, which their contents alone can't settle: a pack with no `pack.md` and only folders looks like either. It would also need to decide whether the parent folder becomes one block or one per pack inside it.
