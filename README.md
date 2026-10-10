@@ -67,7 +67,17 @@ Later, `npx context-packs update` moves packs to their latest version, and `npx 
 
 ## Sync your project's own docs
 
-The same table works for a repo's own docs. Put each in a folder with a `when:` line, and install the folder as a pack read from the working tree. Any folder works; `docs/agents/project/` is just a suggestion:
+The same table works for a repo's own docs. Put each in a folder with a `when:` line, and install the folder as a pack read from the working tree:
+
+```bash
+npx context-packs add <name> . --path <folder>
+```
+
+- `<name>` is what this repo calls the pack.
+- `.` is the origin: the pack is in this repo, so it has no ref and syncs from your working tree.
+- `<folder>` holds the docs.
+
+Any name and folder work. We suggest `project` and `docs/agents/project`:
 
 ```bash
 npx context-packs add project . --path docs/agents/project
@@ -77,7 +87,7 @@ Its table points at the docs where they are. Resync after adding a doc or changi
 
 ## Reference
 
-Each command syncs the current folder, or `--dir <folder>`, and prints what changed. The folder can also hold several repos without being one, so sessions started there get the rules too.
+Each command syncs the current folder, or `--dir <folder>`, and prints what changed. The folder can also hold several repos without being one itself, so sessions started there get the rules too.
 
 | Command | Does |
 |---|---|
