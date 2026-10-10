@@ -38,7 +38,7 @@ If `AGENTS.md` already exists, the first run prints two marker lines instead. Pa
 | `docs <name> a,b` | Replaces a pack's optional doc sets (`''` for none) |
 | `list` | Lists each pack and its doc sets, marking the installed ones |
 
-Pass `--workspace` before the command to sync a folder that holds several repos but isn't one itself. It gets the packs but no `CLAUDE.md`, since one there would make Claude Code load the workspace's rules inside every repo too.
+A folder that holds several repos without being one can be synced too, so sessions started there get the rules. A Claude Code session started inside one of those repos then loads both copies, since Claude Code reads `CLAUDE.md` from the folders above it as well.
 
 ### Pinning and updates
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sync context packs into a repository, or into the workspace folder above the repositories: each pack's rules as a
+"""Sync context packs into a repository, or any folder such as the one above the repositories: each pack's rules as a
 block in AGENTS.md, after a header block explaining context packs, and each pack's required doc sets and the ones the
 repository chose in docs/agents/packs/<pack>/."""
 import argparse
@@ -86,8 +86,6 @@ def main():
     parser = argparse.ArgumentParser(prog='context-packs', description=__doc__)
     parser.add_argument('--dir', type=Path, default=Path.cwd(),
                         help='the folder to sync, if not the current one')
-    parser.add_argument('--workspace', action='store_true',
-                        help='sync the folder above the repos, which gets no CLAUDE.md and needs no git repo')
     commands = parser.add_subparsers(dest='command', metavar='command',
                                      description='leave out the command to resync every pack at its pinned ref')
     add = commands.add_parser('add', help="install a pack, pinned to its origin's latest commit or to --ref")
@@ -111,11 +109,6 @@ def main():
     repo = args.dir
     if not repo.is_dir():
         sys.exit(f'context-packs: {repo} is not a folder')
-    if args.workspace and (repo / '.git').exists():
-        sys.exit(f'context-packs: {repo} is a git repo. Sync it without --workspace.')
-    if not args.workspace and not (repo / '.git').exists():
-        sys.exit(f'context-packs: {repo} is not the root of a git repo. Run it from the root of the repo to sync or '
-                 'pass that with --dir, or pass --workspace for the folder above the repos.')
 
     found = region(repo)
     packs, picked = apply(args, found)
@@ -128,10 +121,7 @@ def main():
 
         claude_md = repo / 'CLAUDE.md'
         linked = claude_md.is_symlink() and os.readlink(claude_md) == 'AGENTS.md'
-        if args.workspace and os.path.lexists(claude_md):
-            sys.exit(f'context-packs: {claude_md} must not exist, or Claude Code would load the workspace\'s rules '
-                     'inside every repo too. Delete it, then sync again.')
-        if not args.workspace and not linked and os.path.lexists(claude_md):
+        if not linked and os.path.lexists(claude_md):
             sys.exit(f'context-packs: {claude_md} must be a symlink to AGENTS.md, so every agent reads the same rules. '
                      'Move its contents into AGENTS.md, delete it, then sync again.')
 
@@ -164,7 +154,7 @@ def main():
             (repo / PACKS).rmdir()
         text = found.text[:found.start] + '\n'.join(blocks) + found.text[found.end:]
         (repo / 'AGENTS.md').write_bytes(text.encode('utf-8'))
-        if not args.workspace and not linked:
+        if not linked:
             claude_md.symlink_to('AGENTS.md')
 
 

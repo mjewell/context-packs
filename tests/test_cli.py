@@ -168,15 +168,24 @@ class SyncTests(SyncCase):
         self.assertEqual(result.returncode, 2)
         self.assertTrue(result.stderr.startswith('usage: context-packs '), result.stderr)
 
-    def test_folder_that_is_not_a_repo_root_stops_the_sync_untouched(self):
-        shutil.rmtree(self.repo / '.git')
+    def test_agents_md_that_is_a_link_stops_the_sync_untouched(self):
+        target = self.source / 'old-rules.md'
+        (self.repo / 'AGENTS.md').symlink_to(target)
 
         result = self.sync()
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn('not the root of a git repo', result.stderr)
-        self.assertIn('--dir', result.stderr)
-        self.assertEqual(list(self.repo.iterdir()), [])
+        self.assertIn('symlink', result.stderr)
+        self.assertFalse(target.exists())
+
+    def test_folder_that_is_not_a_repo_gets_agents_md_and_claude_md(self):
+        shutil.rmtree(self.repo / '.git')
+
+        result = self.sync()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.repo / 'AGENTS.md').read_text(), HEADER)
+        self.assertEqual(os.readlink(self.repo / 'CLAUDE.md'), 'AGENTS.md')
 
     def test_pack_block_repeated_stops_the_sync_untouched(self):
         self.share('Prefer small PRs.\n')
@@ -748,48 +757,6 @@ class RequiredDocSetTests(SyncCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn('context/python/index.md', result.stderr)
-        self.assertFalse((self.repo / 'AGENTS.md').exists())
-
-
-class WorkspaceTests(SyncCase):
-    def setUp(self):
-        super().setUp()
-        self.share('Prefer small PRs.\n')
-        shutil.rmtree(self.repo / '.git')
-
-    def test_workspace_gets_the_packs_but_no_claude_md(self):
-        result = self.sync('--workspace', 'add', 'house-rules', str(self.origin), '--path', 'context')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual((self.repo / 'AGENTS.md').read_text(), self.rules())
-        self.assertFalse(os.path.lexists(self.repo / 'CLAUDE.md'))
-
-    def test_workspace_with_a_claude_md_stops_the_sync_untouched(self):
-        (self.repo / 'CLAUDE.md').symlink_to('AGENTS.md')
-
-        result = self.sync('--workspace')
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('CLAUDE.md', result.stderr)
-        self.assertFalse((self.repo / 'AGENTS.md').exists())
-
-    def test_workspace_whose_agents_md_is_a_link_stops_the_sync_untouched(self):
-        target = self.source / 'old-rules.md'
-        (self.repo / 'AGENTS.md').symlink_to(target)
-
-        result = self.sync('--workspace')
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('symlink', result.stderr)
-        self.assertFalse(target.exists())
-
-    def test_workspace_flag_on_a_repo_stops_the_sync(self):
-        (self.repo / '.git').mkdir()
-
-        result = self.sync('--workspace')
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('is a git repo', result.stderr)
         self.assertFalse((self.repo / 'AGENTS.md').exists())
 
 
