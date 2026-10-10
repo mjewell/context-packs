@@ -78,8 +78,8 @@ class SyncCase(unittest.TestCase):
         """AGENTS.md as a sync writes it from the pack's rules 'Prefer small PRs.', with no doc sets."""
         return HEADER + '\n' + self.start(ref) + 'Prefer small PRs.\n' + END
 
-    def sync(self, *args, repo=None):
-        return subprocess.run([sys.executable, str(CLI), str(repo or self.repo), *args],
+    def sync(self, *args, cwd=None):
+        return subprocess.run([sys.executable, str(CLI), *args], cwd=cwd or self.repo,
                               text=True, capture_output=True, timeout=30, env=self.env)
 
     def add(self, *args):
@@ -144,10 +144,20 @@ class SyncTests(SyncCase):
         self.assertIn('CLAUDE.md', result.stderr)
         self.assertEqual(sorted(p.name for p in self.repo.iterdir()), ['.git', 'CLAUDE.md'])
 
-    def test_missing_repo_folder_stops_the_sync(self):
+    def test_dir_syncs_that_folder_instead_of_the_current_one(self):
+        elsewhere = self.root / 'elsewhere'
+        elsewhere.mkdir()
+
+        result = self.sync('--dir', str(self.repo), cwd=elsewhere)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.repo / 'AGENTS.md').read_text(), HEADER)
+        self.assertEqual(list(elsewhere.iterdir()), [])
+
+    def test_missing_dir_stops_the_sync(self):
         missing = self.repo / 'not-a-repo'
 
-        result = self.sync(repo=missing)
+        result = self.sync('--dir', str(missing))
 
         self.assertEqual(result.returncode, 1)
         self.assertIn(f'context-packs: {missing} is not a folder', result.stderr)
@@ -165,6 +175,7 @@ class SyncTests(SyncCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn('not the root of a git repo', result.stderr)
+        self.assertIn('--dir', result.stderr)
         self.assertEqual(list(self.repo.iterdir()), [])
 
     def test_pack_block_repeated_stops_the_sync_untouched(self):

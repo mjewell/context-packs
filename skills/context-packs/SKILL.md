@@ -10,7 +10,7 @@ Done when the target repo's packs are what the user asked for and synced, any wo
 1. Pick the target: the repo the user names, else the root of the repo this session is working in. Ask when neither settles it. The folder above several repos, which isn't a git repo itself, is synced as a workspace: pass `--workspace` before the command.
 2. Run the tool through npx; it needs `git`, Node 18 or later and Python 3.9 or later:
    ```bash
-   npx --yes github:mjewell/context-packs <repo> <command>
+   npx --yes github:mjewell/context-packs --dir <repo> <command>
    ```
 3. Note what's already changed in the target, so the report can tell the sync's changes apart:
    ```bash

@@ -99,4 +99,4 @@ Edit only files I own. Plugins, synced skills, and installed dependencies belong
 - `bin/context-packs.js` is the npm package's bin, which npx runs. It only hands its arguments to the Python CLI.
 - `skills/context-packs/` is the skill this repo ships as a Claude Code plugin, alongside `.claude-plugin/plugin.json`.
 - Run the tests with `python3 -m unittest discover tests`.
-- This repo's own context docs are in `docs/agents/project/`, which the `project` pack lists. After adding a doc or changing its `when:` line, run `node bin/context-packs.js .` and commit the result.
+- This repo's own context docs are in `docs/agents/project/`, which the `project` pack lists. After adding a doc or changing its `when:` line, run `node bin/context-packs.js` and commit the result.

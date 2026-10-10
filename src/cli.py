@@ -29,7 +29,7 @@ def apply(args, found):
             sys.exit(f'context-packs: {args.name} can\'t name a pack. '
                      'Use letters, digits, dots, dashes and underscores.')
         if args.name in names:
-            sys.exit(f'context-packs: {args.repo} already has a pack named {args.name}.')
+            sys.exit(f'context-packs: {args.dir} already has a pack named {args.name}.')
         if args.origin == LOCAL:
             if args.ref:
                 sys.exit('context-packs: a pack in this repo syncs from its working tree, so it takes no --ref.')
@@ -43,7 +43,7 @@ def apply(args, found):
     named = [args.name] if args.command in ('remove', 'docs') else getattr(args, 'names', [])
     unknown = [n for n in named if n not in names]
     if unknown:
-        sys.exit(f'context-packs: {args.repo} has no pack named {", ".join(unknown)}. '
+        sys.exit(f'context-packs: {args.dir} has no pack named {", ".join(unknown)}. '
                  f'Its packs: {", ".join(names) or "none"}.')
     if args.command == 'remove':
         packs = [p for p in packs if p.name != args.name]
@@ -84,7 +84,8 @@ def show(sources, picked):
 
 def main():
     parser = argparse.ArgumentParser(prog='context-packs', description=__doc__)
-    parser.add_argument('repo', type=Path)
+    parser.add_argument('--dir', type=Path, default=Path.cwd(),
+                        help='the folder to sync, if not the current one')
     parser.add_argument('--workspace', action='store_true',
                         help='sync the folder above the repos, which gets no CLAUDE.md and needs no git repo')
     commands = parser.add_subparsers(dest='command', metavar='command',
@@ -107,14 +108,14 @@ def main():
     docs.add_argument('sets', help="comma-separated optional doc sets, or '' for none")
     commands.add_parser('list', help='list the packs and their doc sets, marking the installed ones')
     args = parser.parse_args()
-    repo = args.repo
+    repo = args.dir
     if not repo.is_dir():
         sys.exit(f'context-packs: {repo} is not a folder')
     if args.workspace and (repo / '.git').exists():
         sys.exit(f'context-packs: {repo} is a git repo. Sync it without --workspace.')
     if not args.workspace and not (repo / '.git').exists():
-        sys.exit(f'context-packs: {repo} is not the root of a git repo. Pass the root of the repo to sync, '
-                 'or --workspace for the folder above the repos.')
+        sys.exit(f'context-packs: {repo} is not the root of a git repo. Run it from the root of the repo to sync or '
+                 'pass that with --dir, or pass --workspace for the folder above the repos.')
 
     found = region(repo)
     packs, picked = apply(args, found)

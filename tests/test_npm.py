@@ -18,14 +18,14 @@ class NpmBinTests(unittest.TestCase):
         self.repo = Path(temp.name)
         (self.repo / '.git').mkdir()
 
-    def test_bin_runs_the_cli_with_its_arguments(self):
-        result = subprocess.run(['node', str(BIN), str(self.repo)], text=True, capture_output=True, timeout=30)
+    def test_bin_runs_the_cli_in_the_current_folder(self):
+        result = subprocess.run(['node', str(BIN)], cwd=self.repo, text=True, capture_output=True, timeout=30)
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue((self.repo / 'AGENTS.md').read_text().startswith('<!-- context-packs:start header -->\n'))
 
     def test_bin_passes_the_clis_failure_through(self):
-        result = subprocess.run(['node', str(BIN), str(self.repo), 'remove', 'acme'],
+        result = subprocess.run(['node', str(BIN), 'remove', 'acme'], cwd=self.repo,
                                 text=True, capture_output=True, timeout=30)
 
         self.assertEqual(result.returncode, 1)
