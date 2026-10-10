@@ -44,13 +44,19 @@ def snapshot(folder):
 
 
 def installed(repo, folder):
+    """The doc sets copied into folder: each a folder holding an index.md, or a single .md file."""
     if not (repo / folder).is_dir():
         return []
+    names = []
     for entry in (repo / folder).iterdir():
-        if not (entry / 'index.md').is_file():
-            sys.exit(f'context-packs: {(folder / entry.name).as_posix()} is not a doc set, since it has no index.md. '
-                     'Remove it, then sync again.')
-    return sorted(p.name for p in (repo / folder).iterdir())
+        if (entry / 'index.md').is_file():
+            names.append(entry.name)
+        elif entry.is_file() and entry.suffix == '.md':
+            names.append(entry.stem)
+        else:
+            sys.exit(f'context-packs: {(folder / entry.name).as_posix()} is not a doc set, since it\'s neither a '
+                     '.md file nor a folder with an index.md. Remove it, then sync again.')
+    return sorted(names)
 
 
 def marked_pack(agents_md, name, marker):
@@ -90,16 +96,17 @@ def region(repo):
         if text[before.end():after.start()] != '\n':
             sys.exit(f'context-packs: {agents_md} has text between the context-packs blocks, which must sit together '
                      'separated by blank lines. Move it outside them, then sync again.')
+    packs = [marked_pack(agents_md, m.group(1), m.group(2)) for m in blocks[1:]]
+    copied = {p.name for p in packs if not p.local}
     if (repo / PACKS).is_dir():
         for entry in sorted((repo / PACKS).iterdir()):
-            if entry.name not in names[1:]:
-                sys.exit(f'context-packs: {(PACKS / entry.name).as_posix()} has no block in {agents_md}. '
-                         'Remove it, then sync again.')
-    packs = [marked_pack(agents_md, m.group(1), m.group(2)) for m in blocks[1:]]
-    current = {p.name: installed(repo, p.synced) for p in packs}
+            if entry.name not in copied:
+                sys.exit(f'context-packs: {(PACKS / entry.name).as_posix()} has no block in {agents_md} for a pack '
+                         'copied from another repo. Remove it, then sync again.')
+    current = {p.name: installed(repo, p.synced) for p in packs if not p.local}
     for match in blocks:
         name, _, synced, sha = match.groups()
-        if digest(synced, b'' if name == HEADER else snapshot(repo / PACKS / name)) != sha:
+        if digest(synced, snapshot(repo / PACKS / name) if name in copied else b'') != sha:
             sys.exit(f'context-packs: {agents_md}: the {name} block or a doc in {PACKS / name} was edited since '
                      'the last sync. Move the change into its context pack or outside them, revert it, '
                      'then sync again.')

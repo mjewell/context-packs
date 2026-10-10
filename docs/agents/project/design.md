@@ -1,11 +1,15 @@
+---
+when: Changing how packs are written, pinned or updated
+---
 # Why context-packs works the way it does
 
-The [README](../README.md) covers how to use it. This covers the choices that look like mistakes until you know the reason.
+The [README](../../../README.md) covers how to use it. This covers the choices that look like mistakes until you know the reason.
 
 - **Packs are copied into each repo, not linked or loaded by a hook.** Cloud sessions and fresh clones see only what's committed, and Codex can't include another file from `AGENTS.md`. A link into a plugin's install folder would differ by machine and break wherever the plugin isn't installed. A hook would have to be set up for each agent, and would load every doc up front instead of only when a row matches.
 - **A header block the tool owns comes before the packs.** It states the one rule every pack relies on: read a doc when its row matches, and change synced content at its source. That way no pack's rules need to repeat it. Each pack's hash covers its own folder under `docs/agents/packs/`, so an edit is traced to one pack.
 - **The blocks sit together as one region.** The tool owns everything from the header block to the last pack block. Adding or removing a pack is then an append or a delete, and a new `AGENTS.md` needs only the two empty header-block lines pasted in. Text between the blocks stops the sync rather than being worked around.
 - **The blocks are the list of installed packs.** Each start marker records its pack's origin, path and ref, so there's no separate manifest to keep in step with them.
 - **Packs are pinned, except a pack in the synced repo itself.** A pack pinned to a commit or tag syncs the same for everyone until someone runs `update`. `update` moves a release tag only to a newer release with the same prefix, so a pack pinned to a version never lands on an unreleased commit by accident. A pack in the synced repo, `from=.`, is read from the working tree instead, because a commit can't pin itself: that's what lets a repo holding a pack resync its own `AGENTS.md` in the commit that changes the pack.
+- **A pack in the synced repo is listed where it is, not copied.** A copy would duplicate every doc in the same repo, and editing your own docs would trip the check for synced content edited in place. So its table points at the docs themselves, its hash covers only its block, and it installs every doc set it has, since choosing among a repo's own docs means nothing. That's what makes it the home for a repo's own context docs: the table is generated from each doc's `when:` line, so there's no hand-written table to keep in step.
 - **Packs are added and removed explicitly.** Installing a Claude Code plugin doesn't add its pack. That would tie which packs a repo has to one agent's settings, while what the tool writes works for every agent that reads `AGENTS.md`. A trigger for each agent can come later without changing the format.
 - **It's Python behind an npm package.** npx is the familiar way to run a tool like this, and Python needs nothing installed beyond what comes with `git` on macOS. The cost is needing both Node and Python; a rewrite in TypeScript would remove the Python requirement if Windows users or contributors need that.

@@ -33,6 +33,8 @@ def apply(args, found):
         if args.origin == LOCAL:
             if args.ref:
                 sys.exit('context-packs: a pack in this repo syncs from its working tree, so it takes no --ref.')
+            if args.docs:
+                sys.exit('context-packs: a pack in this repo installs every doc set it has, so it takes no --docs.')
             ref = None
         else:
             ref = origins.pin(args.origin, args.ref) if args.ref else origins.tip(args.origin)
@@ -46,6 +48,9 @@ def apply(args, found):
     if args.command == 'remove':
         packs = [p for p in packs if p.name != args.name]
     if args.command == 'docs':
+        if next(p for p in packs if p.name == args.name).local:
+            sys.exit(f'context-packs: the {args.name} pack is in this repo, so it installs every doc set it has. '
+                     'Delete a doc to drop it.')
         picked[args.name] = sets(args.sets)
     if args.command == 'update':
         if args.ref and len(named) != 1:
@@ -69,7 +74,9 @@ def show(sources, picked):
         print(f'{pack.name}  {pack.origin}' + f'  {pack.path}' * bool(pack.path) + f' @ {pack.ref}' * bool(pack.ref))
         for name in source.available():
             fields = source.front(name)
-            if fields.get('tier') == 'required':
+            if pack.local:
+                print(f'  [x] {name}: {fields["when"]}')
+            elif fields.get('tier') == 'required':
                 print(f'  [x] {name} (required): {fields["when"]}')
             else:
                 print(f'  [{"x" if name in picked[pack.name] else " "}] {name}: {fields["when"]}')
@@ -134,7 +141,7 @@ def main():
             if unknown:
                 sys.exit(f'context-packs: {name} has no doc set named {", ".join(unknown)}. '
                          f'Available: {", ".join(source.available()) or "none"}. Choose from those with --docs.')
-            chosen[name] = sorted(picked[name] | set(source.required()))
+            chosen[name] = source.installs(picked[name])
         bodies = {s.pack.name: s.body(chosen[s.pack.name]) for s in sources}
         starts = {s.pack.name: s.pack.start() for s in sources}
 
@@ -143,11 +150,14 @@ def main():
                 shutil.rmtree(repo / PACKS / gone)
         blocks = [block(HEADER_START, HEADER_RULES)]
         for source in sources:
+            if source.pack.local:
+                blocks.append(block(starts[source.pack.name], bodies[source.pack.name]))
+                continue
             synced = repo / source.pack.synced
             if synced.exists():
                 shutil.rmtree(synced)
             for name in chosen[source.pack.name]:
-                shutil.copytree(source.folder / name, synced / name)
+                source.copy(name, synced)
             blocks.append(block(starts[source.pack.name], bodies[source.pack.name], snapshot(synced)))
         if (repo / PACKS).is_dir() and not any((repo / PACKS).iterdir()):
             (repo / PACKS).rmdir()

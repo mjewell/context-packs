@@ -315,6 +315,88 @@ class AddRemoveTests(SyncCase):
         self.assertIn('acme', result.stderr)
 
 
+class LocalPackTests(SyncCase):
+    """A pack in the synced repo itself, such as the repo's own context docs, which syncs from its working tree."""
+
+    def setUp(self):
+        super().setUp()
+        self.docs = self.repo / 'docs' / 'agents' / 'project'
+        (self.docs / 'deploy').mkdir(parents=True)
+        (self.docs / 'deploy' / 'index.md').write_text('---\nwhen: Deploying\n---\nShip it.\n')
+        (self.docs / 'design.md').write_text('---\nwhen: Changing the design\n---\nKeep it small.\n')
+        self.agents_md = self.repo / 'AGENTS.md'
+
+    def add_project(self):
+        return self.sync('add', 'project', '.', '--path', 'docs/agents/project')
+
+    def test_local_pack_lists_every_doc_set_where_it_is(self):
+        result = self.add_project()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.agents_md.read_text(),
+                         HEADER + '\n<!-- context-packs:start project from=. path=docs/agents/project -->\n'
+                         '## project context\n\n| When | Read |\n|---|---|\n'
+                         '| Deploying | `docs/agents/project/deploy/index.md` |\n'
+                         '| Changing the design | `docs/agents/project/design.md` |\n'
+                         '<!-- context-packs:end sha256:c6b4d20cb496 -->\n')
+        self.assertFalse((self.repo / 'docs' / 'agents' / 'packs').exists())
+
+    def test_editing_a_local_doc_needs_no_resync(self):
+        self.add_project()
+        before = self.agents_md.read_text()
+        (self.docs / 'design.md').write_text('---\nwhen: Changing the design\n---\nKeep it smaller.\n')
+
+        result = self.sync()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.agents_md.read_text(), before)
+
+    def test_new_local_doc_joins_the_table_on_resync(self):
+        self.add_project()
+        (self.docs / 'billing.md').write_text('---\nwhen: Editing billing\n---\nCharge once.\n')
+
+        result = self.sync()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('| Editing billing | `docs/agents/project/billing.md` |\n', self.agents_md.read_text())
+
+    def test_choosing_doc_sets_for_a_local_pack_stops(self):
+        self.add_project()
+        before = self.agents_md.read_text()
+
+        result = self.sync('docs', 'project', 'deploy')
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('every doc set', result.stderr)
+        self.assertEqual(self.agents_md.read_text(), before)
+
+
+class PackShapeTests(SyncCase):
+    def test_single_file_doc_set_is_copied_and_listed(self):
+        self.publish({'billing.md': '---\nwhen: Billing\ntier: required\n---\nCharge once.\n'})
+
+        result = self.add()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.repo / 'docs' / 'agents' / 'packs' / 'house-rules' / 'billing.md').read_text(),
+                         '---\nwhen: Billing\ntier: required\n---\nCharge once.\n')
+        self.assertEqual((self.repo / 'AGENTS.md').read_text(),
+                         HEADER + '\n' + self.start() + '## house-rules context\n\n| When | Read |\n|---|---|\n'
+                         '| Billing | `docs/agents/packs/house-rules/billing.md` |\n'
+                         '<!-- context-packs:end sha256:93aaba65c05b -->\n')
+        self.assertEqual(self.sync().returncode, 0)
+
+    def test_doc_set_as_both_a_file_and_a_folder_stops(self):
+        self.publish({'billing.md': '---\nwhen: Billing\n---\nCharge once.\n',
+                      'billing/index.md': '---\nwhen: Billing\n---\nCharge twice.\n'})
+
+        result = self.add()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('billing', result.stderr)
+        self.assertFalse((self.repo / 'AGENTS.md').exists())
+
+
 class PinningTests(SyncCase):
     def setUp(self):
         super().setUp()

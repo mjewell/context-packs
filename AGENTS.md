@@ -88,15 +88,18 @@ Edit only files I own. Plugins, synced skills, and installed dependencies belong
 | Writing commit messages, PR titles or descriptions, or anything else others will read without session context | `docs/agents/packs/agent-config/writing-for-humans/index.md` |
 <!-- context-packs:end sha256:dd64c1561cc5 -->
 
+<!-- context-packs:start project from=. path=docs/agents/project -->
+## project context
+
+| When | Read |
+|---|---|
+| Changing how packs are written, pinned or updated | `docs/agents/project/design.md` |
+<!-- context-packs:end sha256:e16100477110 -->
+
 ## Project
 
 - The CLI is `src/cli.py`, with `src/blocks.py` for the blocks in `AGENTS.md`, `src/packs.py` for packs and their content, and `src/origins.py` for fetching packs from git. It uses only the Python standard library and `git`, and runs on macOS's system `python3` (3.9).
 - `bin/context-packs.js` is the npm package's bin, which npx runs. It only hands its arguments to the Python CLI.
 - `skills/context-packs/` is the skill this repo ships as a Claude Code plugin, alongside `.claude-plugin/plugin.json`.
 - Run the tests with `python3 -m unittest discover tests`.
-
-## Project context
-
-| When | Read |
-|---|---|
-| Changing how packs are written, pinned or updated | `docs/design.md` |
+- This repo's own context docs are in `docs/agents/project/`, which the `project` pack lists. After adding a doc or changing its `when:` line, run `node bin/context-packs.js .` and commit the result.

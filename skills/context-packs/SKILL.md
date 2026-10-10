@@ -21,6 +21,7 @@ Done when the target repo's packs are what the user asked for and synced, and th
    - **Remove a pack:** `remove <name>`.
    - **Take the latest:** `update`, or `update <name>…` for some packs. A pack pinned to a commit moves to the default branch's tip, and one pinned to a release tag to the newest release with the same prefix. `update <name> --ref <tag or commit>` pins one pack somewhere specific.
    - **Change doc sets:** run `list`, then `docs <name> a,b`, passing every optional set the pack should have, installed ones included (`''` for none). In `list`, each pack's line is `name  origin  path @ ref`, followed by `[x] set: when` for an installed optional set, `[ ] set: when` for one that isn't, and `[x] set (required): when` for one every repo gets.
+   - **Add or drop one of the repo's own context docs:** a pack in the repo itself (`from=.` in its marker) installs every doc set in its folder, so add or delete the doc there, give a new one a `when:` line in its front matter, and resync with no command.
    - **Resync without changing anything:** no command.
 5. If `AGENTS.md` exists without context-packs blocks, the tool stops and prints two lines. Paste them after the file's intro and before its project-specific sections, then run the command again.
 6. Report what changed, from the same `git status` as step 3. Leave it uncommitted for the user.

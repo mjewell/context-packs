@@ -54,7 +54,9 @@ Each pack's start marker records where it comes from and where it's pinned:
 
 The sync fetches origins into `~/.cache/context-packs/` using your own git credentials, so private repos work.
 
-A pack can also live in the repo it's synced into: `add <name> . --path <folder>` reads it from the working tree, with no ref.
+A pack can also live in the repo it's synced into: `add <name> . --path <folder>` reads it from the working tree, with no ref. Its table points at the docs where they are instead of copying them, and it installs every doc set it has.
+
+That's the way to keep a repo's own context docs. Put each one in `docs/agents/project/` with a `when:` line, run `add project . --path docs/agents/project` once, and resync after adding a doc or changing its `when:`. The table in `AGENTS.md` stays generated from the docs.
 
 ### Edits stay upstream
 
@@ -62,19 +64,18 @@ Each block ends with a hash covering its text and its docs folder. If either was
 
 ## Write a pack
 
-A pack is a folder holding an `agents.md` and any number of doc sets:
+A pack is a folder holding an optional `agents.md` and any number of doc sets. A doc set is a single `.md` file, or a folder whose `index.md` links to its other files:
 
 ```text
 context/
 ├── agents.md           # rules pasted into the pack's block
-├── testing/
-│   └── index.md        # a doc set's entry point
+├── testing.md          # a doc set in one file
 └── typescript/
-    ├── index.md
+    ├── index.md        # a doc set's entry point
     └── react.md        # other files, linked from index.md
 ```
 
-Each doc set's `index.md` starts with front matter saying when to read it:
+Each doc set's entry point starts with front matter saying when to read it:
 
 ```markdown
 ---
