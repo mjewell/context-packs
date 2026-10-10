@@ -23,7 +23,7 @@ Prefer small PRs. Never commit secrets.
 <!-- context-packs:end sha256:3f2c1aa0b9d4 -->
 ```
 
-Run it with `npx context-packs`. It needs `git`, Node 18+ and Python 3.9+; on macOS, the command line tools provide both `git` and Python.
+Run it with `npx context-packs`, or [let your agent run it](#let-your-agent-run-it). It needs `git`, Node 18+ and Python 3.9+; on macOS, the command line tools provide both `git` and Python.
 
 ## Write a pack
 
@@ -85,6 +85,25 @@ npx context-packs add project . --path docs/agents/project
 
 Its table points at the docs where they are. Resync after adding a doc or changing a `when:` line.
 
+## Let your agent run it
+
+The `context-packs` skill lets you skip the commands: ask Claude Code or Codex in plain words, and it runs them, shows you what changed, and leaves the result uncommitted for you to review. Install it for every project:
+
+```bash
+npx skills add mjewell/context-packs -g
+```
+
+Leave out `-g` to install it into the current project instead.
+
+Then ask things like:
+
+- "Add the context pack in the `context` folder of github.com/acme/agent-rules"
+- "Update our context packs"
+- "Install the typescript docs from team-rules"
+- "Sync our project docs"
+
+In Claude Code, `/context-packs` invokes it directly.
+
 ## Reference
 
 Each command syncs the current folder, or `--dir <folder>`, and prints what changed. The folder can also hold several repos without being one itself, so sessions started there get the rules too.
@@ -102,7 +121,5 @@ Each command syncs the current folder, or `--dir <folder>`, and prints what chan
 **Pinning.** `--ref` takes a tag or a commit, never a branch, since a branch moves. `update` moves a pack pinned to a commit to the tip of the default branch, and one pinned to a release tag (a prefix and dot-separated numbers, such as `v1.2.0` or `acme-v3`) to the newest release with the same prefix, skipping pre-releases. Other tags stay put.
 
 **Edits stay upstream.** Each block ends with a hash of its text and synced docs. If either was edited in the repo, the sync stops and says what to fix: change the pack in its origin, then `update`.
-
-**Claude Code skill.** This repo is also a Claude Code plugin whose `/context-packs` skill runs the commands for you. To install just the skill for Claude Code and Codex: `npx skills add mjewell/context-packs -g -a claude-code -a codex`.
 
 **Contributing.** [design.md](docs/agents/project/design.md) explains the choices behind the format. Run the tests with `python3 -m unittest discover tests`.
