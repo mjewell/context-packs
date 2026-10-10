@@ -5,12 +5,12 @@ description: Sync context packs, which are shared agent rules and docs kept in o
 
 # Context packs
 
-Done when the target repo's packs are what the user asked for and synced, and the user has seen what changed, left uncommitted.
+Done when the target repo's packs are what the user asked for and synced, any workspace above it is updated too, and the user has seen what changed, left uncommitted.
 
 1. Pick the target: the repo the user names, else the root of the repo this session is working in. Ask when neither settles it. The folder above several repos, which isn't a git repo itself, is synced as a workspace: pass `--workspace` before the command.
-2. Find the tool: `bin/context-packs.js` in the repo holding this skill. This skill's folder may be a symlink, so resolve it first:
+2. Run the tool through npx; it needs `git`, Node 18 or later and Python 3.9 or later:
    ```bash
-   node "$(realpath <skill-dir>)/../../bin/context-packs.js" <repo> <command>
+   npx --yes github:mjewell/context-packs <repo> <command>
    ```
 3. Note what's already changed in the target, so the report can tell the sync's changes apart:
    ```bash
@@ -24,4 +24,5 @@ Done when the target repo's packs are what the user asked for and synced, and th
    - **Add or drop one of the repo's own context docs:** a pack in the repo itself (`from=.` in its marker) installs every doc set in its folder, so add or delete the doc there, give a new one a `when:` line in its front matter, and resync with no command.
    - **Resync without changing anything:** no command.
 5. If `AGENTS.md` exists without context-packs blocks, the tool stops and prints two lines. Paste them after the file's intro and before its project-specific sections, then run the command again.
-6. Report what changed, from the same `git status` as step 3. Leave it uncommitted for the user.
+6. After an `update`, check the folder containing the repo. If it isn't a git repo and its `AGENTS.md` has a `<!-- context-packs:start header -->` line, it's a synced workspace: run `update` on it too, with `--workspace` before the command. Workspace sessions read its copy, so it lags otherwise.
+7. Report what changed in the repo, from the same `git status` as step 3, and whether the workspace was updated. Leave it uncommitted for the user.

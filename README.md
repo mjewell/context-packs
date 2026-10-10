@@ -14,7 +14,7 @@ npx github:mjewell/context-packs <repo> <command>
 
 It needs `git`, Node 18 or later, and Python 3.9 or later. On macOS, the Xcode command line tools that provide `git` provide Python too.
 
-This repo is also a Claude Code plugin with a `/context-packs` skill, which runs the commands for you. Add it to a plugin marketplace, or install it from GitHub.
+This repo is also a Claude Code plugin with a `/context-packs` skill, which runs the commands for you. Add it to a plugin marketplace, or install just the skill for Claude Code and Codex with `npx skills add mjewell/context-packs -g -a claude-code -a codex`.
 
 ## Use it
 
