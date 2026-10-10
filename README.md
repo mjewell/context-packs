@@ -9,7 +9,7 @@ A context pack is a folder in a git repo holding rules every agent session shoul
 Run it with npx:
 
 ```bash
-npx github:mjewell/context-packs <command>
+npx context-packs <command>
 ```
 
 It syncs the current folder. Pass `--dir <folder>` before the command to sync another.
@@ -21,7 +21,7 @@ This repo is also a Claude Code plugin with a `/context-packs` skill, which runs
 ## Use it
 
 ```bash
-npx github:mjewell/context-packs add team-rules https://github.com/acme/agent-rules.git --path context
+npx context-packs add team-rules https://github.com/acme/agent-rules.git --path context
 ```
 
 That writes two blocks into `AGENTS.md`: a header block explaining context packs, and one for the pack. It also copies the pack's doc sets into `docs/agents/packs/team-rules/`, and creates `CLAUDE.md` as a symlink to `AGENTS.md`, so Claude Code reads the same file. Commit the result.
