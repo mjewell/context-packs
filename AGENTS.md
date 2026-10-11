@@ -90,13 +90,12 @@ Edit only files I own. Plugins, synced skills, and installed dependencies belong
 | When | Read |
 |---|---|
 | Changing how packs are written, pinned or updated | `docs/agents/project/design.md` |
-| Changing how a repo chooses which of a pack's docs it installs | `docs/agents/project/ideas.md` |
 | Releasing a new version to npm | `docs/agents/project/releasing.md` |
-<!-- context-packs:end sha256:a43b086902dd -->
+<!-- context-packs:end sha256:7038f0690ddc -->
 
 ## Project
 
-- The CLI is `src/cli.py`, with `src/blocks.py` for the blocks in `AGENTS.md`, `src/packs.py` for packs and their content, and `src/origins.py` for fetching packs from git. It uses only the Python standard library and `git`, and runs on macOS's system `python3` (3.9).
+- The CLI is `src/cli.py`, with `src/blocks.py` for the blocks in `AGENTS.md`, `src/packs.py` for where packs come from, `src/tree.py` for a pack's content as a tree of nested packs, and `src/origins.py` for fetching packs from git. It uses only the Python standard library and `git`, and runs on macOS's system `python3` (3.9).
 - `bin/context-packs.js` is the npm package's bin, which npx runs. It only hands its arguments to the Python CLI.
 - `skills/context-packs/` is the skill this repo ships as a Claude Code plugin, alongside `.claude-plugin/plugin.json`.
 - Run the tests with `python3 -m unittest discover tests`.
