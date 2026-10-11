@@ -13,7 +13,7 @@ import sys
 
 import origins
 import report
-from blocks import HEADER, HEADER_RULES, HEADER_START, block, region, snapshot
+from blocks import HEADER, HEADER_RULES, HEADER_START, block, instructions, region, snapshot
 from packs import LOCAL, PACKS, Pack, fetch
 import tree
 
@@ -118,7 +118,8 @@ def main():
     if not repo.is_dir():
         sys.exit(f'context-packs: {repo} is not a folder')
 
-    found = region(repo)
+    file = instructions(repo)
+    found = region(repo, file)
     packs = apply(args, found)
 
     with contextlib.ExitStack() as stack:
@@ -127,12 +128,6 @@ def main():
         if args.command == 'list':
             show(packs, roots)
             return
-
-        claude_md = repo / 'CLAUDE.md'
-        linked = claude_md.is_symlink() and os.readlink(claude_md) == 'AGENTS.md'
-        if not linked and os.path.lexists(claude_md):
-            sys.exit(f'context-packs: {claude_md} must be a symlink to AGENTS.md, so every agent reads the same rules. '
-                     'Move its contents into AGENTS.md, delete it, then sync again.')
 
         installed = {p.name: tree.installs(roots[p.name], p) for p in packs}
 
@@ -151,11 +146,14 @@ def main():
         if (repo / PACKS).is_dir() and not any((repo / PACKS).iterdir()):
             (repo / PACKS).rmdir()
         text = found.text[:found.start] + '\n'.join(blocks.values()) + found.text[found.end:]
-        created = not (repo / 'AGENTS.md').exists()
-        (repo / 'AGENTS.md').write_bytes(text.encode('utf-8'))
-        if not linked:
-            claude_md.symlink_to('AGENTS.md')
-        for line in report.changes(found, packs, blocks, created, linked):
+        created = not file.exists()
+        file.write_bytes(text.encode('utf-8'))
+        # A new AGENTS.md gets CLAUDE.md linked to it, so Claude Code reads it too. A repo that already has its own
+        # instruction files keeps them as they are.
+        link = created and not os.path.lexists(repo / 'CLAUDE.md')
+        if link:
+            (repo / 'CLAUDE.md').symlink_to('AGENTS.md')
+        for line in report.changes(found, packs, blocks, created, link):
             print(line)
 
 

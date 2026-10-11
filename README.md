@@ -34,11 +34,11 @@ Build UI from `@acme/ui` components; don't style raw HTML elements. Every user-f
 [The full example](docs/example.md) shows the packs, the commands, and every file they generate.
 
 - **Mix packs from anywhere.** A pack is a folder in any git repo, and each one gets its own block, pinned and updated on its own. Optional parts of a pack are installed only where a repo asks for them.
-- **Keeps what you already have.** Your own content in `AGENTS.md` stays. The packs go wherever you put them in the file, and the sync never touches the rest.
+- **Keeps what you already have.** Packs sync into the `AGENTS.md` or `CLAUDE.md` you already have, and your own content in it stays. The packs go wherever you put them in the file, and the sync never touches the rest.
 - **Docs load only when they apply.** Long docs stay out of every session. `AGENTS.md` gets a table saying when to read each one.
 - **Committed, so every session sees it.** Packs are copied in, not linked or loaded by a hook, so clones, CI and cloud agent sessions get them too.
 - **Fixed once, at the source.** A pack's owners change it in its repo, and every repo picks up the change with `update` instead of keeping its own copy that drifts.
-- **Any agent.** Anything that reads `AGENTS.md` works, and `CLAUDE.md` is linked to it for Claude Code.
+- **Any agent.** Anything that reads `AGENTS.md` or `CLAUDE.md` works. A repo with neither gets an `AGENTS.md`, with `CLAUDE.md` linked to it for Claude Code.
 
 Run it with `npx context-packs`, or [let your agent run it](#let-your-agent-run-it). It needs `git`, Node 18+ and Python 3.9+; on macOS, the command line tools provide both `git` and Python.
 
@@ -101,9 +101,11 @@ npx context-packs add <name> <git-url> --path <folder>
 - `<git-url>` is the repo holding the pack, as you'd pass it to `git clone`.
 - `<folder>` is the pack's folder in that repo, such as `context`. Leave out `--path` if the pack is the whole repo.
 
-That adds the pack's block to `AGENTS.md`, creating it if needed, and copies the docs into `docs/agents/packs/<name>/`, pinned to the origin's latest commit or to `--ref <tag or commit>`. Commit the result.
+That adds the pack's block to your instruction file, creating `AGENTS.md` if you have none, and copies the docs into `docs/agents/packs/<name>/`, pinned to the origin's latest commit or to `--ref <tag or commit>`. Commit the result.
 
-**Already have an `AGENTS.md`?** Keep it. The first run prints two marker lines. Paste them wherever the packs should go, then run it again. The packs are synced in at that spot, and the rest of the file stays yours: no sync ever changes it. If you have a `CLAUDE.md`, move its contents into `AGENTS.md` and delete it. The sync then links `CLAUDE.md` to `AGENTS.md`, so every agent reads the same file.
+**Already have an `AGENTS.md` or `CLAUDE.md`?** Keep it. The sync writes to the one you have, or to `AGENTS.md` if you have both. The first run prints two marker lines. Paste them wherever the packs should go, then run it again. The packs are synced in at that spot, and the rest of the file stays yours: no sync ever changes it. From then on, the file holding the packs is the one synced.
+
+The sync leaves your other instruction file alone. If you keep a separate `CLAUDE.md` while the packs are in `AGENTS.md`, make sure Claude Code reads them, for example with an `@AGENTS.md` line in `CLAUDE.md`. With neither file, the sync creates `AGENTS.md` and links `CLAUDE.md` to it, so every agent reads the same rules.
 
 Later, `npx context-packs update` moves packs to their latest version, and `npx context-packs` resyncs at the pinned ones. Private repos work, since origins are fetched with your own git credentials.
 
