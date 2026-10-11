@@ -18,8 +18,9 @@ class ReportTests(SyncCase):
         self.assertEqual(result.stdout, f'house-rules: added @ {self.first[:7]}\n')
 
     def test_add_names_the_nested_packs_it_picked(self):
-        self.doc_set('typescript', {'pack.md': '---\nwhen: Editing `**/*.ts`\n---\nType it.\n'})
-        latest = self.doc_set('skills', {'pack.md': '---\nwhen: Editing skills\n---\nKeep skills short.\n'})
+        self.doc_set('typescript', {'pack.md': '---\nwhen: Editing `**/*.ts`\noptional: true\n---\nType it.\n'})
+        latest = self.doc_set('skills',
+                              {'pack.md': '---\nwhen: Editing skills\noptional: true\n---\nKeep skills short.\n'})
 
         result = self.add('--docs', 'typescript,skills')
 
@@ -70,8 +71,8 @@ class ReportTests(SyncCase):
         self.assertEqual(result.stdout, 'Nothing changed: no packs installed\n')
 
     def test_docs_shows_the_picks_before_and_after(self):
-        self.doc_set('typescript', {'pack.md': '---\nwhen: Editing `**/*.ts`\n---\nType it.\n'})
-        self.doc_set('skills', {'pack.md': '---\nwhen: Editing skills\n---\nKeep skills short.\n'})
+        self.doc_set('typescript', {'pack.md': '---\nwhen: Editing `**/*.ts`\noptional: true\n---\nType it.\n'})
+        self.doc_set('skills', {'pack.md': '---\nwhen: Editing skills\noptional: true\n---\nKeep skills short.\n'})
         self.add('--docs', 'skills')
 
         widened = self.sync('docs', 'house-rules', 'skills,typescript')

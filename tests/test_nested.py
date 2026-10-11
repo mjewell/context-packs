@@ -48,7 +48,7 @@ class NestedPackTests(SyncCase):
         self.publish({
             'pack.md': 'Prefer small PRs.\n',
             'testing.md': doc('Writing tests', 'Test behavior.\n'),
-            'frontend/pack.md': doc('Editing `web/**`', 'Keep components small.\n', tier='required'),
+            'frontend/pack.md': doc('Editing `web/**`', 'Keep components small.\n'),
             'frontend/react.md': doc('Writing React components', 'Use function components.\n'),
             'frontend/css/layout.md': doc('Laying out pages', 'Use grid.\n'),
         })
@@ -119,8 +119,8 @@ class NestedPackTests(SyncCase):
         self.assertIn('context/testing.md', result.stderr)
         self.assertIn('tier', result.stderr)
 
-    def test_unknown_tier_stops_the_sync(self):
-        self.publish({'frontend/pack.md': doc('Editing `web/**`', tier='recommended')})
+    def test_optional_other_than_true_stops_the_sync(self):
+        self.publish({'frontend/pack.md': doc('Editing `web/**`', optional='false')})
 
         result = self.add()
 
@@ -149,18 +149,18 @@ class NestedPackTests(SyncCase):
 
 
 class PickTests(SyncCase):
-    """Optional nested packs, which a repo picks with --docs or the docs command."""
+    """Nested packs marked optional: true, which a repo picks with --docs or the docs command."""
 
     def setUp(self):
         super().setUp()
         self.publish({
             'pack.md': 'Prefer small PRs.\n',
             'testing.md': doc('Writing tests', 'Test behavior.\n'),
-            'skills/pack.md': doc('Editing `**/SKILL.md`', 'Keep skills short.\n'),
-            'typescript/pack.md': doc('Editing `**/*.ts`', 'Prefer unions.\n'),
+            'skills/pack.md': doc('Editing `**/SKILL.md`', 'Keep skills short.\n', optional='true'),
+            'typescript/pack.md': doc('Editing `**/*.ts`', 'Prefer unions.\n', optional='true'),
             'typescript/types.md': doc('Declaring types'),
-            'typescript/lint/pack.md': doc('Configuring ESLint', 'Lint in CI.\n', tier='required'),
-            'typescript/react/pack.md': doc('Writing React components', 'Use hooks.\n'),
+            'typescript/lint/pack.md': doc('Configuring ESLint', 'Lint in CI.\n'),
+            'typescript/react/pack.md': doc('Writing React components', 'Use hooks.\n', optional='true'),
         })
         self.synced = self.repo / 'docs' / 'agents' / 'packs' / 'house-rules'
         self.agents_md = self.repo / 'AGENTS.md'
@@ -183,7 +183,7 @@ class PickTests(SyncCase):
         self.assertIn('| Editing `**/SKILL.md` | `docs/agents/packs/house-rules/skills.md` |\n',
                       self.agents_md.read_text())
 
-    def test_picked_pack_brings_its_required_children_but_not_its_optional_ones(self):
+    def test_picked_pack_brings_its_children_but_not_its_optional_ones(self):
         result = self.add('--docs', 'typescript')
 
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -234,17 +234,17 @@ class PickTests(SyncCase):
                          f'house-rules  {self.origin}  context @ {git(self.source, "rev-parse", "HEAD")}\n'
                          '  [x] skills: Editing `**/SKILL.md`\n'
                          '  [x] typescript (needed by typescript/react): Editing `**/*.ts`\n'
-                         '    [x] typescript/lint (required): Configuring ESLint\n'
+                         '    [x] typescript/lint: Configuring ESLint\n'
                          '    [x] typescript/react: Writing React components\n')
 
-    def test_list_leaves_a_required_pack_unmarked_when_its_parent_isnt_installed(self):
+    def test_list_leaves_a_pack_unmarked_when_its_parent_isnt_installed(self):
         self.add()
 
         result = self.sync('list')
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(result.stdout.endswith('  [ ] typescript: Editing `**/*.ts`\n'
-                                               '    [ ] typescript/lint (required): Configuring ESLint\n'
+                                               '    [ ] typescript/lint: Configuring ESLint\n'
                                                '    [ ] typescript/react: Writing React components\n'),
                         result.stdout)
 
@@ -282,9 +282,10 @@ class InlineTests(SyncCase):
         self.publish({
             'pack.md': 'Prefer small PRs.\n',
             'testing.md': doc('Writing tests'),
-            'typescript/pack.md': doc('Working in a TypeScript repo', 'Prefer unions.\n', inline='true'),
+            'typescript/pack.md': doc('Working in a TypeScript repo', 'Prefer unions.\n', optional='true',
+                                      inline='true'),
             'typescript/types.md': doc('Declaring types'),
-            'typescript/react/pack.md': doc('Writing React components', 'Use hooks.\n', tier='required'),
+            'typescript/react/pack.md': doc('Writing React components', 'Use hooks.\n'),
         })
         self.synced = self.repo / 'docs' / 'agents' / 'packs' / 'house-rules'
         self.agents_md = self.repo / 'AGENTS.md'
@@ -315,22 +316,22 @@ class InlineTests(SyncCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn('unions', self.agents_md.read_text())
 
-    def test_required_inline_pack_needs_no_when_line(self):
-        self.publish({'style/pack.md': '---\ntier: required\ninline: true\n---\nUse tabs.\n'})
+    def test_inline_pack_that_isnt_optional_needs_no_when_line(self):
+        self.publish({'style/pack.md': '---\ninline: true\n---\nUse tabs.\n'})
 
         result = self.add()
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('Use tabs.\n', self.agents_md.read_text())
 
-    def test_list_shows_a_required_inline_pack_without_a_when_line(self):
-        self.publish({'style/pack.md': '---\ntier: required\ninline: true\n---\nUse tabs.\n'})
+    def test_list_shows_an_inline_pack_without_a_when_line(self):
+        self.publish({'style/pack.md': '---\ninline: true\n---\nUse tabs.\n'})
         self.add()
 
         result = self.sync('list')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('  [x] style (required)\n', result.stdout)
+        self.assertIn('  [x] style\n', result.stdout)
 
     def test_inline_other_than_true_stops_the_sync(self):
         self.publish({'typescript/pack.md': doc('Working in a TypeScript repo', inline='yes')})
@@ -434,6 +435,22 @@ class LocalNestedPackTests(SyncCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn('docs/agents/packs/project', result.stderr)
         self.assertEqual(self.index.read_text(), 'Edited here.\n')
+
+    def test_local_optional_nested_pack_is_left_out_unless_picked(self):
+        (self.docs / 'deploy' / 'pack.md').write_text(doc('Deploying', 'Ship on green.\n', optional='true'))
+
+        left_out = self.add_project()
+
+        self.assertEqual(left_out.returncode, 0, left_out.stderr)
+        self.assertNotIn('Deploying', (self.repo / 'AGENTS.md').read_text())
+        self.assertFalse(self.index.exists())
+
+        picked = self.sync('docs', 'project', 'deploy')
+
+        self.assertEqual(picked.returncode, 0, picked.stderr)
+        self.assertIn('<!-- context-packs:start project from=. path=docs/agents/project docs=deploy -->\n',
+                      (self.repo / 'AGENTS.md').read_text())
+        self.assertTrue(self.index.exists())
 
     def test_editing_a_local_nested_packs_rules_regenerates_its_index_on_resync(self):
         self.add_project()

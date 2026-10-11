@@ -35,8 +35,6 @@ def apply(args, found):
         if args.origin == LOCAL:
             if args.ref:
                 sys.exit('context-packs: a pack in this repo syncs from its working tree, so it takes no --ref.')
-            if args.docs:
-                sys.exit('context-packs: a pack in this repo installs every nested pack it has, so it takes no --docs.')
             ref = None
         else:
             ref = origins.pin(args.origin, args.ref) if args.ref else origins.tip(args.origin)
@@ -50,9 +48,6 @@ def apply(args, found):
         packs = [p for p in packs if p.name != args.name]
     if args.command == 'docs':
         i = names.index(args.name)
-        if packs[i].local:
-            sys.exit(f'context-packs: the {args.name} pack is in this repo, so it installs every nested pack it has. '
-                     'Delete one to drop it.')
         packs[i] = packs[i]._replace(docs=sets(args.sets))
     if args.command == 'update':
         if args.ref and len(named) != 1:
@@ -87,9 +82,8 @@ def show(packs, roots):
         def lines(node, depth):
             for child in node.children:
                 below = [p for p in pack.docs if p.startswith(f'{child.id}/')]
-                why = (' (required)' if child.required else
-                       f' (needed by {", ".join(below)})' if child.id in installed and child.id not in pack.docs
-                       and not pack.local else '')
+                why = (f' (needed by {", ".join(below)})' if child.optional and child.id in installed
+                       and child.id not in pack.docs else '')
                 when = f': {child.fields["when"]}' if 'when' in child.fields else ''
                 print(f'{"  " * depth}[{"x" if child.id in installed else " "}] {child.id}{why}{when}')
                 lines(child, depth + 1)

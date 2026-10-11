@@ -381,16 +381,6 @@ class LocalPackTests(SyncCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('| Editing billing | `docs/agents/project/billing.md` |\n', self.agents_md.read_text())
 
-    def test_picking_nested_packs_for_a_local_pack_stops(self):
-        self.add_project()
-        before = self.agents_md.read_text()
-
-        result = self.sync('docs', 'project', 'deploy')
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('every nested pack', result.stderr)
-        self.assertEqual(self.agents_md.read_text(), before)
-
 
 class PackShapeTests(SyncCase):
     def test_doc_is_copied_and_listed(self):
@@ -545,7 +535,7 @@ class SeveralPacksTests(SyncCase):
         self.acme_ref = self.publish({
             'pack.md': 'Use acme.\n',
             'deploy.md': '---\nwhen: Deploying\n---\nShip it.\n',
-            'billing/pack.md': '---\nwhen: Editing billing\n---\nCharge once.\n',
+            'billing/pack.md': '---\nwhen: Editing billing\noptional: true\n---\nCharge once.\n',
         }, checkout=self.acme, folder='plugins/x')
         self.agents_md = self.repo / 'AGENTS.md'
 

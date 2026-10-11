@@ -9,7 +9,6 @@ from typing import NamedTuple, Tuple
 from packs import PACKS
 
 FRONT = re.compile(r'---\n(.*?)\n---\n', re.DOTALL)
-TIERS = ('optional', 'required')
 
 
 class Doc(NamedTuple):
@@ -29,8 +28,8 @@ class Node(NamedTuple):
     children: Tuple['Node', ...]
 
     @property
-    def required(self):
-        return self.fields.get('tier') == 'required'
+    def optional(self):
+        return 'optional' in self.fields
 
     @property
     def inline(self):
@@ -53,7 +52,7 @@ def front(text, where, keys):
     unknown = sorted(set(fields) - set(keys))
     if unknown:
         sys.exit(f'context-packs: {where} has front matter context-packs doesn\'t know: {", ".join(unknown)}. '
-                 'A doc takes only `when`, and a pack.md takes `when`, `tier` and `inline`. Remove it, or update '
+                 'A doc takes only `when`, and a pack.md takes `when`, `optional` and `inline`. Remove it, or update '
                  'context-packs if the pack needs a newer version.')
     return fields, text[match.end():] if match else text
 
@@ -68,17 +67,15 @@ def load(folder, pack, id=''):
         sys.exit(f'context-packs: {where("agents.md")} holds rules under the name packs used before 0.2.0. Rename it '
                  'to pack.md in the pack, or run update to move to a version of the pack that has one.')
     pack_md = folder / home / 'pack.md'
-    fields, rules = front(pack_md.read_text(encoding='utf-8'), where(home / 'pack.md'), ('when', 'tier', 'inline')) \
-        if pack_md.is_file() else ({}, '')
-    if fields.get('tier', 'optional') not in TIERS:
-        sys.exit(f'context-packs: {where(home / "pack.md")} has tier: {fields["tier"]}, but a tier is '
-                 f'{" or ".join(TIERS)}.')
-    if fields.get('inline', 'true') != 'true':
-        sys.exit(f'context-packs: {where(home / "pack.md")} has inline: {fields["inline"]}, but inline takes only '
-                 'true. Leave it out for a pack that gets a row.')
-    # A nested pack's when is its row in its parent's table, or what list shows for an optional one, so only a
-    # required inline pack goes without. The installed pack's front matter goes unread.
-    if id and 'when' not in fields and not ('inline' in fields and fields.get('tier') == 'required'):
+    fields, rules = front(pack_md.read_text(encoding='utf-8'), where(home / 'pack.md'),
+                          ('when', 'optional', 'inline')) if pack_md.is_file() else ({}, '')
+    for key, without in (('optional', 'installed whenever its parent is'), ('inline', 'that gets a row')):
+        if fields.get(key, 'true') != 'true':
+            sys.exit(f'context-packs: {where(home / "pack.md")} has {key}: {fields[key]}, but {key} takes only '
+                     f'true. Leave it out for a pack {without}.')
+    # A nested pack's when is its row in its parent's table, or what list shows for an optional one, so only an
+    # inline pack that isn't optional goes without. The installed pack's front matter goes unread.
+    if id and 'when' not in fields and not ('inline' in fields and 'optional' not in fields):
         sys.exit(f'context-packs: {where(home / "pack.md")} must start with front matter saying when to read it, '
                  'since it\'s nested in another pack:\n\n---\nwhen: Editing `web/**`\n---')
     # The end marker has to start its own line, or the next sync can't find the block.
@@ -113,21 +110,19 @@ def load(folder, pack, id=''):
 
 
 def installs(root, pack):
-    """The ids of the packs nested in root that a sync installs: every one for a pack in the synced repo, else each
-    one picked or above a picked one, and each required one whose parent is installed."""
+    """The ids of the packs nested in root that a sync installs: each one picked or above a picked one, and each
+    one not optional whose parent is installed."""
     nested = {n.id for n in root.nested()}
     unknown = sorted(set(pack.docs) - nested)
     if unknown:
         sys.exit(f'context-packs: {pack.name} has no nested pack named {", ".join(unknown)}. '
                  f'Its nested packs: {", ".join(sorted(nested)) or "none"}. Choose from those with --docs.')
-    if pack.local:
-        return nested
     parts = [pick.split('/') for pick in pack.docs]
     wanted = {'/'.join(p[:i]) for p in parts for i in range(1, len(p) + 1)}
 
     def visit(node):
         for child in node.children:
-            if child.required or child.id in wanted:
+            if not child.optional or child.id in wanted:
                 yield child.id
                 yield from visit(child)
     return set(visit(root))

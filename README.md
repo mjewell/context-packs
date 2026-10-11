@@ -54,12 +54,13 @@ A nested pack gets a row too, from the `when` in its `pack.md`, pointing at a ge
 
 A nested pack's `pack.md` takes two more fields:
 
-- `tier: required` installs it whenever its parent is installed. Without it, the nested pack is optional, and each repo picks it with `--docs`.
-- `inline: true` pastes its rules and table after its parent's instead of giving it a row, for rules that apply whenever a repo has the nested pack, like a language's. A required inline pack needs no `when`.
+- `optional: true` leaves it out unless a repo picks it with `--docs`. Without it, the nested pack is installed whenever its parent is.
+- `inline: true` pastes its rules and table after its parent's instead of giving it a row, for rules that apply whenever a repo has the nested pack, like a language's. An inline pack that isn't optional needs no `when`.
 
 ```markdown
 ---
 when: Working in a TypeScript repo
+optional: true
 inline: true
 ---
 Prefer unions to enums.
