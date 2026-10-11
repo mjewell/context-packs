@@ -82,8 +82,8 @@ def show(packs, roots):
                 why = (' (required)' if child.required else
                        f' (needed by {", ".join(below)})' if child.id in installed and child.id not in pack.docs
                        and not pack.local else '')
-                print(f'{"  " * depth}[{"x" if child.id in installed else " "}] {child.id}{why}: '
-                      f'{child.fields["when"]}')
+                when = f': {child.fields["when"]}' if 'when' in child.fields else ''
+                print(f'{"  " * depth}[{"x" if child.id in installed else " "}] {child.id}{why}{when}')
                 lines(child, depth + 1)
         lines(roots[pack.name], 1)
 

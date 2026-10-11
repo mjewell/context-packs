@@ -274,6 +274,74 @@ class PickTests(SyncCase):
         self.assertIn('testing', result.stderr)
 
 
+class InlineTests(SyncCase):
+    """A nested pack with inline: true, whose rules and table follow its parent's instead of taking a row."""
+
+    def setUp(self):
+        super().setUp()
+        self.publish({
+            'pack.md': 'Prefer small PRs.\n',
+            'testing.md': doc('Writing tests'),
+            'typescript/pack.md': doc('Working in a TypeScript repo', 'Prefer unions.\n', inline='true'),
+            'typescript/types.md': doc('Declaring types'),
+            'typescript/react/pack.md': doc('Writing React components', 'Use hooks.\n', tier='required'),
+        })
+        self.synced = self.repo / 'docs' / 'agents' / 'packs' / 'house-rules'
+        self.agents_md = self.repo / 'AGENTS.md'
+
+    def test_picked_inline_pack_follows_its_parent_in_the_block(self):
+        result = self.add('--docs', 'typescript')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(self.start().replace(' -->', ' docs=typescript -->') + 'Prefer small PRs.\n\n'
+                      '## house-rules context\n\n| When | Read |\n|---|---|\n'
+                      '| Writing tests | `docs/agents/packs/house-rules/testing.md` |\n\n'
+                      'Prefer unions.\n\n## house-rules/typescript context\n\n| When | Read |\n|---|---|\n'
+                      '| Writing React components | `docs/agents/packs/house-rules/typescript/react.md` |\n'
+                      '| Declaring types | `docs/agents/packs/house-rules/typescript/types.md` |\n'
+                      '<!-- context-packs:end',
+                      self.agents_md.read_text())
+
+    def test_inline_pack_gets_no_index_of_its_own(self):
+        result = self.add('--docs', 'typescript')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(sorted(p.relative_to(self.synced).as_posix() for p in self.synced.rglob('*') if p.is_file()),
+                         ['testing.md', 'typescript/react.md', 'typescript/types.md'])
+
+    def test_inline_pack_left_unpicked_adds_nothing(self):
+        result = self.add()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn('unions', self.agents_md.read_text())
+
+    def test_required_inline_pack_needs_no_when_line(self):
+        self.publish({'style/pack.md': '---\ntier: required\ninline: true\n---\nUse tabs.\n'})
+
+        result = self.add()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('Use tabs.\n', self.agents_md.read_text())
+
+    def test_list_shows_a_required_inline_pack_without_a_when_line(self):
+        self.publish({'style/pack.md': '---\ntier: required\ninline: true\n---\nUse tabs.\n'})
+        self.add()
+
+        result = self.sync('list')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('  [x] style (required)\n', result.stdout)
+
+    def test_inline_other_than_true_stops_the_sync(self):
+        self.publish({'typescript/pack.md': doc('Working in a TypeScript repo', inline='yes')})
+
+        result = self.add()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('context/typescript/pack.md', result.stderr)
+        self.assertIn('inline', result.stderr)
+
+
 class LocalNestedPackTests(SyncCase):
     """A nested pack in a pack in the synced repo: its docs stay where they are, and only its index is generated."""
 
