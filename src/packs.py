@@ -70,8 +70,12 @@ class Source(NamedTuple):
         match = FRONT.match((self.folder / self.entry(name)).read_text(encoding='utf-8'))
         pairs = [line.split(': ', 1) for line in match.group(1).split('\n')] if match else []
         fields = dict(p for p in pairs if len(p) == 2)
+        where = (Path(self.pack.path) / self.entry(name)).as_posix()
+        unknown = sorted(set(fields) - {'when', 'tier'})
+        if unknown:
+            sys.exit(f'context-packs: {where} in {self.pack.origin} has front matter context-packs doesn\'t know: '
+                     f'{", ".join(unknown)}. Remove it, or update context-packs if the pack needs a newer version.')
         if len(fields) != len(pairs) or 'when' not in fields or fields.get('tier', 'optional') not in TIERS:
-            where = (Path(self.pack.path) / self.entry(name)).as_posix()
             sys.exit(f'context-packs: {where} in {self.pack.origin} must start with front matter saying when to '
                      'read it, plus `tier: required` if every repo gets it:\n\n---\nwhen: Editing `**/*.ts`\n---')
         return fields

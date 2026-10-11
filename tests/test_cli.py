@@ -406,6 +406,16 @@ class PackShapeTests(SyncCase):
                          '<!-- context-packs:end sha256:93aaba65c05b -->\n')
         self.assertEqual(self.sync().returncode, 0)
 
+    def test_front_matter_key_the_tool_doesnt_know_stops_the_sync(self):
+        self.publish({'billing.md': '---\nwhen: Billing\nowner: payments\n---\nCharge once.\n'})
+
+        result = self.add()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('context/billing.md', result.stderr)
+        self.assertIn('owner', result.stderr)
+        self.assertFalse((self.repo / 'AGENTS.md').exists())
+
     def test_doc_set_as_both_a_file_and_a_folder_stops(self):
         self.publish({'billing.md': '---\nwhen: Billing\n---\nCharge once.\n',
                       'billing/index.md': '---\nwhen: Billing\n---\nCharge twice.\n'})
