@@ -146,7 +146,7 @@ def main():
             if generated.exists():
                 shutil.rmtree(generated)
             tree.write(root, pack, installed[pack.name], folders[pack.name], repo)
-            blocks[pack.name] = block(pack.start(), tree.render(root, pack, installed[pack.name]),
+            blocks[pack.name] = block(pack.start(), tree.body(root, pack, installed[pack.name]),
                                       snapshot(generated))
         if (repo / PACKS).is_dir() and not any((repo / PACKS).iterdir()):
             (repo / PACKS).rmdir()

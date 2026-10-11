@@ -66,7 +66,7 @@ inline: true
 Prefer unions to enums.
 ```
 
-Any folder with a `pack.md` can also be installed on its own, as its own pack. Its front matter is ignored then, since it describes the folder as nested.
+Any folder with a `pack.md` can also be installed on its own, as its own pack, and it renders the way it would inside its parent. If its `pack.md` has a `when` and isn't inline, its block in `AGENTS.md` is a one-row table pointing at a generated index of its rules, so installing just `typescript` still loads its rules only when a row matches. Without a `when`, or with `inline: true`, its rules are pasted into the block. `optional` doesn't apply, since installing it is the pick.
 
 Keep `pack.md` short, since every session loads it.
 

@@ -35,6 +35,13 @@ class Node(NamedTuple):
     def inline(self):
         return 'inline' in self.fields
 
+    @property
+    def row(self):
+        """Whether the pack gets a row pointing at its index, rather than having its rules and table pasted into its
+        parent's, or into the block for the installed pack. Its parent is wherever it's installed, so a pack renders
+        the same installed on its own as inside another."""
+        return 'when' in self.fields and not self.inline
+
     def nested(self):
         """Every pack nested in this one, at any depth, parents before their children."""
         for child in self.children:
@@ -74,7 +81,7 @@ def load(folder, pack, id=''):
             sys.exit(f'context-packs: {where(home / "pack.md")} has {key}: {fields[key]}, but {key} takes only '
                      f'true. Leave it out for a pack {without}.')
     # A nested pack's when is its row in its parent's table, or what list shows for an optional one, so only an
-    # inline pack that isn't optional goes without. The installed pack's front matter goes unread.
+    # inline pack that isn't optional goes without. The installed pack needs none: without one, it's pasted in.
     if id and 'when' not in fields and not ('inline' in fields and 'optional' not in fields):
         sys.exit(f'context-packs: {where(home / "pack.md")} must start with front matter saying when to read it, '
                  'since it\'s nested in another pack:\n\n---\nwhen: Editing `web/**`\n---')
@@ -129,32 +136,41 @@ def installs(root, pack):
 
 
 def index(node, pack):
-    """Where a nested pack's generated index sits."""
-    return PACKS / pack.name / f'{node.id}.md'
+    """Where a pack's generated index sits: pack.md for the installed pack, since no doc can have that name."""
+    return PACKS / pack.name / f'{node.id or "pack"}.md'
+
+
+def table(title, rows):
+    """A table of (when, path) rows under its heading, or nothing without rows."""
+    return (f'## {title} context\n\n| When | Read |\n|---|---|\n'
+            + ''.join(f'| {when} | `{path.as_posix()}` |\n' for when, path in rows)) if rows else ''
 
 
 def render(node, pack, installed):
-    """The node's rules, then its table: a row for each of its docs and for each installed pack nested in it, except
-    the inline ones, which are rendered the same way after it."""
+    """The node's rules, then its table: a row for each of its docs and for each installed pack nested in it that
+    gets one. The others are rendered the same way after it."""
     children = [c for c in node.children if c.id in installed]
     rows = sorted([(d.path[:-len('.md')], d.when, pack.synced / d.path) for d in node.docs]
-                  + [(c.id, c.fields['when'], index(c, pack)) for c in children if not c.inline])
+                  + [(c.id, c.fields['when'], index(c, pack)) for c in children if c.row])
     title = f'{pack.name}/{node.id}' if node.id else pack.name
-    table = (f'## {title} context\n\n| When | Read |\n|---|---|\n'
-             + ''.join(f'| {when} | `{path.as_posix()}` |\n' for _, when, path in rows)) if rows else ''
-    inlined = [render(c, pack, installed) for c in children if c.inline]
-    return '\n'.join(part for part in (node.rules, table, *inlined) if part)
+    pasted = [render(c, pack, installed) for c in children if not c.row]
+    return '\n'.join(part for part in (node.rules, table(title, [r[1:] for r in rows]), *pasted) if part)
+
+
+def body(root, pack, installed):
+    """The installed pack's block: a row pointing at its index if it gets one, else its rules and table."""
+    return table(pack.name, [(root.fields['when'], index(root, pack))]) if root.row else render(root, pack, installed)
 
 
 def write(root, pack, installed, source, repo):
     """Copy the installed packs' files from source into repo, unless the pack is in repo already, and write the
-    index of each installed nested pack that isn't inline."""
+    index of each installed pack that gets a row."""
     for node in [root] + [n for n in root.nested() if n.id in installed]:
         copies = [] if pack.local else [(source / path, repo / pack.synced / path) for path in node.files]
         for origin, target in copies:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(origin, target)
-        if node.id and not node.inline:
+        if node.row:
             target = repo / index(node, pack)
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(render(node, pack, installed), encoding='utf-8')

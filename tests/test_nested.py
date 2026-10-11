@@ -378,13 +378,6 @@ class OverlapTests(SyncCase):
         self.assertIn('house-rules', result.stderr)
         self.assertEqual(self.agents_md.read_text(), before)
 
-    def test_folder_installed_on_its_own_gets_its_rules_in_its_block(self):
-        result = self.add_typescript()
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(' path=context/typescript ref=', self.agents_md.read_text())
-        self.assertIn(' -->\nPrefer unions.\n<!-- context-packs:end', self.agents_md.read_text())
-
     def test_same_folder_from_another_origin_doesnt_overlap(self):
         other_origin, other = self.remote('other-rules')
         self.publish({'typescript/pack.md': doc('Editing `**/*.ts`', 'Use strict mode.\n')}, checkout=other)
@@ -393,6 +386,55 @@ class OverlapTests(SyncCase):
         result = self.add_typescript(other_origin)
 
         self.assertEqual(result.returncode, 0, result.stderr)
+
+
+class InstallPointTests(SyncCase):
+    """A folder with a pack.md installed on its own, which renders the way it would inside its parent."""
+
+    def setUp(self):
+        super().setUp()
+        self.publish({
+            'pack.md': 'Prefer small PRs.\n',
+            'typescript/pack.md': doc('Editing `**/*.ts`', 'Prefer unions.\n', optional='true'),
+            'typescript/types.md': doc('Declaring types'),
+            'style/pack.md': '---\ninline: true\n---\nUse tabs.\n',
+        })
+        self.agents_md = self.repo / 'AGENTS.md'
+        self.synced = self.repo / 'docs' / 'agents' / 'packs' / 'typescript'
+
+    def add_folder(self, name):
+        return self.sync('add', name, str(self.origin), '--path', f'context/{name}')
+
+    def test_pack_with_a_when_line_gets_a_row_in_its_block(self):
+        result = self.add_folder('typescript')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(' -->\n## typescript context\n\n| When | Read |\n|---|---|\n'
+                      '| Editing `**/*.ts` | `docs/agents/packs/typescript/pack.md` |\n<!-- context-packs:end',
+                      self.agents_md.read_text())
+
+    def test_pack_with_a_when_line_gets_an_index_of_its_rules_and_table(self):
+        result = self.add_folder('typescript')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.synced / 'pack.md').read_text(),
+                         'Prefer unions.\n\n## typescript context\n\n| When | Read |\n|---|---|\n'
+                         '| Declaring types | `docs/agents/packs/typescript/types.md` |\n')
+
+    def test_inline_pack_gets_its_rules_in_its_block(self):
+        result = self.add_folder('style')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(' -->\nUse tabs.\n<!-- context-packs:end', self.agents_md.read_text())
+
+    def test_nested_pack_named_pack_beside_a_root_index_stops_the_sync(self):
+        self.publish({'typescript/pack/pack.md': doc('Packaging')})
+
+        result = self.add_folder('typescript')
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('context/typescript/pack', result.stderr)
+        self.assertFalse(self.agents_md.exists())
 
 
 class LocalNestedPackTests(SyncCase):
