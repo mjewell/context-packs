@@ -12,10 +12,11 @@ CLI = ROOT / 'src' / 'cli.py'
 HEADER = ('<!-- context-packs:start header -->\n'
           '## Context Packs\n\n'
           'Context packs bring shared rules and docs in from elsewhere. Each pack has a block in this file holding its '
-          "rules and a table of its context docs. Before starting work that a row in a pack's table matches, read its "
-          "doc. A pack's block, and any of its docs under `docs/agents/packs/`, are copied from the `from` and `path` "
-          "in the block's start marker: change them there, never here.\n"
-          '<!-- context-packs:end sha256:135a93783b06 -->\n')
+          "rules and a table of its context docs, and a doc may hold a table of its own. Before starting work that a "
+          "row in any of these tables matches, read its doc. A pack's block, and everything under "
+          "`docs/agents/packs/`, are generated from the `from` and `path` in the block's start marker: change them "
+          "there, never here.\n"
+          '<!-- context-packs:end sha256:9ca6e3aa65e7 -->\n')
 EMPTY_HEADER = '<!-- context-packs:start header -->\n<!-- context-packs:end sha256:e3b0c44298fc -->\n'
 EMPTY_END = '<!-- context-packs:end sha256:e3b0c44298fc -->\n'
 END = '<!-- context-packs:end sha256:d3e10247057e -->\n'
