@@ -17,10 +17,9 @@ def sets(names):
     return ', '.join(names) or 'none'
 
 
-def changes(found, after, chosen, blocks, created, linked):
+def changes(found, after, blocks, created, linked):
     """Lines describing what the sync did: whether it created AGENTS.md or found CLAUDE.md already linked to it, and
-    how the packs found in AGENTS.md became the packs after it, with chosen holding the doc sets each pack installs
-    and blocks the text the sync wrote for each."""
+    how the packs found in AGENTS.md became the packs after it, with blocks the text the sync wrote for each."""
     before = found.packs
     old = {p.name: p for p in before}
     new = {p.name for p in after}
@@ -29,12 +28,11 @@ def changes(found, after, chosen, blocks, created, linked):
     for pack in after:
         was = old.get(pack.name)
         if not was:
-            docs = chosen[pack.name]
-            lines.append(f'{pack.name}: added{at(pack)}' + f' (docs: {sets(docs)})' * bool(docs))
+            lines.append(f'{pack.name}: added{at(pack)}' + f' (docs: {sets(pack.docs)})' * bool(pack.docs))
         elif was.ref != pack.ref:
             lines.append(f'{pack.name}: {short(was.ref)} → {short(pack.ref)}')
         elif was.docs != pack.docs:
-            lines.append(f'{pack.name}: doc sets {sets(was.docs)} → {sets(pack.docs)}')
+            lines.append(f'{pack.name}: nested packs {sets(was.docs)} → {sets(pack.docs)}')
         elif found.blocks[pack.name] != blocks[pack.name]:
             lines.append(f'{pack.name}: changed')
     lines += [f'{p.name}: removed' for p in before if p.name not in new]

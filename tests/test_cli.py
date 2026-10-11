@@ -75,7 +75,7 @@ class SyncCase(unittest.TestCase):
         return f'<!-- context-packs:start house-rules from={self.origin} path=context ref={ref} -->\n'
 
     def rules(self, ref=None):
-        """AGENTS.md as a sync writes it from the pack's rules 'Prefer small PRs.', with no doc sets."""
+        """AGENTS.md as a sync writes it from the pack's rules 'Prefer small PRs.', with no docs."""
         return HEADER + '\n' + self.start(ref) + 'Prefer small PRs.\n' + END
 
     def sync(self, *args, cwd=None):
@@ -317,7 +317,7 @@ class AddRemoveTests(SyncCase):
                          '<!-- context-packs:end sha256:8deb5dab0c1e -->\n')
 
     def test_remove_drops_the_packs_block_and_docs(self):
-        self.doc_set('testing', {'index.md': '---\nwhen: Writing tests\ntier: required\n---\nTest behavior.\n'})
+        self.publish({'testing.md': '---\nwhen: Writing tests\n---\nTest behavior.\n'})
         self.add()
 
         result = self.sync('remove', 'house-rules')
@@ -349,7 +349,7 @@ class LocalPackTests(SyncCase):
     def add_project(self):
         return self.sync('add', 'project', '.', '--path', 'docs/agents/project')
 
-    def test_local_pack_lists_every_doc_set_where_it_is(self):
+    def test_local_pack_lists_every_doc_where_it_is(self):
         result = self.add_project()
 
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -380,30 +380,30 @@ class LocalPackTests(SyncCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('| Editing billing | `docs/agents/project/billing.md` |\n', self.agents_md.read_text())
 
-    def test_choosing_doc_sets_for_a_local_pack_stops(self):
+    def test_picking_nested_packs_for_a_local_pack_stops(self):
         self.add_project()
         before = self.agents_md.read_text()
 
         result = self.sync('docs', 'project', 'deploy')
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn('every doc set', result.stderr)
+        self.assertIn('every nested pack', result.stderr)
         self.assertEqual(self.agents_md.read_text(), before)
 
 
 class PackShapeTests(SyncCase):
-    def test_single_file_doc_set_is_copied_and_listed(self):
-        self.publish({'billing.md': '---\nwhen: Billing\ntier: required\n---\nCharge once.\n'})
+    def test_doc_is_copied_and_listed(self):
+        self.publish({'billing.md': '---\nwhen: Billing\n---\nCharge once.\n'})
 
         result = self.add()
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.repo / 'docs' / 'agents' / 'packs' / 'house-rules' / 'billing.md').read_text(),
-                         '---\nwhen: Billing\ntier: required\n---\nCharge once.\n')
+                         '---\nwhen: Billing\n---\nCharge once.\n')
         self.assertEqual((self.repo / 'AGENTS.md').read_text(),
                          HEADER + '\n' + self.start() + '## house-rules context\n\n| When | Read |\n|---|---|\n'
                          '| Billing | `docs/agents/packs/house-rules/billing.md` |\n'
-                         '<!-- context-packs:end sha256:93aaba65c05b -->\n')
+                         '<!-- context-packs:end sha256:47388956ddb5 -->\n')
         self.assertEqual(self.sync().returncode, 0)
 
     def test_front_matter_key_the_tool_doesnt_know_stops_the_sync(self):
@@ -414,16 +414,6 @@ class PackShapeTests(SyncCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn('context/billing.md', result.stderr)
         self.assertIn('owner', result.stderr)
-        self.assertFalse((self.repo / 'AGENTS.md').exists())
-
-    def test_doc_set_as_both_a_file_and_a_folder_stops(self):
-        self.publish({'billing.md': '---\nwhen: Billing\n---\nCharge once.\n',
-                      'billing/index.md': '---\nwhen: Billing\n---\nCharge twice.\n'})
-
-        result = self.add()
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('billing', result.stderr)
         self.assertFalse((self.repo / 'AGENTS.md').exists())
 
     def test_rules_in_agents_md_stop_the_sync_and_say_to_rename_it(self):
@@ -553,8 +543,8 @@ class SeveralPacksTests(SyncCase):
         self.acme_origin, self.acme = self.remote('acme')
         self.acme_ref = self.publish({
             'pack.md': 'Use acme.\n',
-            'deploy/index.md': '---\nwhen: Deploying\ntier: required\n---\nShip it.\n',
-            'billing/index.md': '---\nwhen: Editing billing\n---\nCharge once.\n',
+            'deploy.md': '---\nwhen: Deploying\n---\nShip it.\n',
+            'billing/pack.md': '---\nwhen: Editing billing\n---\nCharge once.\n',
         }, checkout=self.acme, folder='plugins/x')
         self.agents_md = self.repo / 'AGENTS.md'
 
@@ -570,10 +560,10 @@ class SeveralPacksTests(SyncCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.agents_md.read_text(),
                          self.rules() + '\n' + self.acme_start(self.acme_ref) + 'Use acme.\n\n## acme context\n\n'
-                         '| When | Read |\n|---|---|\n| Deploying | `docs/agents/packs/acme/deploy/index.md` |\n'
-                         '<!-- context-packs:end sha256:10e161169c08 -->\n')
-        self.assertEqual((self.repo / 'docs' / 'agents' / 'packs' / 'acme' / 'deploy' / 'index.md').read_text(),
-                         '---\nwhen: Deploying\ntier: required\n---\nShip it.\n')
+                         '| When | Read |\n|---|---|\n| Deploying | `docs/agents/packs/acme/deploy.md` |\n'
+                         '<!-- context-packs:end sha256:7f810f66be5d -->\n')
+        self.assertEqual((self.repo / 'docs' / 'agents' / 'packs' / 'acme' / 'deploy.md').read_text(),
+                         '---\nwhen: Deploying\n---\nShip it.\n')
 
     def test_update_moves_every_pinned_pack(self):
         self.add_acme()
@@ -599,17 +589,17 @@ class SeveralPacksTests(SyncCase):
         self.assertIn(self.rules(git(self.source, 'rev-parse', 'HEAD~1')), text)
         self.assertIn(self.acme_start(acme_latest), text)
 
-    def test_choosing_doc_sets_changes_only_the_named_pack(self):
+    def test_picking_nested_packs_changes_only_the_named_pack(self):
         self.add_acme()
 
         result = self.sync('docs', 'acme', 'billing')
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(sorted(p.name for p in (self.repo / 'docs' / 'agents' / 'packs' / 'acme').iterdir()),
-                         ['billing', 'deploy'])
+                         ['billing.md', 'deploy.md'])
         self.assertTrue(self.agents_md.read_text().startswith(self.rules()))
 
-    def test_list_shows_every_pack_and_its_doc_sets(self):
+    def test_list_shows_every_pack_and_its_nested_packs(self):
         self.add_acme('--docs', 'billing')
 
         result = self.sync('list')
@@ -618,174 +608,7 @@ class SeveralPacksTests(SyncCase):
         self.assertEqual(result.stdout,
                          f'house-rules  {self.origin}  context @ {git(self.source, "rev-parse", "HEAD")}\n'
                          f'acme  {self.acme_origin}  plugins/x @ {self.acme_ref}\n'
-                         '  [x] billing: Editing billing\n'
-                         '  [x] deploy (required): Deploying\n')
-
-
-class DocSetTests(SyncCase):
-    def setUp(self):
-        super().setUp()
-        self.share('Prefer small PRs.\n')
-        self.doc_set('typescript', {
-            'index.md': '---\nwhen: Editing `**/*.ts`\n---\nSee react.md for components.\n',
-            'react.md': 'Use function components.\n',
-        })
-        self.doc_set('skills', {'index.md': '---\nwhen: Editing `**/SKILL.md`\n---\nKeep skills short.\n'})
-        self.synced = self.repo / 'docs' / 'agents' / 'packs' / 'house-rules'
-
-    def test_chosen_doc_sets_are_copied_in_and_listed_in_the_block(self):
-        result = self.add('--docs', 'typescript,skills')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual((self.synced / 'typescript' / 'react.md').read_text(), 'Use function components.\n')
-        self.assertEqual((self.synced / 'skills' / 'index.md').read_text(),
-                         '---\nwhen: Editing `**/SKILL.md`\n---\nKeep skills short.\n')
-        self.assertIn('Prefer small PRs.\n\n## house-rules context\n\n| When | Read |\n|---|---|\n'
-                      '| Editing `**/SKILL.md` | `docs/agents/packs/house-rules/skills/index.md` |\n'
-                      '| Editing `**/*.ts` | `docs/agents/packs/house-rules/typescript/index.md` |\n'
-                      '<!-- context-packs:end',
-                      (self.repo / 'AGENTS.md').read_text())
-
-    def test_chosen_doc_sets_are_recorded_in_the_start_marker(self):
-        result = self.add('--docs', 'typescript,skills')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(self.start().replace(' -->', ' docs=skills,typescript -->'),
-                      (self.repo / 'AGENTS.md').read_text())
-
-    def test_update_keeps_the_installed_doc_sets_and_updates_them(self):
-        self.add('--docs', 'skills')
-        self.doc_set('skills', {'index.md': '---\nwhen: Editing `**/SKILL.md`\n---\nKeep skills shorter.\n'})
-
-        result = self.sync('update')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(sorted(p.name for p in self.synced.iterdir()), ['skills'])
-        self.assertIn('Keep skills shorter.', (self.synced / 'skills' / 'index.md').read_text())
-
-    def test_doc_sets_left_out_of_the_choice_are_removed(self):
-        self.add('--docs', 'typescript,skills')
-
-        result = self.sync('docs', 'house-rules', 'skills')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(sorted(p.name for p in self.synced.iterdir()), ['skills'])
-        self.assertNotIn('typescript', (self.repo / 'AGENTS.md').read_text())
-
-    def test_choosing_no_doc_sets_removes_the_table_and_the_folder(self):
-        self.add('--docs', 'skills')
-
-        result = self.sync('docs', 'house-rules', '')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertFalse((self.repo / 'docs' / 'agents' / 'packs').exists())
-        self.assertEqual((self.repo / 'AGENTS.md').read_text(), self.rules())
-
-    def test_synced_doc_edited_in_the_repo_stops_the_sync_untouched(self):
-        self.add('--docs', 'skills')
-        doc = self.synced / 'skills' / 'index.md'
-        doc.write_text('Edited here.\n')
-        before = (self.repo / 'AGENTS.md').read_text()
-
-        result = self.sync()
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('docs/agents/packs/house-rules', result.stderr)
-        self.assertEqual(doc.read_text(), 'Edited here.\n')
-        self.assertEqual((self.repo / 'AGENTS.md').read_text(), before)
-
-    def test_unknown_doc_set_stops_the_sync_and_names_the_available_ones(self):
-        result = self.add('--docs', 'python')
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('python', result.stderr)
-        self.assertIn('skills, typescript', result.stderr)
-        self.assertFalse((self.repo / 'AGENTS.md').exists())
-
-    def test_installed_doc_set_gone_from_the_pack_stops_the_update(self):
-        self.add('--docs', 'skills')
-        self.publish({'skills': None})
-
-        result = self.sync('update')
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('skills', result.stderr)
-        self.assertTrue((self.synced / 'skills' / 'index.md').exists())
-
-    def test_doc_set_without_a_when_line_stops_the_sync(self):
-        self.doc_set('python', {'index.md': 'Use uv.\n'})
-
-        result = self.add('--docs', 'python')
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('context/python/index.md', result.stderr)
-
-    def test_stray_file_in_the_synced_folder_stops_the_sync_and_names_it(self):
-        self.add('--docs', 'skills')
-        (self.synced / '.DS_Store').write_text('')
-
-        result = self.sync()
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('a doc in docs/agents/packs/house-rules was edited', result.stderr)
-        self.assertTrue((self.synced / '.DS_Store').exists())
-
-    def test_list_shows_every_doc_set_and_marks_the_installed_ones(self):
-        self.add('--docs', 'skills')
-        before = (self.repo / 'AGENTS.md').read_text()
-
-        result = self.sync('list')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout,
-                         f'house-rules  {self.origin}  context @ {git(self.source, "rev-parse", "HEAD")}\n'
-                         '  [x] skills: Editing `**/SKILL.md`\n'
-                         '  [ ] typescript: Editing `**/*.ts`\n')
-        self.assertEqual((self.repo / 'AGENTS.md').read_text(), before)
-
-
-class RequiredDocSetTests(SyncCase):
-    def setUp(self):
-        super().setUp()
-        self.share('Prefer small PRs.\n')
-        self.doc_set('testing', {'index.md': '---\nwhen: Writing tests\ntier: required\n---\nTest behavior.\n'})
-        self.doc_set('typescript', {'index.md': '---\nwhen: Editing `**/*.ts`\n---\nUse unions.\n'})
-        self.synced = self.repo / 'docs' / 'agents' / 'packs' / 'house-rules'
-
-    def test_required_sets_are_installed_and_listed_without_being_chosen(self):
-        result = self.add()
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual((self.synced / 'testing' / 'index.md').read_text(),
-                         '---\nwhen: Writing tests\ntier: required\n---\nTest behavior.\n')
-        self.assertIn('| Writing tests | `docs/agents/packs/house-rules/testing/index.md` |\n',
-                      (self.repo / 'AGENTS.md').read_text())
-
-    def test_required_sets_stay_when_no_doc_sets_are_chosen(self):
-        self.add('--docs', 'typescript')
-
-        result = self.sync('docs', 'house-rules', '')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(sorted(p.name for p in self.synced.iterdir()), ['testing'])
-
-    def test_list_marks_the_required_sets(self):
-        self.add()
-
-        result = self.sync('list')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue(result.stdout.endswith('  [x] testing (required): Writing tests\n'
-                                               '  [ ] typescript: Editing `**/*.ts`\n'), result.stdout)
-
-    def test_unknown_tier_stops_the_sync(self):
-        self.doc_set('python', {'index.md': '---\nwhen: Editing `**/*.py`\ntier: recommended\n---\n'})
-
-        result = self.add()
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('context/python/index.md', result.stderr)
-        self.assertFalse((self.repo / 'AGENTS.md').exists())
+                         '  [x] billing: Editing billing\n')
 
 
 if __name__ == '__main__':

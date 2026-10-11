@@ -1,4 +1,4 @@
-"""The context-packs blocks in AGENTS.md, and the doc sets each pack installed beside them."""
+"""The context-packs blocks in AGENTS.md, and the files each pack wrote beside them."""
 import hashlib
 import re
 import sys
@@ -51,7 +51,7 @@ def marked_pack(agents_md, name, marker):
             or (origin == LOCAL) == ('ref' in fields) or (origin == LOCAL and 'docs' in fields)):
         sys.exit(f'context-packs: {agents_md}: the {name} block\'s start marker needs from=<git URL> and '
                  'ref=<tag or commit>, or from=. for a pack in this repo, plus path=<folder> unless the pack is the '
-                 'whole repo, and docs=<doc sets> for the optional ones a pack from another repo installs. '
+                 'whole repo, and docs=<nested packs> for the optional ones picked from a pack in another repo. '
                  'Fix the marker, then sync again.')
     docs = tuple(fields['docs'].split(',')) if 'docs' in fields else ()
     return Pack(name, origin, fields.get('path', ''), fields.get('ref'), docs)
@@ -82,15 +82,14 @@ def region(repo):
             sys.exit(f'context-packs: {agents_md} has text between the context-packs blocks, which must sit together '
                      'separated by blank lines. Move it outside them, then sync again.')
     packs = [marked_pack(agents_md, m.group(1), m.group(2)) for m in blocks[1:]]
-    copied = {p.name for p in packs if not p.local}
     if (repo / PACKS).is_dir():
         for entry in sorted((repo / PACKS).iterdir()):
-            if entry.name not in copied:
-                sys.exit(f'context-packs: {(PACKS / entry.name).as_posix()} has no block in {agents_md} for a pack '
-                         'copied from another repo. Remove it, then sync again.')
+            if entry.name not in names[1:]:
+                sys.exit(f'context-packs: {(PACKS / entry.name).as_posix()} has no block in {agents_md}. '
+                         'Remove it, then sync again.')
     for match in blocks:
         name, _, synced, sha = match.groups()
-        if digest(synced, snapshot(repo / PACKS / name) if name in copied else b'') != sha:
+        if digest(synced, snapshot(repo / PACKS / name)) != sha:
             sys.exit(f'context-packs: {agents_md}: the {name} block or a doc in {PACKS / name} was edited since '
                      'the last sync. Move the change into its context pack or outside them, revert it, '
                      'then sync again.')

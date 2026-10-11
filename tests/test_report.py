@@ -17,9 +17,9 @@ class ReportTests(SyncCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, f'house-rules: added @ {self.first[:7]}\n')
 
-    def test_add_names_the_doc_sets_it_installs(self):
-        self.doc_set('typescript', {'index.md': '---\nwhen: Editing `**/*.ts`\n---\nType it.\n'})
-        latest = self.doc_set('skills', {'index.md': '---\nwhen: Editing skills\n---\nKeep skills short.\n'})
+    def test_add_names_the_nested_packs_it_picked(self):
+        self.doc_set('typescript', {'pack.md': '---\nwhen: Editing `**/*.ts`\n---\nType it.\n'})
+        latest = self.doc_set('skills', {'pack.md': '---\nwhen: Editing skills\n---\nKeep skills short.\n'})
 
         result = self.add('--docs', 'typescript,skills')
 
@@ -69,29 +69,29 @@ class ReportTests(SyncCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, 'Nothing changed: no packs installed\n')
 
-    def test_docs_shows_the_doc_sets_before_and_after(self):
-        self.doc_set('typescript', {'index.md': '---\nwhen: Editing `**/*.ts`\n---\nType it.\n'})
-        self.doc_set('skills', {'index.md': '---\nwhen: Editing skills\n---\nKeep skills short.\n'})
+    def test_docs_shows_the_picks_before_and_after(self):
+        self.doc_set('typescript', {'pack.md': '---\nwhen: Editing `**/*.ts`\n---\nType it.\n'})
+        self.doc_set('skills', {'pack.md': '---\nwhen: Editing skills\n---\nKeep skills short.\n'})
         self.add('--docs', 'skills')
 
         widened = self.sync('docs', 'house-rules', 'skills,typescript')
         emptied = self.sync('docs', 'house-rules', '')
 
-        self.assertEqual(widened.stdout, 'house-rules: doc sets skills → skills, typescript\n')
-        self.assertEqual(emptied.stdout, 'house-rules: doc sets skills, typescript → none\n')
+        self.assertEqual(widened.stdout, 'house-rules: nested packs skills → skills, typescript\n')
+        self.assertEqual(emptied.stdout, 'house-rules: nested packs skills, typescript → none\n')
 
     def project_doc(self, name, when):
         docs = self.repo / 'docs' / 'agents' / 'project'
         docs.mkdir(parents=True, exist_ok=True)
         (docs / f'{name}.md').write_text(f'---\nwhen: {when}\n---\nKeep it small.\n')
 
-    def test_add_of_a_pack_in_the_repo_names_its_docs_without_a_ref(self):
+    def test_add_of_a_pack_in_the_repo_names_no_ref(self):
         self.project_doc('design', 'Changing the design')
 
         result = self.sync('add', 'project', '.', '--path', 'docs/agents/project')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, 'project: added (docs: design)\n')
+        self.assertEqual(result.stdout, 'project: added\n')
 
     def test_resync_after_a_pack_in_the_repo_changes_says_it_changed(self):
         self.project_doc('design', 'Changing the design')

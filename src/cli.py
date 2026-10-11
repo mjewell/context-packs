@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Sync context packs into a repository, or any folder such as the one above the repositories: each pack's rules as a
-block in AGENTS.md, after a header block explaining context packs, and each pack's required doc sets and the ones the
-repository chose in docs/agents/packs/<pack>/."""
+block in AGENTS.md, after a header block explaining context packs, and each pack's docs and the nested packs it
+installs in docs/agents/packs/<pack>/."""
 import argparse
 import contextlib
 import os
@@ -13,7 +13,8 @@ import sys
 import origins
 import report
 from blocks import HEADER, HEADER_RULES, HEADER_START, block, region, snapshot
-from packs import LOCAL, PACKS, Pack, Source, fetch
+from packs import LOCAL, PACKS, Pack, fetch
+import tree
 
 
 def sets(text):
@@ -21,7 +22,7 @@ def sets(text):
 
 
 def apply(args, found):
-    """The packs, each with the optional doc sets it should have, once the command has run."""
+    """The packs, each with the optional nested packs it should have, once the command has run."""
     packs = list(found.packs)
     names = [p.name for p in packs]
     if args.command == 'add':
@@ -34,7 +35,7 @@ def apply(args, found):
             if args.ref:
                 sys.exit('context-packs: a pack in this repo syncs from its working tree, so it takes no --ref.')
             if args.docs:
-                sys.exit('context-packs: a pack in this repo installs every doc set it has, so it takes no --docs.')
+                sys.exit('context-packs: a pack in this repo installs every nested pack it has, so it takes no --docs.')
             ref = None
         else:
             ref = origins.pin(args.origin, args.ref) if args.ref else origins.tip(args.origin)
@@ -49,8 +50,8 @@ def apply(args, found):
     if args.command == 'docs':
         i = names.index(args.name)
         if packs[i].local:
-            sys.exit(f'context-packs: the {args.name} pack is in this repo, so it installs every doc set it has. '
-                     'Delete a doc to drop it.')
+            sys.exit(f'context-packs: the {args.name} pack is in this repo, so it installs every nested pack it has. '
+                     'Delete one to drop it.')
         packs[i] = packs[i]._replace(docs=sets(args.sets))
     if args.command == 'update':
         if args.ref and len(named) != 1:
@@ -68,18 +69,23 @@ def apply(args, found):
     return packs
 
 
-def show(sources):
-    for source in sources:
-        pack = source.pack
+def show(packs, roots):
+    """Each pack, then its nested packs as a tree, marking the installed ones and why each was installed if it
+    wasn't picked."""
+    for pack in packs:
         print(f'{pack.name}  {pack.origin}' + f'  {pack.path}' * bool(pack.path) + f' @ {pack.ref}' * bool(pack.ref))
-        for name in source.available():
-            fields = source.front(name)
-            if pack.local:
-                print(f'  [x] {name}: {fields["when"]}')
-            elif fields.get('tier') == 'required':
-                print(f'  [x] {name} (required): {fields["when"]}')
-            else:
-                print(f'  [{"x" if name in pack.docs else " "}] {name}: {fields["when"]}')
+        installed = tree.installs(roots[pack.name], pack)
+
+        def lines(node, depth):
+            for child in node.children:
+                below = [p for p in pack.docs if p.startswith(f'{child.id}/')]
+                why = (' (required)' if child.required else
+                       f' (needed by {", ".join(below)})' if child.id in installed and child.id not in pack.docs
+                       and not pack.local else '')
+                print(f'{"  " * depth}[{"x" if child.id in installed else " "}] {child.id}{why}: '
+                      f'{child.fields["when"]}')
+                lines(child, depth + 1)
+        lines(roots[pack.name], 1)
 
 
 def main():
@@ -93,7 +99,7 @@ def main():
     add.add_argument('origin', help='a git URL, or . for a folder in the synced repo itself')
     add.add_argument('--path', default='', help='the folder in the origin holding the pack, if not its root')
     add.add_argument('--ref', help='a tag or commit to pin the pack to')
-    add.add_argument('--docs', default='', help='comma-separated optional doc sets to install')
+    add.add_argument('--docs', default='', help='comma-separated optional nested packs to install')
     remove = commands.add_parser('remove', help='uninstall a pack')
     remove.add_argument('name')
     update = commands.add_parser('update', help='move pinned packs on: one pinned to a commit to the tip of its '
@@ -101,10 +107,10 @@ def main():
                                                 'release in its series')
     update.add_argument('names', nargs='*', help='the packs to update; all of them if left out')
     update.add_argument('--ref', help='a tag or commit to pin the one named pack to instead')
-    docs = commands.add_parser('docs', help="replace a pack's optional doc sets")
+    docs = commands.add_parser('docs', help="replace a pack's optional nested packs")
     docs.add_argument('name')
-    docs.add_argument('sets', help="comma-separated optional doc sets, or '' for none")
-    commands.add_parser('list', help='list the packs and their doc sets, marking the installed ones')
+    docs.add_argument('sets', help="comma-separated optional nested packs, or '' for none")
+    commands.add_parser('list', help='list the packs and their nested packs, marking the installed ones')
     args = parser.parse_args()
     repo = args.dir
     if not repo.is_dir():
@@ -114,9 +120,10 @@ def main():
     packs = apply(args, found)
 
     with contextlib.ExitStack() as stack:
-        sources = [Source(p, fetch(repo, p, stack)) for p in packs]
+        folders = {p.name: fetch(repo, p, stack) for p in packs}
+        roots = {p.name: tree.load(folders[p.name], p) for p in packs}
         if args.command == 'list':
-            show(sources)
+            show(packs, roots)
             return
 
         claude_md = repo / 'CLAUDE.md'
@@ -125,31 +132,20 @@ def main():
             sys.exit(f'context-packs: {claude_md} must be a symlink to AGENTS.md, so every agent reads the same rules. '
                      'Move its contents into AGENTS.md, delete it, then sync again.')
 
-        chosen = {}
-        for source in sources:
-            name = source.pack.name
-            unknown = sorted(n for n in source.pack.docs if n not in source.available())
-            if unknown:
-                sys.exit(f'context-packs: {name} has no doc set named {", ".join(unknown)}. '
-                         f'Available: {", ".join(source.available()) or "none"}. Choose from those with --docs.')
-            chosen[name] = source.installs(source.pack.docs)
-        bodies = {s.pack.name: s.body(chosen[s.pack.name]) for s in sources}
-        starts = {s.pack.name: s.pack.start() for s in sources}
+        installed = {p.name: tree.installs(roots[p.name], p) for p in packs}
 
         for gone in {p.name for p in found.packs} - {p.name for p in packs}:
             if (repo / PACKS / gone).exists():
                 shutil.rmtree(repo / PACKS / gone)
         blocks = {HEADER: block(HEADER_START, HEADER_RULES)}
-        for source in sources:
-            if source.pack.local:
-                blocks[source.pack.name] = block(starts[source.pack.name], bodies[source.pack.name])
-                continue
-            synced = repo / source.pack.synced
-            if synced.exists():
-                shutil.rmtree(synced)
-            for name in chosen[source.pack.name]:
-                source.copy(name, synced)
-            blocks[source.pack.name] = block(starts[source.pack.name], bodies[source.pack.name], snapshot(synced))
+        for pack in packs:
+            root = roots[pack.name]
+            generated = repo / PACKS / pack.name
+            if generated.exists():
+                shutil.rmtree(generated)
+            tree.write(root, pack, installed[pack.name], folders[pack.name], repo)
+            blocks[pack.name] = block(pack.start(), tree.render(root, pack, installed[pack.name]),
+                                      snapshot(generated))
         if (repo / PACKS).is_dir() and not any((repo / PACKS).iterdir()):
             (repo / PACKS).rmdir()
         text = found.text[:found.start] + '\n'.join(blocks.values()) + found.text[found.end:]
@@ -157,7 +153,7 @@ def main():
         (repo / 'AGENTS.md').write_bytes(text.encode('utf-8'))
         if not linked:
             claude_md.symlink_to('AGENTS.md')
-        for line in report.changes(found, packs, chosen, blocks, created, linked):
+        for line in report.changes(found, packs, blocks, created, linked):
             print(line)
 
 

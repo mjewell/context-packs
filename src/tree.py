@@ -1,0 +1,154 @@
+"""A pack's content as a tree of packs: the installed pack's pack.md and docs, and each folder holding a pack.md of
+its own nested inside it. A folder without a pack.md only groups files, whose docs join the nearest pack's table."""
+from pathlib import Path
+import re
+import shutil
+import sys
+from typing import NamedTuple, Tuple
+
+from packs import PACKS
+
+FRONT = re.compile(r'---\n(.*?)\n---\n', re.DOTALL)
+TIERS = ('optional', 'required')
+
+
+class Doc(NamedTuple):
+    path: str
+    when: str
+
+
+class Node(NamedTuple):
+    """A pack in the tree. Its id is its folder relative to the installed pack's, '' for the installed pack itself,
+    and paths are relative to that folder too. Its files are every one it brings, docs included, but not those of
+    the packs nested in it."""
+    id: str
+    fields: dict
+    rules: str
+    docs: Tuple[Doc, ...]
+    files: Tuple[str, ...]
+    children: Tuple['Node', ...]
+
+    @property
+    def required(self):
+        return self.fields.get('tier') == 'required'
+
+    def nested(self):
+        """Every pack nested in this one, at any depth, parents before their children."""
+        for child in self.children:
+            yield child
+            yield from child.nested()
+
+
+def front(text, where, keys):
+    """text's front matter as fields, keeping only those named in keys, and the text after it."""
+    match = FRONT.match(text)
+    pairs = [line.split(': ', 1) for line in match.group(1).split('\n')] if match else []
+    fields = dict(p for p in pairs if len(p) == 2)
+    if len(fields) != len(pairs):
+        sys.exit(f'context-packs: {where} has front matter that isn\'t `key: value` lines.')
+    unknown = sorted(set(fields) - set(keys))
+    if unknown:
+        sys.exit(f'context-packs: {where} has front matter context-packs doesn\'t know: {", ".join(unknown)}. '
+                 'A doc takes only `when`, and a pack.md takes `when`, `tier` and `inline`. Remove it, or update '
+                 'context-packs if the pack needs a newer version.')
+    return fields, text[match.end():] if match else text
+
+
+def load(folder, pack, id=''):
+    """The pack in folder/id and the packs nested in it, with folder holding the pack fetched from pack."""
+    def where(path):
+        return f'{(Path(pack.path) / path).as_posix()} in {pack.origin}'
+
+    home = Path(id)
+    if not id and (folder / 'agents.md').is_file():
+        sys.exit(f'context-packs: {where("agents.md")} holds rules under the name packs used before 0.2.0. Rename it '
+                 'to pack.md in the pack, or run update to move to a version of the pack that has one.')
+    pack_md = folder / home / 'pack.md'
+    fields, rules = front(pack_md.read_text(encoding='utf-8'), where(home / 'pack.md'), ('when', 'tier', 'inline')) \
+        if pack_md.is_file() else ({}, '')
+    if fields.get('tier', 'optional') not in TIERS:
+        sys.exit(f'context-packs: {where(home / "pack.md")} has tier: {fields["tier"]}, but a tier is '
+                 f'{" or ".join(TIERS)}.')
+    # A nested pack's when is its row in its parent's table; the installed pack's front matter goes unread.
+    if id and 'when' not in fields:
+        sys.exit(f'context-packs: {where(home / "pack.md")} must start with front matter saying when to read it, '
+                 'since it\'s nested in another pack:\n\n---\nwhen: Editing `web/**`\n---')
+    # The end marker has to start its own line, or the next sync can't find the block.
+    if rules and not rules.endswith('\n'):
+        rules += '\n'
+    docs, files, children = [], [], []
+
+    def walk(rel):
+        for entry in sorted((folder / rel).iterdir()):
+            path = rel / entry.name
+            if entry.name.startswith('.') or path == home / 'pack.md':
+                continue
+            if entry.is_dir() and (entry / 'pack.md').is_file():
+                twin = path.parent / f'{entry.name}.md'
+                if (folder / twin).is_file():
+                    sys.exit(f'context-packs: {where(path)} holds a pack.md and sits beside {where(twin)}, so its '
+                             f'index and that doc would both be {twin.as_posix()}. Rename one.')
+                children.append(load(folder, pack, path.as_posix()))
+            elif entry.is_dir():
+                walk(path)
+            else:
+                files.append(path.as_posix())
+                if entry.suffix == '.md':
+                    doc_fields, _ = front(entry.read_text(encoding='utf-8'), where(path), ('when',))
+                    if 'when' not in doc_fields:
+                        sys.exit(f'context-packs: {where(path)} must start with front matter saying when to read '
+                                 'it:\n\n---\nwhen: Editing `**/*.ts`\n---')
+                    docs.append(Doc(path.as_posix(), doc_fields['when']))
+
+    walk(home)
+    return Node(id, fields, rules, tuple(docs), tuple(files), tuple(children))
+
+
+def installs(root, pack):
+    """The ids of the packs nested in root that a sync installs: every one for a pack in the synced repo, else each
+    one picked or above a picked one, and each required one whose parent is installed."""
+    nested = {n.id for n in root.nested()}
+    unknown = sorted(set(pack.docs) - nested)
+    if unknown:
+        sys.exit(f'context-packs: {pack.name} has no nested pack named {", ".join(unknown)}. '
+                 f'Its nested packs: {", ".join(sorted(nested)) or "none"}. Choose from those with --docs.')
+    if pack.local:
+        return nested
+    parts = [pick.split('/') for pick in pack.docs]
+    wanted = {'/'.join(p[:i]) for p in parts for i in range(1, len(p) + 1)}
+
+    def visit(node):
+        for child in node.children:
+            if child.required or child.id in wanted:
+                yield child.id
+                yield from visit(child)
+    return set(visit(root))
+
+
+def index(node, pack):
+    """Where a nested pack's generated index sits."""
+    return PACKS / pack.name / f'{node.id}.md'
+
+
+def render(node, pack, installed):
+    """The node's rules, then its table: a row for each of its docs and for each installed pack nested in it."""
+    rows = sorted([(d.path[:-len('.md')], d.when, pack.synced / d.path) for d in node.docs]
+                  + [(c.id, c.fields['when'], index(c, pack)) for c in node.children if c.id in installed])
+    title = f'{pack.name}/{node.id}' if node.id else pack.name
+    table = (f'## {title} context\n\n| When | Read |\n|---|---|\n'
+             + ''.join(f'| {when} | `{path.as_posix()}` |\n' for _, when, path in rows)) if rows else ''
+    return '\n'.join(part for part in (node.rules, table) if part)
+
+
+def write(root, pack, installed, source, repo):
+    """Copy the installed packs' files from source into repo, unless the pack is in repo already, and write each
+    installed nested pack's index."""
+    for node in [root] + [n for n in root.nested() if n.id in installed]:
+        copies = [] if pack.local else [(source / path, repo / pack.synced / path) for path in node.files]
+        for origin, target in copies:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(origin, target)
+        if node.id:
+            target = repo / index(node, pack)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(render(node, pack, installed), encoding='utf-8')
