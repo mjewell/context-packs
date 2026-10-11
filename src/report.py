@@ -18,12 +18,12 @@ def sets(names):
 
 
 def changes(found, after, blocks, created, linked):
-    """Lines describing what the sync did: whether it created AGENTS.md or found CLAUDE.md already linked to it, and
-    how the packs found in AGENTS.md became the packs after it, with blocks the text the sync wrote for each."""
+    """Lines describing what the sync did: whether it created AGENTS.md and linked CLAUDE.md to it, and how the
+    packs found in the instructions file became the packs after it, with blocks the text the sync wrote for each."""
     before = found.packs
     old = {p.name: p for p in before}
     new = {p.name for p in after}
-    lines = (['Created AGENTS.md'] * created + ['Linked CLAUDE.md to AGENTS.md'] * (not linked)
+    lines = (['Created AGENTS.md'] * created + ['Linked CLAUDE.md to AGENTS.md'] * linked
              + ['Updated the header block'] * (not created and found.blocks[HEADER] != blocks[HEADER]))
     for pack in after:
         was = old.get(pack.name)

@@ -136,15 +136,6 @@ class SyncTests(SyncCase):
         self.assertIn(EMPTY_HEADER, result.stderr)
         self.assertEqual(agents_md.read_text(), '# Repo\n')
 
-    def test_claude_md_that_is_not_the_link_stops_the_sync_untouched(self):
-        (self.repo / 'CLAUDE.md').write_text('Old rules.\n')
-
-        result = self.sync()
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('CLAUDE.md', result.stderr)
-        self.assertEqual(sorted(p.name for p in self.repo.iterdir()), ['.git', 'CLAUDE.md'])
-
     def test_dir_syncs_that_folder_instead_of_the_current_one(self):
         elsewhere = self.root / 'elsewhere'
         elsewhere.mkdir()

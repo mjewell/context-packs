@@ -121,13 +121,14 @@ class ReportTests(SyncCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, 'Created AGENTS.md\nLinked CLAUDE.md to AGENTS.md\n')
 
-    def test_sync_that_adds_the_claude_md_link_says_so(self):
+    def test_resync_after_claude_md_is_deleted_leaves_it_deleted(self):
         (self.repo / 'CLAUDE.md').unlink()
 
         result = self.sync()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, 'Linked CLAUDE.md to AGENTS.md\n')
+        self.assertEqual(result.stdout, 'Nothing changed: no packs installed\n')
+        self.assertFalse((self.repo / 'CLAUDE.md').is_symlink())
 
 
 if __name__ == '__main__':
