@@ -4,8 +4,9 @@ block in AGENTS.md, after a header block explaining context packs, and each pack
 installs in docs/agents/packs/<pack>/."""
 import argparse
 import contextlib
+import itertools
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import shutil
 import sys
@@ -66,6 +67,13 @@ def apply(args, found):
                 continue
             packs[i] = pack._replace(ref=origins.pin(pack.origin, args.ref) if args.ref
                                      else origins.latest(pack.origin, pack.ref))
+    # The folder inside would sync twice, maybe at another ref. Origins compare as written, so the same repo spelled
+    # two ways gets past this.
+    for a, b in itertools.combinations(packs, 2):
+        outer, inner = sorted((PurePosixPath(a.path).parts, PurePosixPath(b.path).parts), key=len)
+        if a.origin == b.origin and inner[:len(outer)] == outer:
+            sys.exit(f'context-packs: the {a.name} and {b.name} packs overlap: one\'s folder in {a.origin} holds the '
+                     'other\'s, so its rules would sync twice. Keep only one of them.')
     return packs
 
 

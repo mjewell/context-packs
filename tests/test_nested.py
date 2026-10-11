@@ -342,6 +342,58 @@ class InlineTests(SyncCase):
         self.assertIn('inline', result.stderr)
 
 
+class OverlapTests(SyncCase):
+    """A pack and a folder inside it installed from the same origin."""
+
+    def setUp(self):
+        super().setUp()
+        self.publish({
+            'pack.md': 'Prefer small PRs.\n',
+            'typescript/pack.md': doc('Editing `**/*.ts`', 'Prefer unions.\n'),
+        })
+        self.agents_md = self.repo / 'AGENTS.md'
+
+    def add_typescript(self, origin=None):
+        return self.sync('add', 'typescript', str(origin or self.origin), '--path', 'context/typescript')
+
+    def test_adding_a_folder_inside_an_installed_pack_stops_untouched(self):
+        self.add()
+        before = self.agents_md.read_text()
+
+        result = self.add_typescript()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('house-rules', result.stderr)
+        self.assertIn('typescript', result.stderr)
+        self.assertEqual(self.agents_md.read_text(), before)
+
+    def test_adding_a_pack_around_an_installed_one_stops_untouched(self):
+        self.add_typescript()
+        before = self.agents_md.read_text()
+
+        result = self.add()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('house-rules', result.stderr)
+        self.assertEqual(self.agents_md.read_text(), before)
+
+    def test_folder_installed_on_its_own_gets_its_rules_in_its_block(self):
+        result = self.add_typescript()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(' path=context/typescript ref=', self.agents_md.read_text())
+        self.assertIn(' -->\nPrefer unions.\n<!-- context-packs:end', self.agents_md.read_text())
+
+    def test_same_folder_from_another_origin_doesnt_overlap(self):
+        other_origin, other = self.remote('other-rules')
+        self.publish({'typescript/pack.md': doc('Editing `**/*.ts`', 'Use strict mode.\n')}, checkout=other)
+        self.add()
+
+        result = self.add_typescript(other_origin)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+
 class LocalNestedPackTests(SyncCase):
     """A nested pack in a pack in the synced repo: its docs stay where they are, and only its index is generated."""
 
