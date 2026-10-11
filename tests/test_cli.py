@@ -636,6 +636,13 @@ class DocSetTests(SyncCase):
                       '<!-- context-packs:end',
                       (self.repo / 'AGENTS.md').read_text())
 
+    def test_chosen_doc_sets_are_recorded_in_the_start_marker(self):
+        result = self.add('--docs', 'typescript,skills')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(self.start().replace(' -->', ' docs=skills,typescript -->'),
+                      (self.repo / 'AGENTS.md').read_text())
+
     def test_update_keeps_the_installed_doc_sets_and_updates_them(self):
         self.add('--docs', 'skills')
         self.doc_set('skills', {'index.md': '---\nwhen: Editing `**/SKILL.md`\n---\nKeep skills shorter.\n'})
@@ -710,7 +717,7 @@ class DocSetTests(SyncCase):
         result = self.sync()
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn('docs/agents/packs/house-rules/.DS_Store is not a doc set', result.stderr)
+        self.assertIn('a doc in docs/agents/packs/house-rules was edited', result.stderr)
         self.assertTrue((self.synced / '.DS_Store').exists())
 
     def test_list_shows_every_doc_set_and_marks_the_installed_ones(self):

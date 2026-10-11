@@ -17,14 +17,13 @@ from packs import LOCAL, PACKS, Pack, Source, fetch
 
 
 def sets(text):
-    return {n for n in text.split(',') if n}
+    return tuple(sorted({n for n in text.split(',') if n}))
 
 
 def apply(args, found):
-    """The packs, and the optional doc sets each should have, once the command has run."""
+    """The packs, each with the optional doc sets it should have, once the command has run."""
     packs = list(found.packs)
     names = [p.name for p in packs]
-    picked = {p.name: set(found.installed.get(p.name, [])) for p in packs}
     if args.command == 'add':
         if not re.fullmatch(r'[A-Za-z0-9._-]+', args.name) or args.name == HEADER:
             sys.exit(f'context-packs: {args.name} can\'t name a pack. '
@@ -39,8 +38,7 @@ def apply(args, found):
             ref = None
         else:
             ref = origins.pin(args.origin, args.ref) if args.ref else origins.tip(args.origin)
-        packs.append(Pack(args.name, args.origin, args.path, ref))
-        picked[args.name] = sets(args.docs)
+        packs.append(Pack(args.name, args.origin, args.path, ref, sets(args.docs)))
     named = [args.name] if args.command in ('remove', 'docs') else getattr(args, 'names', [])
     unknown = [n for n in named if n not in names]
     if unknown:
@@ -49,10 +47,11 @@ def apply(args, found):
     if args.command == 'remove':
         packs = [p for p in packs if p.name != args.name]
     if args.command == 'docs':
-        if next(p for p in packs if p.name == args.name).local:
+        i = names.index(args.name)
+        if packs[i].local:
             sys.exit(f'context-packs: the {args.name} pack is in this repo, so it installs every doc set it has. '
                      'Delete a doc to drop it.')
-        picked[args.name] = sets(args.sets)
+        packs[i] = packs[i]._replace(docs=sets(args.sets))
     if args.command == 'update':
         if args.ref and len(named) != 1:
             sys.exit('context-packs: --ref pins one pack, so name exactly one.')
@@ -66,10 +65,10 @@ def apply(args, found):
                 continue
             packs[i] = pack._replace(ref=origins.pin(pack.origin, args.ref) if args.ref
                                      else origins.latest(pack.origin, pack.ref))
-    return packs, picked
+    return packs
 
 
-def show(sources, picked):
+def show(sources):
     for source in sources:
         pack = source.pack
         print(f'{pack.name}  {pack.origin}' + f'  {pack.path}' * bool(pack.path) + f' @ {pack.ref}' * bool(pack.ref))
@@ -80,7 +79,7 @@ def show(sources, picked):
             elif fields.get('tier') == 'required':
                 print(f'  [x] {name} (required): {fields["when"]}')
             else:
-                print(f'  [{"x" if name in picked[pack.name] else " "}] {name}: {fields["when"]}')
+                print(f'  [{"x" if name in pack.docs else " "}] {name}: {fields["when"]}')
 
 
 def main():
@@ -112,12 +111,12 @@ def main():
         sys.exit(f'context-packs: {repo} is not a folder')
 
     found = region(repo)
-    packs, picked = apply(args, found)
+    packs = apply(args, found)
 
     with contextlib.ExitStack() as stack:
         sources = [Source(p, fetch(repo, p, stack)) for p in packs]
         if args.command == 'list':
-            show(sources, picked)
+            show(sources)
             return
 
         claude_md = repo / 'CLAUDE.md'
@@ -129,11 +128,11 @@ def main():
         chosen = {}
         for source in sources:
             name = source.pack.name
-            unknown = sorted(n for n in picked[name] if n not in source.available())
+            unknown = sorted(n for n in source.pack.docs if n not in source.available())
             if unknown:
                 sys.exit(f'context-packs: {name} has no doc set named {", ".join(unknown)}. '
                          f'Available: {", ".join(source.available()) or "none"}. Choose from those with --docs.')
-            chosen[name] = source.installs(picked[name])
+            chosen[name] = source.installs(source.pack.docs)
         bodies = {s.pack.name: s.body(chosen[s.pack.name]) for s in sources}
         starts = {s.pack.name: s.pack.start() for s in sources}
 

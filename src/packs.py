@@ -4,7 +4,7 @@ import re
 import shutil
 import sys
 import tempfile
-from typing import NamedTuple, Optional
+from typing import NamedTuple, Optional, Tuple
 
 import origins
 
@@ -16,15 +16,17 @@ TIERS = ('optional', 'required')
 
 
 class Pack(NamedTuple):
-    """Where a pack comes from: a folder in a git repo pinned to a commit, or a folder in the synced repo itself."""
+    """Where a pack comes from, a folder in a git repo pinned to a commit or a folder in the synced repo itself, and
+    the optional doc sets the repo picked from it."""
     name: str
     origin: str
     path: str
     ref: Optional[str]
+    docs: Tuple[str, ...] = ()
 
     def start(self):
         fields = ([f'from={self.origin}'] + [f'path={self.path}'] * bool(self.path)
-                  + [f'ref={self.ref}'] * bool(self.ref))
+                  + [f'ref={self.ref}'] * bool(self.ref) + [f'docs={",".join(self.docs)}'] * bool(self.docs))
         if any(re.search(r'\s', field) for field in fields):
             sys.exit(f'context-packs: the {self.name} pack\'s {" ".join(fields)} has whitespace, '
                      'which its marker can\'t hold.')

@@ -19,14 +19,12 @@ BLOCK = re.compile(r'^<!-- context-packs:start (\S+)((?: \S+)*) -->\n(.*?)'
 
 
 class Region(NamedTuple):
-    """Where AGENTS.md's context-packs blocks sit, each block's text by name, the packs they hold, and the doc sets
-    each installed."""
+    """Where AGENTS.md's context-packs blocks sit, each block's text by name, and the packs they hold."""
     text: str
     start: int
     end: int
     blocks: Dict[str, str]
     packs: List[Pack]
-    installed: Dict[str, List[str]]
 
 
 def digest(body, docs=b''):
@@ -45,33 +43,18 @@ def snapshot(folder):
                     for p in sorted(folder.rglob('*')) if p.is_file())
 
 
-def installed(repo, folder):
-    """The doc sets copied into folder: each a folder holding an index.md, or a single .md file."""
-    if not (repo / folder).is_dir():
-        return []
-    names = []
-    for entry in (repo / folder).iterdir():
-        if (entry / 'index.md').is_file():
-            names.append(entry.name)
-        elif entry.is_file() and entry.suffix == '.md':
-            names.append(entry.stem)
-        else:
-            sys.exit(f'context-packs: {(folder / entry.name).as_posix()} is not a doc set, since it\'s neither a '
-                     '.md file nor a folder with an index.md. Remove it, then sync again.')
-    return sorted(names)
-
-
 def marked_pack(agents_md, name, marker):
     pairs = [field.split('=', 1) for field in marker.split()]
     fields = dict(p for p in pairs if len(p) == 2)
     origin = fields.get('from')
-    if (len(fields) != len(pairs) or set(fields) - {'from', 'path', 'ref'} or not origin
-            or (origin == LOCAL) == ('ref' in fields)):
+    if (len(fields) != len(pairs) or set(fields) - {'from', 'path', 'ref', 'docs'} or not origin
+            or (origin == LOCAL) == ('ref' in fields) or (origin == LOCAL and 'docs' in fields)):
         sys.exit(f'context-packs: {agents_md}: the {name} block\'s start marker needs from=<git URL> and '
                  'ref=<tag or commit>, or from=. for a pack in this repo, plus path=<folder> unless the pack is the '
-                 'whole repo. '
+                 'whole repo, and docs=<doc sets> for the optional ones a pack from another repo installs. '
                  'Fix the marker, then sync again.')
-    return Pack(name, origin, fields.get('path', ''), fields.get('ref'))
+    docs = tuple(fields['docs'].split(',')) if 'docs' in fields else ()
+    return Pack(name, origin, fields.get('path', ''), fields.get('ref'), docs)
 
 
 def region(repo):
@@ -105,12 +88,10 @@ def region(repo):
             if entry.name not in copied:
                 sys.exit(f'context-packs: {(PACKS / entry.name).as_posix()} has no block in {agents_md} for a pack '
                          'copied from another repo. Remove it, then sync again.')
-    current = {p.name: installed(repo, p.synced) for p in packs if not p.local}
     for match in blocks:
         name, _, synced, sha = match.groups()
         if digest(synced, snapshot(repo / PACKS / name) if name in copied else b'') != sha:
             sys.exit(f'context-packs: {agents_md}: the {name} block or a doc in {PACKS / name} was edited since '
                      'the last sync. Move the change into its context pack or outside them, revert it, '
                      'then sync again.')
-    return Region(text, blocks[0].start(), blocks[-1].end(), {m.group(1): m.group(0) for m in blocks}, packs,
-                  current)
+    return Region(text, blocks[0].start(), blocks[-1].end(), {m.group(1): m.group(0) for m in blocks}, packs)

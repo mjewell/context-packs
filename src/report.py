@@ -33,8 +33,8 @@ def changes(found, after, chosen, blocks, created, linked):
             lines.append(f'{pack.name}: added{at(pack)}' + f' (docs: {sets(docs)})' * bool(docs))
         elif was.ref != pack.ref:
             lines.append(f'{pack.name}: {short(was.ref)} → {short(pack.ref)}')
-        elif not pack.local and found.installed[pack.name] != chosen[pack.name]:
-            lines.append(f'{pack.name}: doc sets {sets(found.installed[pack.name])} → {sets(chosen[pack.name])}')
+        elif was.docs != pack.docs:
+            lines.append(f'{pack.name}: doc sets {sets(was.docs)} → {sets(pack.docs)}')
         elif found.blocks[pack.name] != blocks[pack.name]:
             lines.append(f'{pack.name}: changed')
     lines += [f'{p.name}: removed' for p in before if p.name not in new]
