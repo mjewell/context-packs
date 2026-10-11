@@ -90,9 +90,8 @@ Edit only files I own. Plugins, synced skills, and installed dependencies belong
 | When | Read |
 |---|---|
 | Changing how packs are written, pinned or updated | `docs/agents/project/design.md` |
-| Changing how a repo chooses which of a pack's docs it installs | `docs/agents/project/ideas.md` |
 | Releasing a new version to npm | `docs/agents/project/releasing.md` |
-<!-- context-packs:end sha256:a43b086902dd -->
+<!-- context-packs:end sha256:7038f0690ddc -->
 
 ## Project
 
