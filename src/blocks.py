@@ -64,17 +64,28 @@ def read(file):
 
 
 def instructions(repo):
-    """The file the sync writes: whichever of AGENTS.md and CLAUDE.md holds the blocks, else AGENTS.md or CLAUDE.md
-    if one exists, else a new AGENTS.md. Which instruction file a repo uses is its call, so the sync takes the one
-    it finds, and never writes through a symlink."""
+    """The file the sync writes: whichever of AGENTS.md and CLAUDE.md holds the blocks, else a new AGENTS.md. Which
+    instruction file a repo uses is its call, so the sync stops for the blocks to be pasted into a file that exists,
+    and never writes through a symlink."""
     agents_md, claude_md = repo / 'AGENTS.md', repo / 'CLAUDE.md'
     files = [f for f in (agents_md, claude_md) if f.is_file() and not f.is_symlink()]
+    for file in files:
+        # Checked first, since the blocks can't be found in a file with CRLF line endings.
+        if '\r' in read(file):
+            sys.exit(f'context-packs: {file} has CRLF line endings. Convert it to LF, then sync again.')
     marked = [f for f in files if BLOCK.search(read(f))]
     if len(marked) > 1:
         sys.exit(f'context-packs: {agents_md} and {claude_md} both have context-packs blocks. '
                  "Delete them from the one that shouldn't be synced, then sync again.")
-    if marked or files:
-        return (marked or files)[0]
+    if marked:
+        return marked[0]
+    lines = block(HEADER_START, '')
+    if len(files) > 1:
+        sys.exit(f'context-packs: Neither {agents_md} nor {claude_md} has context-packs blocks. Add these two lines '
+                 f'to the one that should hold the packs, where the shared rules should go, then sync again:\n\n{lines}')
+    if files:
+        sys.exit(f'context-packs: {files[0]} has no context-packs blocks. '
+                 f'Add these two lines where the shared rules should go, then sync again:\n\n{lines}')
     if agents_md.is_symlink():
         sys.exit(f'context-packs: {agents_md} is a symlink, and the sync would write through it. '
                  'Delete it, then sync again to get a real file.')
@@ -85,14 +96,9 @@ def instructions(repo):
 
 
 def region(repo, file):
-    """file's context-packs blocks, after checking that nothing in them was edited since the last sync."""
+    """file's context-packs blocks, or a new file's empty header block, after checking that nothing in them was edited since the last sync."""
     text = read(file) if file.exists() else block(HEADER_START, '')
-    if '\r' in text:
-        sys.exit(f'context-packs: {file} has CRLF line endings. Convert it to LF, then sync again.')
     blocks = list(BLOCK.finditer(text))
-    if not blocks:
-        sys.exit(f'context-packs: {file} has no context-packs blocks. '
-                 f'Add these two lines where the shared rules should go, then sync again:\n\n{block(HEADER_START, "")}')
     names = [match.group(1) for match in blocks]
     if names[0] != HEADER:
         sys.exit(f'context-packs: {file}: the context-packs blocks must start with the header block. '

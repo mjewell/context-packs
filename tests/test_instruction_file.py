@@ -62,14 +62,15 @@ class InstructionFileTests(SyncCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(os.path.lexists(self.claude_md))
 
-    def test_agents_md_comes_first_when_neither_has_blocks(self):
+    def test_both_files_without_blocks_stop_and_leave_the_choice_to_the_repo(self):
         self.agents_md.write_text('Codex rules.\n')
         self.claude_md.write_text('Claude rules.\n')
 
         result = self.sync()
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn(f'{self.agents_md} has no context-packs blocks', result.stderr)
+        self.assertIn(f'Neither {self.agents_md} nor {self.claude_md} has context-packs blocks', result.stderr)
+        self.assertIn(EMPTY_HEADER, result.stderr)
         self.assertEqual(self.agents_md.read_text(), 'Codex rules.\n')
         self.assertEqual(self.claude_md.read_text(), 'Claude rules.\n')
 

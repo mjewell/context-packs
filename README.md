@@ -103,7 +103,7 @@ npx context-packs add <name> <git-url> --path <folder>
 
 That adds the pack's block to your instruction file, creating `AGENTS.md` if you have none, and copies the docs into `docs/agents/packs/<name>/`, pinned to the origin's latest commit or to `--ref <tag or commit>`. Commit the result.
 
-**Already have an `AGENTS.md` or `CLAUDE.md`?** Keep it. The sync writes to the one you have, or to `AGENTS.md` if you have both. The first run prints two marker lines. Paste them wherever the packs should go, then run it again. The packs are synced in at that spot, and the rest of the file stays yours: no sync ever changes it. From then on, the file holding the packs is the one synced.
+**Already have an `AGENTS.md` or `CLAUDE.md`?** Keep it. The first run prints two marker lines. Paste them wherever the packs should go, then run it again. If you have both files, paste them into the one that should hold the packs. The packs are synced in at that spot, and the rest of the file stays yours: no sync ever changes it. From then on, the file holding the packs is the one synced.
 
 The sync leaves your other instruction file alone. If you keep a separate `CLAUDE.md` while the packs are in `AGENTS.md`, make sure Claude Code reads them, for example with an `@AGENTS.md` line in `CLAUDE.md`. With neither file, the sync creates `AGENTS.md` and links `CLAUDE.md` to it, so every agent reads the same rules.
 
