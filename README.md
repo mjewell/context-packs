@@ -1,33 +1,50 @@
 # context-packs
 
-Keep your coding agents' rules in one git repo, and sync them into the `AGENTS.md` of every repo that should follow them.
+Pull the context your teams write for coding agents into each repo's `AGENTS.md`.
 
-Agent rules copied from repo to repo drift apart. context-packs syncs them instead:
+Whoever knows a topic writes its rules and docs once, as a pack: the auth team on sessions and permissions, the frontend team on forms and components. Each repo installs the packs that apply to it, alongside its own docs. The web app takes auth and frontend, and an API service takes auth, backend and database.
 
-- **One source.** Every repo that installs a pack gets the same text, pinned to a tag or commit, and moves on with `update`.
-- **Committed, so every session sees it.** Packs are copied in, not linked or loaded by a hook, so clones, CI and cloud agent sessions get them too.
-- **Read only when relevant.** Long docs don't load into every session: `AGENTS.md` gets a table saying when to read each one.
-- **Any agent.** Anything that reads `AGENTS.md` works, and `CLAUDE.md` is linked to it for Claude Code.
-
-A synced pack in `AGENTS.md`:
+Two packs synced into a web app's `AGENTS.md`:
 
 ```markdown
-<!-- context-packs:start team-rules from=https://github.com/acme/agent-rules.git path=context ref=v1.2.0 -->
-Prefer small PRs. Never commit secrets.
+<!-- context-packs:start auth from=https://github.com/acme/auth-service.git path=agent-pack ref=e60c2aac61c0e51fd90cf1406318dd785884bb19 -->
+Never log tokens, session IDs or passwords, even at debug level.
 
-## team-rules context
+## auth context
 
 | When | Read |
 |---|---|
-| Writing or changing tests | `docs/agents/packs/team-rules/testing.md` |
-<!-- context-packs:end sha256:3f2c1aa0b9d4 -->
+| Adding an endpoint, or checking what a user may do | `docs/agents/packs/auth/permissions.md` |
+| Reading the signed-in user, or changing sign-in or sign-out | `docs/agents/packs/auth/sessions.md` |
+<!-- context-packs:end sha256:3ccb7c0b8f64 -->
+
+<!-- context-packs:start frontend from=https://github.com/acme/agent-context.git path=frontend ref=frontend-v1.4.0 docs=react -->
+Build UI from `@acme/ui` components; don't style raw HTML elements. Every user-facing string goes through `t()`.
+
+## frontend context
+
+| When | Read |
+|---|---|
+| Adding anything a user can click, type into or focus | `docs/agents/packs/frontend/accessibility.md` |
+| Building or changing a form | `docs/agents/packs/frontend/forms.md` |
+| Writing or changing React components | `docs/agents/packs/frontend/react.md` |
+<!-- context-packs:end sha256:94fffbdf036a -->
 ```
+
+[The full example](docs/example.md) shows the packs, the commands, and every file they generate.
+
+- **Mix packs from anywhere.** A pack is a folder in any git repo, and each one gets its own block, pinned and updated on its own. Optional parts of a pack are installed only where a repo asks for them.
+- **Keeps what you already have.** Your own content in `AGENTS.md` stays. The packs go wherever you put them in the file, and the sync never touches the rest.
+- **Docs load only when they apply.** Long docs stay out of every session. `AGENTS.md` gets a table saying when to read each one.
+- **Committed, so every session sees it.** Packs are copied in, not linked or loaded by a hook, so clones, CI and cloud agent sessions get them too.
+- **Fixed once, at the source.** A pack's owners change it in its repo, and every repo picks up the change with `update` instead of keeping its own copy that drifts.
+- **Any agent.** Anything that reads `AGENTS.md` works, and `CLAUDE.md` is linked to it for Claude Code.
 
 Run it with `npx context-packs`, or [let your agent run it](#let-your-agent-run-it). It needs `git`, Node 18+ and Python 3.9+; on macOS, the command line tools provide both `git` and Python.
 
 ## Write a pack
 
-A pack is a folder in any git repo. `pack.md` holds the rules every session sees, and every other `.md` file is a doc agents read only when it's relevant. A folder holding a `pack.md` of its own is a nested pack, and a folder without one just groups files:
+A pack is a folder in any git repo. `pack.md` holds the rules every session sees, and every other `.md` file is a doc that only gets read when it's relevant. A folder holding a `pack.md` of its own is a nested pack, and a folder without one just groups files:
 
 ```text
 context/
@@ -72,6 +89,8 @@ Keep `pack.md` short, since every session loads it.
 
 Tags are optional. A repo pins to a commit by default, and `update` moves it to the tip of your default branch. Tag releases like `v1.2.0` once you want repos to pin to versions and `update` from one release to the next.
 
+**One repo or many.** A pack can sit beside the code it describes, such as an `agent-pack/` folder in the auth service, or in a repo that several teams share, with a folder for each. Each install is its own pack with its own pin, even when two come from the same repo, so choose based on who owns and releases what. In a shared repo, give each pack's tags its own prefix, such as `frontend-v1.4.0` and `database-v2.0.0`, and `update` moves each pack along its own series.
+
 ## Sync a pack from another repo
 
 ```bash
@@ -82,7 +101,9 @@ npx context-packs add <name> <git-url> --path <folder>
 - `<git-url>` is the repo holding the pack, as you'd pass it to `git clone`.
 - `<folder>` is the pack's folder in that repo, such as `context`. Leave out `--path` if the pack is the whole repo.
 
-That adds the pack's block to `AGENTS.md`, creating it if needed, and copies the docs into `docs/agents/packs/<name>/`, pinned to the origin's latest commit or to `--ref <tag or commit>`. Commit the result. If `AGENTS.md` already exists, the first run prints two marker lines to paste where the shared rules should go; then run it again.
+That adds the pack's block to `AGENTS.md`, creating it if needed, and copies the docs into `docs/agents/packs/<name>/`, pinned to the origin's latest commit or to `--ref <tag or commit>`. Commit the result.
+
+**Already have an `AGENTS.md`?** Keep it. The first run prints two marker lines. Paste them wherever the packs should go, then run it again. The packs are synced in at that spot, and the rest of the file stays yours: no sync ever changes it. If you have a `CLAUDE.md`, move its contents into `AGENTS.md` and delete it. The sync then links `CLAUDE.md` to `AGENTS.md`, so every agent reads the same file.
 
 Later, `npx context-packs update` moves packs to their latest version, and `npx context-packs` resyncs at the pinned ones. Private repos work, since origins are fetched with your own git credentials.
 
