@@ -95,7 +95,7 @@ Edit only files I own. Plugins, synced skills, and installed dependencies belong
 
 ## Project
 
-- The CLI is `src/cli.py`, with `src/blocks.py` for the blocks in `AGENTS.md`, `src/packs.py` for packs and their content, and `src/origins.py` for fetching packs from git. It uses only the Python standard library and `git`, and runs on macOS's system `python3` (3.9).
+- The CLI is `src/cli.py`, with `src/blocks.py` for the blocks in `AGENTS.md`, `src/packs.py` for where packs come from, `src/tree.py` for a pack's content as a tree of nested packs, and `src/origins.py` for fetching packs from git. It uses only the Python standard library and `git`, and runs on macOS's system `python3` (3.9).
 - `bin/context-packs.js` is the npm package's bin, which npx runs. It only hands its arguments to the Python CLI.
 - `skills/context-packs/` is the skill this repo ships as a Claude Code plugin, alongside `.claude-plugin/plugin.json`.
 - Run the tests with `python3 -m unittest discover tests`.

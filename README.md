@@ -27,25 +27,45 @@ Run it with `npx context-packs`, or [let your agent run it](#let-your-agent-run-
 
 ## Write a pack
 
-A pack is a folder in any git repo. `pack.md` holds the rules every session sees, and each doc set, one `.md` file or a folder with an `index.md`, covers a topic agents read about only when it's relevant:
+A pack is a folder in any git repo. `pack.md` holds the rules every session sees, and every other `.md` file is a doc agents read only when it's relevant. A folder holding a `pack.md` of its own is a nested pack, and a folder without one just groups files:
 
 ```text
 context/
 ├── pack.md          # rules pasted into every repo's AGENTS.md
-├── testing.md       # a doc set in one file
-└── typescript/
-    ├── index.md     # a doc set's entry point
-    └── react.md     # linked from index.md
+├── testing.md       # a doc
+├── git/
+│   └── prs.md       # a doc, grouped in a folder
+└── typescript/      # a nested pack
+    ├── pack.md
+    ├── types.md
+    └── react/       # a nested pack inside it
+        └── pack.md
 ```
 
-Each doc set starts with front matter. `when` becomes its row in the table, and `tier: required` installs it in every repo; without it, the set is optional and each repo chooses it with `--docs`.
+Each doc starts with front matter whose `when` becomes its row in the table:
 
 ```markdown
 ---
 when: Writing or changing tests
-tier: required
 ---
 ```
+
+A nested pack gets a row too, from the `when` in its `pack.md`, pointing at a generated index that holds its rules and a table of its own docs and nested packs. Each nested pack is a read an agent makes before reaching the docs inside it, so nest only where a subtree is big and its `when` is sharp, and use plain folders to group the rest. Files other than `.md` files, such as code examples, are copied along with the docs beside them.
+
+A nested pack's `pack.md` takes two more fields:
+
+- `tier: required` installs it whenever its parent is installed. Without it, the nested pack is optional, and each repo picks it with `--docs`.
+- `inline: true` pastes its rules and table after its parent's instead of giving it a row, for rules that apply whenever a repo has the nested pack, like a language's. A required inline pack needs no `when`.
+
+```markdown
+---
+when: Working in a TypeScript repo
+inline: true
+---
+Prefer unions to enums.
+```
+
+Any folder with a `pack.md` can also be installed on its own, as its own pack. Its front matter is ignored then, since it describes the folder as nested.
 
 Keep `pack.md` short, since every session loads it.
 
@@ -61,13 +81,13 @@ npx context-packs add <name> <git-url> --path <folder>
 - `<git-url>` is the repo holding the pack, as you'd pass it to `git clone`.
 - `<folder>` is the pack's folder in that repo, such as `context`. Leave out `--path` if the pack is the whole repo.
 
-That adds the pack's block to `AGENTS.md`, creating it if needed, and copies the doc sets into `docs/agents/packs/<name>/`, pinned to the origin's latest commit or to `--ref <tag or commit>`. Commit the result. If `AGENTS.md` already exists, the first run prints two marker lines to paste where the shared rules should go; then run it again.
+That adds the pack's block to `AGENTS.md`, creating it if needed, and copies the docs into `docs/agents/packs/<name>/`, pinned to the origin's latest commit or to `--ref <tag or commit>`. Commit the result. If `AGENTS.md` already exists, the first run prints two marker lines to paste where the shared rules should go; then run it again.
 
 Later, `npx context-packs update` moves packs to their latest version, and `npx context-packs` resyncs at the pinned ones. Private repos work, since origins are fetched with your own git credentials.
 
 ## Sync your project's own docs
 
-The same table works for a repo's own docs. Put each in a folder with a `when:` line, and install the folder as a pack read from the working tree:
+The same table works for a repo's own docs. Put them in a folder, each with a `when:` line, and install the folder as a pack read from the working tree:
 
 ```bash
 npx context-packs add <name> . --path <folder>
@@ -83,7 +103,7 @@ Any name and folder work. We suggest `project` and `docs/agents/project`:
 npx context-packs add project . --path docs/agents/project
 ```
 
-Its table points at the docs where they are. Resync after adding a doc or changing a `when:` line.
+Its table points at the docs where they are, and only its nested packs' indexes are generated, into `docs/agents/packs/<name>/`. Resync after adding a doc or changing a `when:` line or a nested pack's rules.
 
 ## Let your agent run it
 
@@ -99,7 +119,7 @@ Then ask things like:
 
 - "Add the context pack in the `context` folder of github.com/acme/agent-rules"
 - "Update our context packs"
-- "Install the typescript docs from team-rules"
+- "Install the typescript pack from team-rules"
 - "Sync our project docs"
 
 In Claude Code, `/context-packs` invokes it directly.
@@ -111,15 +131,15 @@ Each command syncs the current folder, or `--dir <folder>`, and prints what chan
 | Command | Does |
 |---|---|
 | *(none)* | Resyncs every pack at its pinned ref |
-| `add <name> <origin> [--path P] [--ref R] [--docs a,b]` | Installs a pack, pinned to the origin's latest commit or to `--ref` |
+| `add <name> <origin> [--path P] [--ref R] [--docs a,b]` | Installs a pack, pinned to the origin's latest commit or to `--ref`, with the optional nested packs in `--docs` |
 | `remove <name>` | Uninstalls a pack |
 | `update [name…]` | Moves packs to their latest version |
 | `update <name> --ref R` | Pins one pack to a tag or commit |
-| `docs <name> a,b` | Replaces a pack's optional doc sets (`''` for none) |
-| `list` | Lists each pack and its doc sets, marking the installed ones |
+| `docs <name> a,b` | Replaces the optional nested packs a pack installs, each named by its path such as `typescript/react` (`''` for none). Picking one installs the packs above it |
+| `list` | Lists each pack and its nested packs as a tree, marking the installed ones |
 
 **Pinning.** `--ref` takes a tag or a commit, never a branch, since a branch moves. `update` moves a pack pinned to a commit to the tip of the default branch, and one pinned to a release tag (a prefix and dot-separated numbers, such as `v1.2.0` or `acme-v3`) to the newest release with the same prefix, skipping pre-releases. Other tags stay put.
 
-**Edits stay upstream.** Each block ends with a hash of its text and synced docs. If either was edited in the repo, the sync stops and says what to fix: change the pack in its origin, then `update`.
+**Edits stay upstream.** Each block ends with a hash of its text and the files under its `docs/agents/packs/<name>/`. If either was edited in the repo, the sync stops and says what to fix: change the pack in its origin, then `update`.
 
 **Contributing.** [design.md](docs/agents/project/design.md) explains the choices behind the format. Run the tests with `python3 -m unittest discover tests`.
