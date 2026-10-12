@@ -59,11 +59,13 @@ def run(folder, options):
             for c in cases}
 
 
-def compare(title, labels, scores):
-    """Lines comparing each case's score across runs, one column per label, with each run's change from the first."""
+def compare(labels, scores, heading='Case'):
+    """Lines comparing each case's score across runs, one column per label, with each later run's change from the
+    first, and any errors the runs reported."""
     names = sorted(scores[0])
-    width = max(len(n) for n in names + ['Case'])
-    lines = [title, '  ' + '  '.join(['Case'.ljust(width), *(label.rjust(7) for label in labels), ' Change'])]
+    width = max(len(n) for n in names + [heading])
+    lines = ['  ' + '  '.join([heading.ljust(width), *(label.rjust(7) for label in labels),
+                               *[' Change'] * (len(labels) > 1)])]
     for name in names:
         row = [s[name].score for s in scores]
         lines.append('  ' + '  '.join([name.ljust(width), *(f'{score:7.2f}' for score in row),
