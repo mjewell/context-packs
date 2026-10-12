@@ -8,13 +8,20 @@ from typing import NamedTuple, Optional, Tuple
 import origins
 
 PACKS = Path('docs/agents/packs')
-# A pack whose origin is the synced repo itself, read from its working tree.
-LOCAL = '.'
+# A git URL, as git tells one from a path: it has a scheme, such as https:// or file://, or is scp-like, such as
+# git@github.com:acme/rules.git, with a colon before any slash.
+GIT_URL = re.compile(r'[A-Za-z][A-Za-z0-9+.-]*://|[^/]+:')
+
+
+def local(origin):
+    """Whether origin is a folder on disk rather than a git URL: any path, relative to the synced repo, such as . for
+    the repo itself or ../agent-config beside it, or absolute. A local pack syncs from its working tree."""
+    return not GIT_URL.match(origin)
 
 
 class Pack(NamedTuple):
-    """Where a pack comes from, a folder in a git repo pinned to a commit or a folder in the synced repo itself, and
-    the optional nested packs the repo picked from it."""
+    """Where a pack comes from, a folder in a git repo pinned to a commit or a folder on disk, and the optional nested
+    packs the repo picked from it."""
     name: str
     origin: str
     path: str
@@ -31,21 +38,22 @@ class Pack(NamedTuple):
 
     @property
     def local(self):
-        return self.origin == LOCAL
+        return local(self.origin)
 
     @property
     def synced(self):
-        """Where the pack's docs sit in the synced repo: copied into its own folder, or where they are for a
-        pack in that repo."""
-        return Path(self.path) if self.local else PACKS / self.name
+        """Where the pack's docs sit, relative to the synced repo: copied into its own folder, or where they are for
+        a local pack."""
+        return Path(self.origin, self.path) if self.local else PACKS / self.name
 
 
 def fetch(repo, pack, stack):
-    """The folder holding pack's content, fetched at its ref unless it's in the synced repo."""
-    if pack.origin == LOCAL:
-        folder = repo / pack.path
+    """The folder holding pack's content, fetched at its ref unless it's local."""
+    if pack.local:
+        folder = repo / pack.synced
         if not folder.is_dir():
-            sys.exit(f'context-packs: the {pack.name} pack\'s folder {pack.path} isn\'t in {repo}.')
+            sys.exit(f'context-packs: the {pack.name} pack\'s folder {pack.synced.as_posix()} isn\'t there, '
+                     f'relative to {repo}.')
         return folder
     into = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix='context-packs-')))
     return origins.extract(pack.origin, pack.ref, pack.path, into)

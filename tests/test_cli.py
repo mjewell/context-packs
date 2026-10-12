@@ -39,11 +39,11 @@ class SyncCase(unittest.TestCase):
         self.env = {**os.environ, 'XDG_CACHE_HOME': str(self.root / 'cache')}
 
     def remote(self, name):
-        """A bare origin and a checkout of it."""
+        """A bare origin, by its git URL, and a checkout of it."""
         origin = self.root / f'{name}.git'
         git(self.root, 'init', '--quiet', '--bare', '--initial-branch=main', str(origin))
         git(self.root, 'clone', '--quiet', str(origin), str(self.root / name))
-        return origin, self.root / name
+        return origin.as_uri(), self.root / name
 
     def publish(self, files, checkout=None, folder='context'):
         """Commit files into a pack's folder, None deleting one, and push them to its origin. Returns the commit."""
@@ -371,6 +371,99 @@ class LocalPackTests(SyncCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('| Editing billing | `docs/agents/project/billing.md` |\n', self.agents_md.read_text())
+
+
+class SiblingPackTests(SyncCase):
+    """A pack in a folder beside the synced repo, named by a path starting with a dot, which syncs from its working
+    tree the way a pack in the repo itself does."""
+
+    def setUp(self):
+        super().setUp()
+        self.publish({'pack.md': 'Prefer small PRs.\n',
+                      'testing.md': '---\nwhen: Writing tests\n---\nTest behavior.\n'})
+        self.agents_md = self.repo / 'AGENTS.md'
+
+    def add_sibling(self, *args):
+        return self.sync('add', 'house-rules', '../house-rules', '--path', 'context', *args)
+
+    def test_sibling_pack_syncs_its_working_tree_and_lists_its_docs_where_they_are(self):
+        (self.source / 'context' / 'pack.md').write_text('Prefer tiny PRs.\n')
+
+        result = self.add_sibling()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.agents_md.read_text(),
+                         HEADER + '\n<!-- context-packs:start house-rules from=../house-rules path=context -->\n'
+                         'Prefer tiny PRs.\n\n## house-rules context\n\n| When | Read |\n|---|---|\n'
+                         '| Writing tests | `../house-rules/context/testing.md` |\n'
+                         '<!-- context-packs:end sha256:086f3e8c8f8a -->\n')
+        self.assertFalse((self.repo / 'docs' / 'agents' / 'packs').exists())
+
+    def test_editing_a_sibling_doc_needs_no_resync(self):
+        self.add_sibling()
+        before = self.agents_md.read_text()
+        (self.source / 'context' / 'testing.md').write_text('---\nwhen: Writing tests\n---\nTest behavior only.\n')
+
+        result = self.sync()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.agents_md.read_text(), before)
+
+    def test_missing_sibling_folder_stops_the_sync(self):
+        self.add_sibling()
+        before = self.agents_md.read_text()
+        shutil.rmtree(self.source)
+
+        result = self.sync()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('../house-rules/context', result.stderr)
+        self.assertEqual(self.agents_md.read_text(), before)
+
+    def test_sibling_pack_takes_no_ref(self):
+        result = self.add_sibling('--ref', 'v1.0.0')
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('--ref', result.stderr)
+        self.assertFalse(self.agents_md.exists())
+
+    def test_absolute_path_is_a_folder_on_disk_too(self):
+        (self.source / 'context' / 'pack.md').write_text('Prefer tiny PRs.\n')
+
+        result = self.sync('add', 'house-rules', str(self.source), '--path', 'context')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f'from={self.source} path=context -->\nPrefer tiny PRs.\n', self.agents_md.read_text())
+        self.assertIn(f'| Writing tests | `{self.source}/context/testing.md` |', self.agents_md.read_text())
+        self.assertFalse((self.repo / 'docs' / 'agents' / 'packs').exists())
+
+    def test_marker_pinning_a_folder_on_disk_stops_the_sync(self):
+        self.add_sibling()
+        before = self.agents_md.read_text().replace('path=context -->', f'path=context ref={"a" * 40} -->')
+        self.agents_md.write_text(before)
+
+        result = self.sync()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('use its git URL', result.stderr)
+        self.assertEqual(self.agents_md.read_text(), before)
+
+    def test_scp_style_origin_is_a_git_url(self):
+        result = subprocess.run([sys.executable, str(CLI), 'add', 'acme', 'git@example.invalid:acme/rules.git'],
+                                cwd=self.repo, text=True, capture_output=True, timeout=30,
+                                env={**self.env, 'GIT_SSH_COMMAND': 'false'})
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('git ls-remote', result.stderr)
+
+    def test_update_leaves_a_sibling_pack_alone(self):
+        self.add_sibling()
+        before = self.agents_md.read_text()
+
+        result = self.sync('update')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.agents_md.read_text(), before)
 
 
 class PackShapeTests(SyncCase):
