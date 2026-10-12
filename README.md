@@ -109,7 +109,7 @@ The sync leaves your other instruction file alone. If you keep a separate `CLAUD
 
 Later, `npx context-packs update` moves packs to their latest version, and `npx context-packs` resyncs at the pinned ones. Private repos work, since origins are fetched with your own git credentials.
 
-**Trying a pack before pushing it?** Pass a folder beside the repo in place of the git URL, as a path starting with a dot: `npx context-packs add <name> ../agent-rules --path <folder>`. The sync reads that folder as it is on disk, like a pack in the repo itself, so there's no ref to pin, and the table points at the docs where they are. Edits to a doc show up without a resync. Changes to `pack.md` or a `when:` line need one, since those are copied into `AGENTS.md`. It syncs only where that folder exists, so it's for trying a pack out, not for a repo that clones, CI and cloud sessions sync.
+**Trying a pack before pushing it?** Pass the path of a folder beside the repo in place of the git URL: `npx context-packs add <name> ../agent-rules --path <folder>`. The sync reads that folder as it is on disk, like a pack in the repo itself, so there's no ref to pin, and the table points at the docs where they are. Edits to a doc show up without a resync. Changes to `pack.md` or a `when:` line need one, since those are copied into `AGENTS.md`. It syncs only where that folder exists, so it's for trying a pack out, not for a repo that clones, CI and cloud sessions sync.
 
 ## Sync your project's own docs
 

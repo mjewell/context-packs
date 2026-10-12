@@ -8,12 +8,15 @@ from typing import NamedTuple, Optional, Tuple
 import origins
 
 PACKS = Path('docs/agents/packs')
+# A git URL, as git tells one from a path: it has a scheme, such as https:// or file://, or is scp-like, such as
+# git@github.com:acme/rules.git, with a colon before any slash.
+GIT_URL = re.compile(r'[A-Za-z][A-Za-z0-9+.-]*://|[^/]+:')
 
 
 def local(origin):
-    """Whether origin is a folder on disk rather than a git URL: a path relative to the synced repo, starting with a
-    dot, such as . for the repo itself or ../agent-config beside it. A local pack syncs from its working tree."""
-    return origin.startswith('.')
+    """Whether origin is a folder on disk rather than a git URL: any path, relative to the synced repo, such as . for
+    the repo itself or ../agent-config beside it, or absolute. A local pack syncs from its working tree."""
+    return not GIT_URL.match(origin)
 
 
 class Pack(NamedTuple):

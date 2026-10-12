@@ -99,8 +99,8 @@ def main():
                                      description='leave out the command to resync every pack at its pinned ref')
     add = commands.add_parser('add', help="install a pack, pinned to its origin's latest commit or to --ref")
     add.add_argument('name', help='what to call the pack in AGENTS.md and docs/agents/packs/')
-    add.add_argument('origin', help='a git URL, or a folder on disk as a path starting with a dot: . for the synced repo itself, '
-                     'or one beside it such as ../agent-config')
+    add.add_argument('origin', help='a git URL, or the path of a folder on disk: . for the synced repo itself, or one '
+                                    'beside it such as ../agent-config')
     add.add_argument('--path', default='', help='the folder in the origin holding the pack, if not its root')
     add.add_argument('--ref', help='a tag or commit to pin the pack to')
     add.add_argument('--docs', default='', help='comma-separated optional nested packs to install')

@@ -48,12 +48,14 @@ def marked_pack(file, name, marker):
     pairs = [field.split('=', 1) for field in marker.split()]
     fields = dict(p for p in pairs if len(p) == 2)
     origin = fields.get('from')
+    if origin and local(origin) and 'ref' in fields:
+        sys.exit(f'context-packs: {file}: the {name} block\'s start marker pins {origin} to a ref, but a path is a '
+                 'folder on disk, read from its working tree. To pin the pack, use its git URL instead.')
     if (len(fields) != len(pairs) or set(fields) - {'from', 'path', 'ref', 'docs'} or not origin
             or local(origin) == ('ref' in fields)):
         sys.exit(f'context-packs: {file}: the {name} block\'s start marker needs from=<git URL> and '
-                 'ref=<tag or commit>, or from=<a path starting with a dot> for a folder on disk, plus path=<folder> '
-                 'unless the pack is the whole repo, and docs=<nested packs> for the optional ones picked. '
-                 'Fix the marker, then sync again.')
+                 'ref=<tag or commit>, or from=<path> for a folder on disk, plus path=<folder> unless the pack is the '
+                 'whole repo, and docs=<nested packs> for the optional ones picked. Fix the marker, then sync again.')
     docs = tuple(fields['docs'].split(',')) if 'docs' in fields else ()
     return Pack(name, origin, fields.get('path', ''), fields.get('ref'), docs)
 
