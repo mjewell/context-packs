@@ -14,7 +14,8 @@ import sys
 import imports
 import origins
 import report
-from blocks import HEADER, HEADER_RULES, HEADER_START, block, instructions, region, snapshot
+import sync
+from blocks import HEADER, instructions, region
 from packs import PACKS, Pack, fetch, local
 import tree
 
@@ -141,23 +142,13 @@ def main():
         for gone in {p.name for p in found.packs} - {p.name for p in packs}:
             if (repo / PACKS / gone).exists():
                 shutil.rmtree(repo / PACKS / gone)
-        blocks = {HEADER: block(HEADER_START, HEADER_RULES)}
-        for pack in packs:
-            root = roots[pack.name]
-            generated = repo / PACKS / pack.name
-            if generated.exists():
-                shutil.rmtree(generated)
-            tree.write(root, pack, folders[pack.name], repo)
-            blocks[pack.name] = block(pack.start(), tree.body(root, pack), snapshot(generated))
-        if (repo / PACKS).is_dir() and not any((repo / PACKS).iterdir()):
-            (repo / PACKS).rmdir()
-        for pack_md, text in edits:
-            if text is None:
+        text, blocks = sync.write(repo, found, packs, folders, roots)
+        for pack_md, pack_md_text in edits:
+            if pack_md_text is None:
                 shutil.rmtree(repo / pack_md.parent)
             else:
                 (repo / pack_md).parent.mkdir(parents=True, exist_ok=True)
-                (repo / pack_md).write_text(text, encoding='utf-8')
-        text = found.text[:found.start] + '\n'.join(blocks.values()) + found.text[found.end:]
+                (repo / pack_md).write_text(pack_md_text, encoding='utf-8')
         created = not file.exists()
         file.write_bytes(text.encode('utf-8'))
         # A new AGENTS.md gets CLAUDE.md linked to it, so Claude Code reads it too. A repo that already has its own
