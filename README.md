@@ -109,6 +109,8 @@ The sync leaves your other instruction file alone. If you keep a separate `CLAUD
 
 Later, `npx context-packs update` moves packs to their latest version, and `npx context-packs` resyncs at the pinned ones. Private repos work, since origins are fetched with your own git credentials.
 
+**Trying a pack before pushing it?** Give a folder beside the repo as the origin, as a path starting with a dot, such as `../agent-rules`. It's read from that folder's working tree like a pack in the repo itself: no ref, and its table points at the docs where they are, so editing a doc needs no resync, though changing its rules or a `when:` line does. It syncs only where that folder exists, so it's for trying a pack out, not for a repo that clones, CI and cloud sessions sync.
+
 ## Sync your project's own docs
 
 The same table works for a repo's own docs. Put them in a folder, each with a `when:` line, and install the folder as a pack read from the working tree:
@@ -162,7 +164,7 @@ Each command syncs the current folder, or `--dir <folder>`, and prints what chan
 | `docs <name> a,b` | Replaces the optional nested packs a pack installs, each named by its path such as `typescript/react` (`''` for none). Picking one installs the packs above it |
 | `list` | Lists each pack and its nested packs as a tree, marking the installed ones |
 
-**Pinning.** `--ref` takes a tag or a commit, never a branch, since a branch moves. `update` moves a pack pinned to a commit to the tip of the default branch, and one pinned to a release tag (a prefix and dot-separated numbers, such as `v1.2.0` or `acme-v3`) to the newest release with the same prefix, skipping pre-releases. Other tags stay put.
+**Pinning.** `--ref` takes a tag or a commit, never a branch, since a branch moves. `update` moves a pack pinned to a commit to the tip of the default branch, and one pinned to a release tag (a prefix and dot-separated numbers, such as `v1.2.0` or `acme-v3`) to the newest release with the same prefix, skipping pre-releases. Other tags stay put. A pack in a folder on disk, such as `.` or `../agent-rules`, isn't pinned.
 
 **Edits stay upstream.** Each block ends with a hash of its text and the files under its `docs/agents/packs/<name>/`. If either was edited in the repo, the sync stops and says what to fix: change the pack in its origin, then `update`.
 

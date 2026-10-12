@@ -5,7 +5,7 @@ import re
 import sys
 from typing import Dict, List, NamedTuple
 
-from packs import LOCAL, PACKS, Pack
+from packs import PACKS, Pack, local
 
 HEADER = 'header'
 HEADER_START = '<!-- context-packs:start header -->\n'
@@ -49,10 +49,10 @@ def marked_pack(file, name, marker):
     fields = dict(p for p in pairs if len(p) == 2)
     origin = fields.get('from')
     if (len(fields) != len(pairs) or set(fields) - {'from', 'path', 'ref', 'docs'} or not origin
-            or (origin == LOCAL) == ('ref' in fields)):
+            or local(origin) == ('ref' in fields)):
         sys.exit(f'context-packs: {file}: the {name} block\'s start marker needs from=<git URL> and '
-                 'ref=<tag or commit>, or from=. for a pack in this repo, plus path=<folder> unless the pack is the '
-                 'whole repo, and docs=<nested packs> for the optional ones picked. '
+                 'ref=<tag or commit>, or from=<a path starting with a dot> for a folder on disk, plus path=<folder> '
+                 'unless the pack is the whole repo, and docs=<nested packs> for the optional ones picked. '
                  'Fix the marker, then sync again.')
     docs = tuple(fields['docs'].split(',')) if 'docs' in fields else ()
     return Pack(name, origin, fields.get('path', ''), fields.get('ref'), docs)

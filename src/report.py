@@ -9,7 +9,7 @@ def short(ref):
 
 
 def at(pack):
-    """Where the pack is pinned, or nothing for one that syncs from the repo's working tree."""
+    """Where the pack is pinned, or nothing for a local one, which syncs from its working tree."""
     return f' @ {short(pack.ref)}' if pack.ref else ''
 
 

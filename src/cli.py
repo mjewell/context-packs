@@ -14,7 +14,7 @@ import sys
 import origins
 import report
 from blocks import HEADER, HEADER_RULES, HEADER_START, block, instructions, region, snapshot
-from packs import LOCAL, PACKS, Pack, fetch
+from packs import PACKS, Pack, fetch, local
 import tree
 
 
@@ -32,9 +32,10 @@ def apply(args, found):
                      'Use letters, digits, dots, dashes and underscores.')
         if args.name in names:
             sys.exit(f'context-packs: {args.dir} already has a pack named {args.name}.')
-        if args.origin == LOCAL:
+        if local(args.origin):
             if args.ref:
-                sys.exit('context-packs: a pack in this repo syncs from its working tree, so it takes no --ref.')
+                sys.exit(f'context-packs: {args.origin} is a folder on disk, which syncs from its working tree, so '
+                         'it takes no --ref.')
             ref = None
         else:
             ref = origins.pin(args.origin, args.ref) if args.ref else origins.tip(args.origin)
@@ -55,9 +56,9 @@ def apply(args, found):
         for i, pack in enumerate(packs):
             if pack.name not in (named or names):
                 continue
-            if pack.origin == LOCAL:
+            if pack.local:
                 if args.ref:
-                    sys.exit(f'context-packs: the {pack.name} pack syncs from this repo\'s working tree, '
+                    sys.exit(f'context-packs: the {pack.name} pack syncs from the working tree of {pack.origin}, '
                              'so it takes no --ref.')
                 continue
             packs[i] = pack._replace(ref=origins.pin(pack.origin, args.ref) if args.ref
@@ -98,7 +99,8 @@ def main():
                                      description='leave out the command to resync every pack at its pinned ref')
     add = commands.add_parser('add', help="install a pack, pinned to its origin's latest commit or to --ref")
     add.add_argument('name', help='what to call the pack in AGENTS.md and docs/agents/packs/')
-    add.add_argument('origin', help='a git URL, or . for a folder in the synced repo itself')
+    add.add_argument('origin', help='a git URL, or a folder on disk as a path starting with a dot: . for the synced repo itself, '
+                     'or one beside it such as ../agent-config')
     add.add_argument('--path', default='', help='the folder in the origin holding the pack, if not its root')
     add.add_argument('--ref', help='a tag or commit to pin the pack to')
     add.add_argument('--docs', default='', help='comma-separated optional nested packs to install')
