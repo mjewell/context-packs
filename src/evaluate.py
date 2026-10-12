@@ -18,9 +18,9 @@ EVALS = '.evals'
 CASE_FILES = ('prompt.md', 'case.yaml')
 TRIGGERS = 'triggers.md'
 SECTIONS = {'## Reads': 'reads', '## Skips': 'skips'}
-# What a trigger's run gets unless its triggers.md's front matter says otherwise: enough turns to read a table, an
-# index and a doc, and tools that look but change nothing.
-DEFAULTS = (('max_turns', '6'), ('allowed_tools', '[Read, Glob, Grep]'))
+# What a trigger's run gets unless its triggers.md's front matter says otherwise: enough turns to read the docs a
+# real repo's tables point at before settling, and tools that look but change nothing.
+DEFAULTS = (('max_turns', '10'), ('allowed_tools', '[Read, Glob, Grep]'))
 TRIGGERS_FORMAT = ('A triggers.md holds `## Reads` and `## Skips` headings, each followed by `- ` items, one prompt '
                    'each, with any further lines of a prompt indented under it.')
 
@@ -172,8 +172,9 @@ def evaluate(repo, file, found, packs, folders, name, doc, options):
             render(repo, file, found, packs, {**folders, name: content}, without)
             without_doc = harness.run(harness.plugin(work / f'{slug}-without', without, file.name, doc_tests.cases),
                                       options)
-            for line in harness.compare(['With', 'Without'],
-                                        [{n: with_doc[n] for n in without_doc}, without_doc]):
+            # Without first, so each change is what the doc does to the score.
+            for line in harness.compare(['Without', 'With'],
+                                        [without_doc, {n: with_doc[n] for n in without_doc}]):
                 print(line)
         if triggers:
             for line in harness.compare(['Score'], [{n: s for n, s in with_doc.items() if n not in without_doc}],

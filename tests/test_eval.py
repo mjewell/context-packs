@@ -58,7 +58,7 @@ class EvalTests(EvalCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertRegex(result.stdout, r'house-rules/testing\.md')
-        self.assertRegex(result.stdout, r'writes-test-first +1\.00 +0\.00 +-1\.00')
+        self.assertRegex(result.stdout, r'writes-test-first +0\.00 +1\.00 +\+1\.00')
 
     def test_rest_of_the_pack_and_instructions_stay_when_the_doc_is_left_out(self):
         (self.repo / 'AGENTS.md').write_text('# Our repo\n\nUse pnpm.\n\n' + (self.repo / 'AGENTS.md').read_text())
@@ -70,7 +70,7 @@ class EvalTests(EvalCase):
         billing = self.eval('house-rules', 'billing')
 
         self.assertRegex(result.stdout, r'keeps-prs-small +1\.00 +1\.00 +\+0\.00')
-        self.assertRegex(billing.stdout, r'charges-once +1\.00 +0\.00 +-1\.00')
+        self.assertRegex(billing.stdout, r'charges-once +0\.00 +1\.00 +\+1\.00')
         self.assertRegex(billing.stdout, r'uses-pnpm +1\.00 +1\.00 +\+0\.00')
 
     def test_each_run_passes_claude_the_options_after_a_double_dash(self):
@@ -92,8 +92,8 @@ class EvalTests(EvalCase):
         result = self.eval('house-rules')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertRegex(result.stdout, r'charges-once +1\.00 +0\.00')
-        self.assertRegex(result.stdout, r'writes-test-first +1\.00 +0\.00')
+        self.assertRegex(result.stdout, r'charges-once +0\.00 +1\.00')
+        self.assertRegex(result.stdout, r'writes-test-first +0\.00 +1\.00')
         self.assertEqual(len(self.calls()), 4)
 
     def test_doc_without_cases_stops_and_names_the_docs_that_have_them(self):
@@ -156,7 +156,7 @@ class NestedEvalTests(EvalCase):
         result = self.eval('house-rules', 'typescript/types')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertRegex(result.stdout, r'avoids-any +1\.00 +0\.00')
+        self.assertRegex(result.stdout, r'avoids-any +0\.00 +1\.00')
 
 
 class LocalPackEvalTests(EvalCase):
@@ -169,7 +169,7 @@ class LocalPackEvalTests(EvalCase):
         result = self.eval('house-rules', 'testing')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertRegex(result.stdout, r'writes-test-first +1\.00 +0\.00')
+        self.assertRegex(result.stdout, r'writes-test-first +0\.00 +1\.00')
 
     def test_pack_in_the_repo_itself_keeps_its_docs_where_they_are(self):
         docs = self.repo / 'docs' / 'agents' / 'project'
@@ -185,8 +185,24 @@ class LocalPackEvalTests(EvalCase):
         result = self.eval('project', 'deploying')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertRegex(result.stdout, r'ships-it +1\.00 +0\.00')
+        self.assertRegex(result.stdout, r'ships-it +0\.00 +1\.00')
 
+
+
+class RepoEvalsTests(EvalCase):
+    """The tests on this repo's own project docs, which double as the example of the format."""
+
+    def test_project_docs_tests_run(self):
+        shutil.copytree(Path(__file__).resolve().parents[1] / 'docs' / 'agents' / 'project',
+                        self.repo / 'docs' / 'agents' / 'project', ignore=shutil.ignore_patterns('__pycache__'))
+        self.sync('add', 'project', '.', '--path', 'docs/agents/project')
+
+        result = self.eval('project')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for name in ('stops-npm-tagging', 'reads-1-release-0-4-0-to-npm', 'skips-1-fix-the-typo-teh-in-readme',
+                     'reads-1-should-a-repo-be-able-to', 'skips-2-rename-the-sets-function-in-src'):
+            self.assertIn(name, result.stdout)
 
 if __name__ == '__main__':
     unittest.main()

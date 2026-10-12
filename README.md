@@ -166,7 +166,7 @@ context/
 
 ````markdown
 ---
-max_turns: 6
+max_turns: 12
 ---
 ## Reads
 
@@ -182,7 +182,7 @@ max_turns: 6
 - Bump the version to 0.4.0
 ````
 
-Indent any further lines of a prompt under its `- `. Front matter, if any, goes to every prompt's run; without it, each run gets 6 turns and tools that look but change nothing (`Read`, `Glob` and `Grep`). Write other cases, such as one checking that the agent writes the test first, in `claude plugin eval`'s own format (see `claude plugin eval --help`).
+Indent any further lines of a prompt under its `- `. Front matter, if any, goes to every prompt's run; without it, each run gets 10 turns and tools that look but change nothing (`Read`, `Glob` and `Grep`). Write other cases, such as one checking that the agent writes the test first, in `claude plugin eval`'s own format (see `claude plugin eval --help`).
 
 The sync skips `.evals`, like every name starting with a dot, so tests stay with the pack and never reach the repos that install it. A nested pack's tests go in its own `.evals`.
 
@@ -196,7 +196,7 @@ npx context-packs eval <name> [doc] [-- <claude plugin eval options>]
 - `[doc]` is the doc whose tests to run, by its path in the pack without `.md`, such as `testing` or `typescript/types`. Leave it out to run every doc that has tests.
 - Options after `--` go to `claude plugin eval`, such as `--runs 1 --model haiku`.
 
-Each prompt in `triggers.md` runs with this repo's instructions as a sync writes them. Each case runs that way too, then again with the doc left out of the pack, keeping the rest of the pack and of `AGENTS.md`. It prints each score, each case's both ways, and the folder holding the reports and transcripts. To try a pack you're writing, install it from your working tree by a path such as `../agent-rules`, into an empty folder to test it alone, or into a repo whose instructions you want to test it with.
+Each prompt in `triggers.md` runs with this repo's instructions as a sync writes them. Each case runs that way too, then again with the doc left out of the pack, keeping the rest of the pack and of `AGENTS.md`. It prints each score, each case's without the doc and with it, so a positive change means the doc helps, and the folder holding the reports and transcripts. To try a pack you're writing, install it from your working tree by a path such as `../agent-rules`, into an empty folder to test it alone, or into a repo whose instructions you want to test it with.
 
 ## Let your agent run it
 

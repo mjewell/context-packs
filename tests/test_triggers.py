@@ -46,7 +46,7 @@ class TriggerTests(EvalCase):
         result = self.eval('house-rules', 'testing')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertRegex(result.stdout, r'writes-test-first +1\.00 +0\.00 +-1\.00')
+        self.assertRegex(result.stdout, r'writes-test-first +0\.00 +1\.00 +\+1\.00')
         self.assertRegex(result.stdout, r'reads-1-writing-tests-for-the-parser +1\.00\n')
         self.assertEqual(len(self.calls()), 2)
 
