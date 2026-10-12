@@ -1,6 +1,6 @@
 ---
 name: context-packs
-description: Sync context packs, which are shared agent rules and docs kept in other git repos, into a repo's AGENTS.md, and add, remove or update them. Use when asked to update a repo's shared rules or context packs, or install or remove a pack.
+description: Sync context packs, which are shared agent rules and docs kept in other git repos, into a repo's AGENTS.md, add, remove or update them, and write and run a pack's evals. Use when asked to update a repo's shared rules or context packs, install or remove a pack, or test whether a pack's docs get read and change what agents do.
 ---
 
 # Context packs
@@ -26,3 +26,24 @@ Done when the target repo's packs are what the user asked for and synced, any wo
 5. If the repo's `AGENTS.md` or `CLAUDE.md` exists without context-packs blocks, the tool stops, names the file, and prints two lines. When it names both files, ask the user which should hold the packs. Paste the lines into that file, after its intro and before its project-specific sections, then run the command again.
 6. After an `update`, check the folder containing the repo. If it isn't a git repo and its `AGENTS.md` or `CLAUDE.md` has a `<!-- context-packs:start header -->` line, it's a synced workspace: run `update` on it too, with `--dir` set to that folder. Workspace sessions read its copy, so it lags otherwise.
 7. Report what changed in the repo, from the same `git status` as step 3, and whether the workspace was updated. Leave it uncommitted for the user.
+
+## Evals
+
+Done when the evals the user asked for are written or run, and the user has seen each score and the folder holding the reports and transcripts.
+
+- **Where tests go:** a doc's tests sit in a `.evals` folder beside it, under a folder named after the doc: `<pack>/.evals/<doc>/` for `<pack>/<doc>.md`. A nested pack's docs have their tests in its own `.evals`. The sync skips `.evals`.
+- **Triggers** check that agents read the doc when they should. Write them in `.evals/<doc>/triggers.md`, exactly this shape, since anything else stops the eval:
+  ```markdown
+  ## Reads
+
+  - A prompt that should make an agent read the doc
+  - A prompt over more than one line,
+    with each further line indented under its item
+
+  ## Skips
+
+  - A prompt that shouldn't
+  ```
+  Optional front matter goes to every prompt's run. Make Skips near misses, prompts close to the doc's `when` that still shouldn't match it, since those are what catch a `when` that's too broad.
+- **Cases** check that the doc changes what agents do. Each is a folder in `.evals/<doc>/` in `claude plugin eval`'s format: a `prompt.md` with front matter such as `max_turns` and `allowed_tools`, and graders in `graders/*.md`. A case should hinge on something only that doc says: when the repo's other instructions also say it, the case scores the same without the doc and measures nothing.
+- **Run them** from a repo with the pack installed, which needs Claude Code: `npx --yes context-packs --dir <repo> eval <name> [doc] [-- <claude plugin eval options>]`, with `doc` as its path in the pack without `.md`. Each trigger runs with the doc; each case runs without the doc, then with it, and a positive change means the doc helps. Every run spends the user's Claude usage, and each case and trigger runs three times by default, so unless the user said how much to run, say how many cases and triggers will run and offer `-- --runs 1 --model haiku` for a quick check. To test a pack being written, install it into an empty folder from its working tree, by a path such as `../agent-rules`, then run `eval` there.
