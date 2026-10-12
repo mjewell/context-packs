@@ -48,7 +48,7 @@ class TriggerTests(EvalCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertRegex(result.stdout, r'writes-test-first +0\.00 +1\.00 +\+1\.00')
         self.assertRegex(result.stdout, r'reads-1-writing-tests-for-the-parser +1\.00\n')
-        self.assertEqual(len(self.calls()), 2)
+        self.assertEqual(len(self.calls()), 3)
 
     def test_indented_lines_continue_a_trigger(self):
         self.triggers('## Reads\n\n- Please help\n\n  ```\n  writing tests\n  ```\n')
@@ -57,7 +57,7 @@ class TriggerTests(EvalCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertRegex(result.stdout, r'reads-1-please-help +1\.00')
-        prompt = (self.work(result) / 'testing-with' / 'evals' / 'reads-1-please-help' / 'prompt.md').read_text()
+        prompt = (self.work(result) / 'triggers' / 'testing' / 'reads-1-please-help' / 'prompt.md').read_text()
         self.assertTrue(prompt.endswith('\nPlease help\n\n```\nwriting tests\n```\n'), prompt)
 
     def test_front_matter_goes_to_every_trigger_with_defaults_for_what_it_leaves_out(self):
@@ -65,7 +65,7 @@ class TriggerTests(EvalCase):
 
         result = self.eval('house-rules', 'testing')
 
-        prompt = (self.work(result) / 'testing-with' / 'evals' / 'reads-1-writing-tests-for-the-parser' /
+        prompt = (self.work(result) / 'triggers' / 'testing' / 'reads-1-writing-tests-for-the-parser' /
                   'prompt.md').read_text()
         self.assertTrue(prompt.startswith('---\nmax_turns: 3\nallowed_tools: [Read, Glob, Grep]\n---\n'), prompt)
 

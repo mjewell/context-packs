@@ -46,8 +46,11 @@ def run(folder, options):
     # No baseline arm: the runs to compare are the plugins' own. A threshold of 0 leaves the exit code to failures.
     command = ['claude', 'plugin', 'eval', str(folder), '--ablation', 'none', '--trust-plugin', '--no-publish',
                '--threshold', '0', '--json', str(result), *options]
-    if subprocess.run(command).returncode != 0 or not result.is_file():
-        sys.exit(f'context-packs: claude plugin eval failed for {folder}; its output above says why.')
+    # Captured, since runs go on side by side and their output would interleave.
+    finished = subprocess.run(command, capture_output=True, text=True)
+    if finished.returncode != 0 or not result.is_file():
+        sys.exit(f'context-packs: claude plugin eval failed for {folder}:\n'
+                 f'{(finished.stdout + finished.stderr).strip()}')
     cases = json.loads(result.read_text())['cases']
     names = [c['name'] for c in cases]
     repeated = sorted({n for n in names if names.count(n) > 1})

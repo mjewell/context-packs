@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import sys
@@ -78,12 +79,53 @@ class EvalTests(EvalCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         calls = self.calls()
-        self.assertEqual(len(calls), 2)
+        self.assertEqual(len(calls), 4)
         for call in calls:
             self.assertEqual(call[:2], ['plugin', 'eval'])
             self.assertIn('--ablation', call)
             self.assertEqual(call[call.index('--ablation') + 1], 'none')
             self.assertEqual(call[-4:], ['--runs', '1', '--model', 'haiku'])
+
+    def test_runs_on_haiku_unless_the_options_name_a_model(self):
+        default = self.eval('house-rules', 'testing')
+        default_calls = self.calls()
+        self.log.unlink()
+        chosen = self.eval('house-rules', 'testing', '--', '--model', 'sonnet')
+
+        self.assertEqual(default.returncode, 0, default.stderr)
+        self.assertIn('on haiku', default.stdout)
+        for call in default_calls:
+            self.assertEqual(call[call.index('--model') + 1], 'haiku')
+        self.assertIn('on sonnet', chosen.stdout)
+        for call in self.calls():
+            self.assertEqual(call.count('--model'), 1)
+            self.assertEqual(call[call.index('--model') + 1], 'sonnet')
+
+    def test_concurrency_sizes_the_pool_and_isnt_passed_on(self):
+        result = self.eval('house-rules', 'testing', '--', '-j', '2')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('2 at a time', result.stdout)
+        for call in self.calls():
+            self.assertNotIn('-j', call)
+            self.assertNotIn('--concurrency', call)
+
+    def test_plan_lists_each_case_before_the_results(self):
+        result = self.eval('house-rules', 'testing')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        plan = result.stdout.index('house-rules: 4 cases on haiku, 4 at a time')
+        for line in (r'\[ \] testing\.md +writes-test-first +without the doc',
+                     r'\[ \] testing\.md +writes-test-first +with the doc',
+                     r'\[ \] testing\.md +keeps-prs-small +with the doc'):
+            self.assertLess(plan, re.search(line, result.stdout).start())
+        self.assertLess(plan, result.stdout.index('house-rules/testing.md\n'))
+
+    def test_each_finished_case_prints_a_line(self):
+        result = self.eval('house-rules', 'testing')
+
+        self.assertRegex(result.stdout, r'\[x\] testing\.md +writes-test-first +without the doc +0\.00')
+        self.assertRegex(result.stdout, r'\[x\] testing\.md +writes-test-first +with the doc +1\.00')
 
     def test_without_a_doc_every_doc_with_cases_is_evaluated(self):
         self.publish(self.cases('billing', {'charges-once': case('Charge once.')}))
@@ -94,7 +136,7 @@ class EvalTests(EvalCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertRegex(result.stdout, r'charges-once +0\.00 +1\.00')
         self.assertRegex(result.stdout, r'writes-test-first +0\.00 +1\.00')
-        self.assertEqual(len(self.calls()), 4)
+        self.assertEqual(len(self.calls()), 6)
 
     def test_doc_without_cases_stops_and_names_the_docs_that_have_them(self):
         result = self.eval('house-rules', 'billing')
@@ -137,6 +179,7 @@ class EvalTests(EvalCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn('claude plugin eval', result.stderr)
+        self.assertIn('something went wrong', result.stderr)
 
     def test_options_after_a_double_dash_belong_only_to_eval(self):
         result = self.sync('list', '--', '--runs', '1')

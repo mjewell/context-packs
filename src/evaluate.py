@@ -3,6 +3,7 @@
 listing prompts that should and shouldn't make an agent read the doc. Each case runs with the repo's instructions as
 a sync writes them, then again with the doc left out of the pack, and the scores are compared; each trigger runs only
 with the doc. The sync skips .evals, since it skips every name starting with a dot."""
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import re
 import shutil
@@ -11,6 +12,7 @@ import tempfile
 from typing import List, NamedTuple, Optional
 
 import harness
+import progress
 import sync
 import tree
 
@@ -21,8 +23,20 @@ SECTIONS = {'## Reads': 'reads', '## Skips': 'skips'}
 # What a trigger's run gets unless its triggers.md's front matter says otherwise: enough turns to read the docs a
 # real repo's tables point at before settling, and tools that look but change nothing.
 DEFAULTS = (('max_turns', '10'), ('allowed_tools', '[Read, Glob, Grep]'))
+# Runs default to a small model, since every case runs several times and a pack can have many; --model picks another.
+MODEL = 'haiku'
+POOL = 4
+PAUSE = 5
 TRIGGERS_FORMAT = ('A triggers.md holds `## Reads` and `## Skips` headings, each followed by `- ` items, one prompt '
                    'each, with any further lines of a prompt indented under it.')
+
+
+class Job(NamedTuple):
+    """A case to run for a doc, with the doc or without it, and the folder holding that version of the repo."""
+    doc: str
+    case: Path
+    variant: str
+    files: Path
 
 
 class Tests(NamedTuple):
@@ -113,6 +127,32 @@ def trigger_cases(path, where, doc, into):
     return cases
 
 
+def scheduling(options):
+    """The options to pass each run of claude plugin eval, with --model added unless they name one, how many runs
+    go on at once, and the model. -j and --concurrency come out of them, since eval runs cases side by side itself."""
+    passed, pool, model = [], POOL, None
+    rest = iter(options)
+    for option in rest:
+        flag, equals, value = option.partition('=')
+        if flag in ('-j', '--concurrency') or (flag.startswith('-j') and flag[2:].isdigit()):
+            value = flag[2:] if flag.startswith('-j') and flag[2:] else value if equals else next(rest, '')
+            if not value.isdigit() or int(value) < 1:
+                sys.exit(f'context-packs: {option} needs a number of runs to go on at once, 1 or more.')
+            pool = int(value)
+            continue
+        passed.append(option)
+        if flag == '--model':
+            model = value if equals else next(rest, None)
+            if model is None:
+                sys.exit('context-packs: --model needs a model to run on.')
+            if not equals:
+                passed.append(model)
+    if model is None:
+        model = MODEL
+        passed += ['--model', MODEL]
+    return passed, pool, model
+
+
 def render(repo, file, found, packs, folders, into):
     """Write the repo's instructions file into the folder into as a sync writes it from the packs' content in
     folders, with every file its tables point at, and return the packs as written. A pack read from a folder outside
@@ -155,30 +195,66 @@ def evaluate(repo, file, found, packs, folders, name, doc, options):
     work = Path(tempfile.mkdtemp(prefix='context-packs-eval-'))
     full = work / 'full'
     run_pack = next(p for p in render(repo, file, found, packs, folders, full) if p.name == name)
+    jobs = []
     for path, doc_tests in sorted(by_doc.items()):
         slug = path[:-len('.md')].replace('/', '-')
         triggers = trigger_cases(doc_tests.triggers, doc_tests.triggers.relative_to(folders[name]).as_posix(),
                                  (run_pack.synced / path).as_posix(),
                                  work / 'triggers' / slug) if doc_tests.triggers else []
-        with_doc = harness.run(harness.plugin(work / f'{slug}-with', full, file.name, doc_tests.cases + triggers),
-                               options)
-        print(f'{name}/{path}')
-        without_doc = {}
         if doc_tests.cases:
             content = work / 'packs' / slug
             shutil.copytree(folders[name], content, ignore=shutil.ignore_patterns('.*'))
             (content / path).unlink()
             without = work / f'without-{slug}'
             render(repo, file, found, packs, {**folders, name: content}, without)
-            without_doc = harness.run(harness.plugin(work / f'{slug}-without', without, file.name, doc_tests.cases),
-                                      options)
+            jobs += [Job(path, case, 'without', without) for case in doc_tests.cases]
+        jobs += [Job(path, case, 'with', full) for case in doc_tests.cases + triggers]
+
+    passed, pool, model = scheduling(options)
+    print(f'{name}: {len(jobs)} cases on {model}, {pool} at a time')
+    doc_width = max(len(job.doc) for job in jobs)
+    case_width = max(len(job.case.name) for job in jobs)
+    checklist = progress.Checklist([f'{job.doc.ljust(doc_width)}  {job.case.name.ljust(case_width)}  '
+                                    f'{job.variant} the doc' for job in jobs])
+    progress.pause(PAUSE)
+
+    def run(index):
+        job = jobs[index]
+        # A plugin for each case, so each case's score arrives as soon as its own runs finish.
+        plugin = harness.plugin(work / 'plugins' / f'{index}-{job.case.name}', job.files, file.name, [job.case])
+        return harness.run(plugin, passed)
+
+    scores = {}
+    with ThreadPoolExecutor(pool) as executor:
+        futures = {executor.submit(run, index): index for index in range(len(jobs))}
+        try:
+            for future in as_completed(futures):
+                index = futures[future]
+                job, result = jobs[index], future.result()
+                [(case_name, score)] = result.items()
+                got = scores.setdefault((job.doc, job.variant), {})
+                if case_name in got:
+                    sys.exit(f'context-packs: more than one test of {job.doc} is named {case_name}, so their scores '
+                             'can\'t be told apart. Give each its own name.')
+                got[case_name] = score
+                checklist.tick(index, f'{score.score:.2f}')
+        except BaseException:
+            for pending in futures:
+                pending.cancel()
+            raise
+    print()
+
+    for path in sorted(by_doc):
+        with_doc, without_doc = scores.get((path, 'with'), {}), scores.get((path, 'without'), {})
+        print(f'{name}/{path}')
+        if without_doc:
             # Without first, so each change is what the doc does to the score.
             for line in harness.compare(['Without', 'With'],
                                         [without_doc, {n: with_doc[n] for n in without_doc}]):
                 print(line)
-        if triggers:
-            for line in harness.compare(['Score'], [{n: s for n, s in with_doc.items() if n not in without_doc}],
-                                        'Trigger'):
+        triggered = {n: s for n, s in with_doc.items() if n not in without_doc}
+        if triggered:
+            for line in harness.compare(['Score'], [triggered], 'Trigger'):
                 print(line)
         print()
     print(f'Reports and transcripts: {work}')
