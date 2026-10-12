@@ -15,7 +15,9 @@ def interactive():
 
 
 class Checklist:
-    """Print each label as an unticked item, then tick it, with a note, as tick is called with its index."""
+    """Print each label as an item waiting, `[ ]`, then mark it running, `[-]`, as start is called with its index,
+    and done, `[x]` with a note, as tick is. Marking an item running shows only on a terminal: elsewhere it would add
+    a line per item that says nothing a finished one doesn't."""
 
     def __init__(self, labels):
         self.labels = labels
@@ -24,15 +26,24 @@ class Checklist:
         for label in labels:
             print(f'  [ ] {label}', flush=True)
 
+    def start(self, index):
+        if sys.stdout.isatty():
+            self.redraw(index, f'  [-] {self.labels[index]}')
+
     def tick(self, index, note):
         line = f'  [x] {self.labels[index].ljust(self.width)}  {note}'
-        with self.lock:
-            if sys.stdout.isatty():
-                up = len(self.labels) - index
-                sys.stdout.write(f'{UP.format(up)}{CLEAR}{line}{DOWN.format(up)}\r')
-                sys.stdout.flush()
-            else:
+        if sys.stdout.isatty():
+            self.redraw(index, line)
+        else:
+            with self.lock:
                 print(line, flush=True)
+
+    def redraw(self, index, line):
+        """Replace the item's line in place, then go back below the list."""
+        up = len(self.labels) - index
+        with self.lock:
+            sys.stdout.write(f'{UP.format(up)}{CLEAR}{line}{DOWN.format(up)}\r')
+            sys.stdout.flush()
 
 
 def pause(seconds):

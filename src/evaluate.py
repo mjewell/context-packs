@@ -219,6 +219,7 @@ def evaluate(repo, file, found, packs, folders, name, doc, options):
     progress.pause(PAUSE)
 
     def run(index):
+        checklist.start(index)
         job = jobs[index]
         # A plugin for each case, so each case's score arrives as soon as its own runs finish.
         plugin = harness.plugin(work / 'plugins' / f'{index}-{job.case.name}', job.files, file.name, [job.case])

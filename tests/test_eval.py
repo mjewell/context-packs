@@ -1,12 +1,15 @@
 import json
 import os
-import re
 from pathlib import Path
+import pty
+import re
+import select
 import shutil
+import subprocess
 import sys
 import unittest
 
-from test_cli import SyncCase
+from test_cli import CLI, SyncCase
 
 FAKE_CLAUDE = Path(__file__).resolve().parent / 'fake_claude.py'
 TESTING = '---\nwhen: Writing tests\n---\nWrite the test first.\n'
@@ -126,6 +129,30 @@ class EvalTests(EvalCase):
 
         self.assertRegex(result.stdout, r'\[x\] testing\.md +writes-test-first +without the doc +0\.00')
         self.assertRegex(result.stdout, r'\[x\] testing\.md +writes-test-first +with the doc +1\.00')
+
+    def test_on_a_terminal_each_case_shows_running_then_done_in_place(self):
+        main, secondary = pty.openpty()
+        process = subprocess.Popen([sys.executable, str(CLI), 'eval', 'house-rules', 'testing'], cwd=self.repo,
+                                   env=self.env, stdin=secondary, stdout=secondary, stderr=secondary)
+        os.close(secondary)
+        output, pressed = b'', False
+        while select.select([main], [], [], 30)[0]:
+            try:
+                chunk = os.read(main, 4096)
+            except OSError:
+                break
+            if not chunk:
+                break
+            output += chunk
+            if not pressed and b'Starting in' in output:
+                os.write(main, b'\n')
+                pressed = True
+        os.close(main)
+        text = output.decode()
+
+        self.assertEqual(process.wait(timeout=30), 0, text)
+        self.assertRegex(text, r'\x1b\[\d+A\r\x1b\[K  \[-\] testing\.md +writes-test-first +with the doc')
+        self.assertRegex(text, r'\x1b\[\d+A\r\x1b\[K  \[x\] testing\.md +writes-test-first +with the doc +1\.00')
 
     def test_without_a_doc_every_doc_with_cases_is_evaluated(self):
         self.publish(self.cases('billing', {'charges-once': case('Charge once.')}))
