@@ -146,6 +146,35 @@ The imported pack becomes a pack nested in yours, with the import pack's `when` 
 
 [The example](docs/example.md#choosing-when-a-pack-loads) imports a pack this way, step by step. The `when` is yours to change, and so is anything you write below the front matter, which comes before the imported rules. The tool keeps the rest: `update` moves `ref`, and `remove typescript` deletes the folder. An import pack's folder holds only its `pack.md`, its name can't be used by another pack in the repo, and only a pack read from a folder on disk, such as your project's own docs, can hold one.
 
+## Test a pack with evals
+
+Check that a doc changes what an agent does by writing eval cases for it, and running them with the doc and without it. Cases use the format of `claude plugin eval` (see `claude plugin eval --help`), so running them needs Claude Code. A doc's cases go in a `.evals` folder beside it, one folder per case, under a folder named after the doc:
+
+```text
+context/
+├── testing.md
+└── .evals/
+    └── testing/
+        └── writes-test-first/
+            ├── prompt.md          # the task, with front matter for the run
+            └── graders/
+                └── test-first.md  # how to score the run
+```
+
+The sync skips `.evals`, like every name starting with a dot, so cases stay with the pack and never reach the repos that install it. A nested pack's cases go in its own `.evals`.
+
+Run a pack's cases from a repo that has the pack installed:
+
+```bash
+npx context-packs eval <name> [doc] [-- <claude plugin eval options>]
+```
+
+- `<name>` is the pack's name in this repo's `AGENTS.md`.
+- `[doc]` is the doc whose cases to run, by its path in the pack without `.md`, such as `testing` or `typescript/types`. Leave it out to run every doc that has cases.
+- Options after `--` go to `claude plugin eval`, such as `--runs 1 --model haiku`.
+
+Each doc's cases run twice: with this repo's instructions as a sync writes them, then with the doc left out of the pack, keeping the rest of the pack and of `AGENTS.md`. It prints each case's score both ways, and the folder holding the reports and transcripts. To try a pack you're writing, install it from your working tree by a path such as `../agent-rules`, into an empty folder to test it alone, or into a repo whose instructions you want to test it with.
+
 ## Let your agent run it
 
 The `context-packs` skill lets you skip the commands: ask Claude Code or Codex in plain words, and it runs them, shows you what changed, and leaves the result uncommitted for you to review. Install it for every project:
@@ -178,6 +207,7 @@ Each command syncs the current folder, or `--dir <folder>`, and prints what chan
 | `update [name…]` | Moves packs to their latest version |
 | `update <name> --ref R` | Pins one pack to a tag or commit |
 | `list` | Lists each pack, where it comes from, and its pin, with its import packs under it |
+| `eval <name> [doc] [-- options]` | Runs a doc's eval cases with the doc and without it, and compares the scores |
 
 **Pinning.** `--ref` takes a tag or a commit, never a branch, since a branch moves. `update` moves a pack pinned to a commit to the tip of the default branch, and one pinned to a release tag (a prefix and dot-separated numbers, such as `v1.2.0` or `acme-v3`) to the newest release with the same prefix, skipping pre-releases. Other tags stay put. A pack in a folder on disk, such as `.` or `../agent-rules`, isn't pinned.
 

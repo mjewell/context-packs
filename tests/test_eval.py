@@ -1,0 +1,192 @@
+import json
+import os
+from pathlib import Path
+import shutil
+import sys
+import unittest
+
+from test_cli import SyncCase
+
+FAKE_CLAUDE = Path(__file__).resolve().parent / 'fake_claude.py'
+TESTING = '---\nwhen: Writing tests\n---\nWrite the test first.\n'
+BILLING = '---\nwhen: Editing billing\n---\nCharge once.\n'
+
+
+def case(pattern, name=None):
+    """A case's files: a prompt, and a grader passing when pattern is in what the run saw."""
+    files = {'prompt.md': '---\nmax_turns: 5\n---\n\nAdd a feature.\n',
+             'graders/rule.md': f'---\ntype: regex\npattern: {pattern}\n---\n'}
+    if name:
+        files['case.yaml'] = f'schema_version: "1.0"\nname: {name}\n'
+    return files
+
+
+class EvalCase(SyncCase):
+    """A repo with a pack installed whose .evals folder holds cases, run against a stand-in for claude."""
+
+    def setUp(self):
+        super().setUp()
+        bin_dir = self.root / 'bin'
+        bin_dir.mkdir()
+        (bin_dir / 'claude').write_text(f'#!/bin/sh\nexec "{sys.executable}" "{FAKE_CLAUDE}" "$@"\n')
+        (bin_dir / 'claude').chmod(0o755)
+        self.log = self.root / 'claude.log'
+        self.env = {**self.env, 'PATH': f'{bin_dir}{os.pathsep}{os.environ["PATH"]}',
+                    'FAKE_CLAUDE_LOG': str(self.log), 'TMPDIR': str(self.root)}
+
+    def cases(self, doc, cases):
+        """Files for the pack: each case's files in the folder .evals/<doc>/<case>/."""
+        return {f'.evals/{doc}/{name}/{path}': text for name, files in cases.items() for path, text in files.items()}
+
+    def calls(self):
+        return [json.loads(line) for line in self.log.read_text().splitlines()]
+
+    def eval(self, *args):
+        return self.sync('eval', *args)
+
+
+class EvalTests(EvalCase):
+    def setUp(self):
+        super().setUp()
+        self.publish({'pack.md': 'Prefer small PRs.\n', 'testing.md': TESTING, 'billing.md': BILLING,
+                      **self.cases('testing', {'writes-test-first': case('Write the test first.'),
+                                               'keeps-prs-small': case('Prefer small PRs.')})})
+        self.add()
+
+    def test_doc_left_out_lowers_the_score_of_cases_that_rely_on_it(self):
+        result = self.eval('house-rules', 'testing')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertRegex(result.stdout, r'house-rules/testing\.md')
+        self.assertRegex(result.stdout, r'writes-test-first +1\.00 +0\.00 +-1\.00')
+
+    def test_rest_of_the_pack_and_instructions_stay_when_the_doc_is_left_out(self):
+        (self.repo / 'AGENTS.md').write_text('# Our repo\n\nUse pnpm.\n\n' + (self.repo / 'AGENTS.md').read_text())
+        self.publish(self.cases('billing', {'charges-once': case('Charge once.'),
+                                            'uses-pnpm': case('Use pnpm.')}))
+        self.sync('update')
+
+        result = self.eval('house-rules', 'testing')
+        billing = self.eval('house-rules', 'billing')
+
+        self.assertRegex(result.stdout, r'keeps-prs-small +1\.00 +1\.00 +\+0\.00')
+        self.assertRegex(billing.stdout, r'charges-once +1\.00 +0\.00 +-1\.00')
+        self.assertRegex(billing.stdout, r'uses-pnpm +1\.00 +1\.00 +\+0\.00')
+
+    def test_each_run_passes_claude_the_options_after_a_double_dash(self):
+        result = self.eval('house-rules', 'testing', '--', '--runs', '1', '--model', 'haiku')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = self.calls()
+        self.assertEqual(len(calls), 2)
+        for call in calls:
+            self.assertEqual(call[:2], ['plugin', 'eval'])
+            self.assertIn('--ablation', call)
+            self.assertEqual(call[call.index('--ablation') + 1], 'none')
+            self.assertEqual(call[-4:], ['--runs', '1', '--model', 'haiku'])
+
+    def test_without_a_doc_every_doc_with_cases_is_evaluated(self):
+        self.publish(self.cases('billing', {'charges-once': case('Charge once.')}))
+        self.sync('update')
+
+        result = self.eval('house-rules')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertRegex(result.stdout, r'charges-once +1\.00 +0\.00')
+        self.assertRegex(result.stdout, r'writes-test-first +1\.00 +0\.00')
+        self.assertEqual(len(self.calls()), 4)
+
+    def test_doc_without_cases_stops_and_names_the_docs_that_have_them(self):
+        result = self.eval('house-rules', 'billing')
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('billing', result.stderr)
+        self.assertIn('testing', result.stderr)
+        self.assertFalse(self.log.exists())
+
+    def test_pack_not_installed_stops(self):
+        result = self.eval('acme')
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('acme', result.stderr)
+
+    def test_cases_for_a_doc_the_pack_doesnt_have_stop_the_eval(self):
+        self.publish(self.cases('deploying', {'ships-it': case('Ship it.')}))
+        self.sync('update')
+
+        result = self.eval('house-rules')
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('.evals/deploying', result.stderr)
+        self.assertFalse(self.log.exists())
+
+    def test_two_cases_of_a_doc_with_one_name_stop_the_eval(self):
+        self.publish(self.cases('billing', {'a': case('Charge once.', name='same'),
+                                            'b': case('Charge once.', name='same')}))
+        self.sync('update')
+
+        result = self.eval('house-rules', 'billing')
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('same', result.stderr)
+
+    def test_claude_failing_stops_the_eval(self):
+        self.env['FAKE_CLAUDE_FAIL'] = '1'
+
+        result = self.eval('house-rules', 'testing')
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('claude plugin eval', result.stderr)
+
+    def test_options_after_a_double_dash_belong_only_to_eval(self):
+        result = self.sync('list', '--', '--runs', '1')
+
+        self.assertEqual(result.returncode, 2)
+
+
+class NestedEvalTests(EvalCase):
+    def test_nested_packs_cases_sit_in_its_own_evals_folder(self):
+        self.publish({'pack.md': 'Prefer small PRs.\n',
+                      'typescript/pack.md': '---\nwhen: Editing TypeScript\n---\nPrefer unions.\n',
+                      'typescript/types.md': '---\nwhen: Writing types\n---\nNo any.\n',
+                      'typescript/.evals/types/avoids-any/prompt.md': case('No any.')['prompt.md'],
+                      'typescript/.evals/types/avoids-any/graders/rule.md': case('No any.')['graders/rule.md']})
+        self.add()
+
+        result = self.eval('house-rules', 'typescript/types')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertRegex(result.stdout, r'avoids-any +1\.00 +0\.00')
+
+
+class LocalPackEvalTests(EvalCase):
+    def test_sibling_pack_is_evaluated_from_its_working_tree(self):
+        self.publish({'pack.md': 'Prefer small PRs.\n', 'testing.md': TESTING,
+                      **self.cases('testing', {'writes-test-first': case('Write the test first, always.')})})
+        self.sync('add', 'house-rules', '../house-rules', '--path', 'context')
+        (self.source / 'context' / 'testing.md').write_text(TESTING.replace('first.', 'first, always.'))
+
+        result = self.eval('house-rules', 'testing')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertRegex(result.stdout, r'writes-test-first +1\.00 +0\.00')
+
+    def test_pack_in_the_repo_itself_keeps_its_docs_where_they_are(self):
+        docs = self.repo / 'docs' / 'agents' / 'project'
+        docs.mkdir(parents=True)
+        (docs / 'deploying.md').write_text('---\nwhen: Deploying\n---\nShip it.\n')
+        files = {**case('docs/agents/project/deploying.md'),
+                 'graders/content.md': '---\ntype: regex\npattern: Ship it.\n---\n'}
+        for path, text in files.items():
+            (docs / '.evals' / 'deploying' / 'ships-it' / path).parent.mkdir(parents=True, exist_ok=True)
+            (docs / '.evals' / 'deploying' / 'ships-it' / path).write_text(text)
+        self.sync('add', 'project', '.', '--path', 'docs/agents/project')
+
+        result = self.eval('project', 'deploying')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertRegex(result.stdout, r'ships-it +1\.00 +0\.00')
+
+
+if __name__ == '__main__':
+    unittest.main()

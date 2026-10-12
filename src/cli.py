@@ -11,6 +11,7 @@ import re
 import shutil
 import sys
 
+import evaluate
 import imports
 import origins
 import report
@@ -41,7 +42,7 @@ def apply(args, found, imported):
         else:
             ref = origins.pin(args.origin, args.ref) if args.ref else origins.tip(args.origin)
         packs.append(Pack(args.name, args.origin, args.path, ref))
-    named = [args.name] if args.command == 'remove' else getattr(args, 'names', [])
+    named = [args.name] if args.command in ('remove', 'eval') else getattr(args, 'names', [])
     unknown = [n for n in named if n not in names + imported]
     if unknown:
         sys.exit(f'context-packs: {args.dir} has no pack named {", ".join(unknown)}. '
@@ -113,7 +114,16 @@ def main():
     update.add_argument('names', nargs='*', help='the packs to update; all of them if left out')
     update.add_argument('--ref', help='a tag or commit to pin the one named pack to instead')
     commands.add_parser('list', help='list the packs, where each comes from, and its pin')
-    args = parser.parse_args()
+    evals = commands.add_parser('eval', help="run a pack's eval cases with each doc, and again without it, through "
+                                             'claude plugin eval; pass it options after --')
+    evals.add_argument('name', help='the pack, by its name in AGENTS.md')
+    evals.add_argument('doc', nargs='?', help='the doc whose cases to run, by its path in the pack without .md; '
+                                              'every doc with cases if left out')
+    argv = sys.argv[1:]
+    split = argv.index('--') if '--' in argv else len(argv)
+    args, options = parser.parse_args(argv[:split]), argv[split + 1:]
+    if split < len(argv) and args.command != 'eval':
+        parser.error('only eval takes options after --, which it passes to claude plugin eval')
     repo = args.dir
     if not repo.is_dir():
         sys.exit(f'context-packs: {repo} is not a folder')
@@ -137,6 +147,9 @@ def main():
         roots = {p.name: tree.load(folders[p.name], p, imported=imported.get(p.name)) for p in packs}
         if args.command == 'list':
             show(packs, known)
+            return
+        if args.command == 'eval':
+            evaluate.evaluate(repo, file, found, packs, folders, args.name, args.doc, options)
             return
 
         for gone in {p.name for p in found.packs} - {p.name for p in packs}:
