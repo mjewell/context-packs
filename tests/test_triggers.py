@@ -28,7 +28,8 @@ class TriggerTests(EvalCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertRegex(result.stdout, r'reads-1-writing-tests-for-the-parser +1\.00')
         self.assertRegex(result.stdout, r'skips-1-bump-the-version +1\.00')
-        self.assertRegex(result.stdout, r'skips-2-writing-tests-can-wait-bump-the +0\.00')
+        self.assertRegex(result.stdout, r'skips-2-writing-tests-can-wait-bump-the +0\.00\n'
+                                        r'    run 1: Read called 1x \(expected 0\.\.0\)\n    report: ')
 
     def test_triggers_run_only_with_the_doc(self):
         self.triggers('## Reads\n\n- Writing tests for the parser\n')

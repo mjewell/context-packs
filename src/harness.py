@@ -16,8 +16,12 @@ HOOK = 'cp -R "${CLAUDE_PLUGIN_ROOT}/files/." . && cat "${CLAUDE_PLUGIN_ROOT}/co
 
 
 class Score(NamedTuple):
+    """A case's score, the errors its runs hit, the explanations of the graders that failed, each with its run's
+    number, and the report claude plugin eval wrote."""
     score: float
     errors: List[str]
+    failures: List[str]
+    report: Path
 
 
 def plugin(into, files, name, cases):
@@ -42,10 +46,10 @@ def plugin(into, files, name, cases):
 def run(folder, options):
     """Run the cases of the plugin in folder with claude plugin eval, passing it options, and return each case's
     score by name."""
-    result = folder / 'result.json'
+    result, report = folder / 'result.json', folder / 'report.html'
     # No baseline arm: the runs to compare are the plugins' own. A threshold of 0 leaves the exit code to failures.
     command = ['claude', 'plugin', 'eval', str(folder), '--ablation', 'none', '--trust-plugin', '--no-publish',
-               '--threshold', '0', '--json', str(result), *options]
+               '--threshold', '0', '--json', str(result), '--report', str(report), *options]
     # Captured, since runs go on side by side and their output would interleave.
     finished = subprocess.run(command, capture_output=True, text=True)
     if finished.returncode != 0 or not result.is_file():
@@ -57,14 +61,21 @@ def run(folder, options):
     if repeated:
         sys.exit(f'context-packs: more than one case in {folder / "evals"} is named {", ".join(repeated)}, so their '
                  'scores can\'t be told apart. Give each case its own name.')
+    def runs(case):
+        return [(number, run) for arm in case['arms'].values() for number, run in enumerate(arm, 1)]
     return {c['name']: Score(c['aggregates']['score'],
-                             [r['error'] for runs in c['arms'].values() for r in runs if r.get('error')])
+                             [f'run {n}: {run["error"]}' for n, run in runs(c) if run.get('error')],
+                             [f'run {n}: {grader["explanation"]}' for n, run in runs(c)
+                              for grader in run.get('graders', []) if not grader['passed']],
+                             report)
             for c in cases}
 
 
 def compare(labels, scores, heading='Case'):
     """Lines comparing each case's score across runs, one column per label, with each later run's change from the
-    first, and any errors the runs reported."""
+    first. Under a case short of 1 in the last column go its failed graders' explanations and its report, and under
+    any case go the errors its runs hit: a low score in an earlier column, such as without a doc, is the expected
+    one, but an error there can still void the comparison."""
     names = sorted(scores[0])
     width = max(len(n) for n in names + [heading])
     lines = ['  ' + '  '.join([heading.ljust(width), *(label.rjust(7) for label in labels),
@@ -73,5 +84,11 @@ def compare(labels, scores, heading='Case'):
         row = [s[name].score for s in scores]
         lines.append('  ' + '  '.join([name.ljust(width), *(f'{score:7.2f}' for score in row),
                                        *(f'{score - row[0]:+7.2f}' for score in row[1:])]))
-    lines += [f'  {name}: {error}' for s in scores for name in names for error in s[name].errors]
+        last = scores[-1][name]
+        explained = last.failures if last.score < 1 else []
+        errors = [f'{label.lower()}: {error}' if len(labels) > 1 else error
+                  for label, s in zip(labels, scores) for error in s[name].errors]
+        lines += [f'    {note}' for note in explained + errors]
+        if explained or errors:
+            lines.append(f'    report: {last.report}')
     return lines

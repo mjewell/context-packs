@@ -154,6 +154,26 @@ class EvalTests(EvalCase):
         self.assertRegex(text, r'\x1b\[\d+A\r\x1b\[K  \[-\] testing\.md +writes-test-first +with the doc')
         self.assertRegex(text, r'\x1b\[\d+A\r\x1b\[K  \[x\] testing\.md +writes-test-first +with the doc +1\.00')
 
+    def test_a_shortfall_with_the_doc_is_explained_with_its_report(self):
+        self.publish(self.cases('testing', {'misses-the-point': case('Never written anywhere.')}))
+        self.sync('update')
+
+        result = self.eval('house-rules', 'testing')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        explained = re.search(r'misses-the-point +0\.00 +0\.00 +\+0\.00\n'
+                              r'    run 1: /Never written anywhere\./ did not match the run\n'
+                              r'    report: (\S+)\n', result.stdout)
+        self.assertIsNotNone(explained, result.stdout)
+        self.assertTrue(Path(explained.group(1)).is_file())
+
+    def test_a_lower_score_without_the_doc_isnt_explained(self):
+        result = self.eval('house-rules', 'testing')
+
+        self.assertRegex(result.stdout, r'writes-test-first +0\.00 +1\.00 +\+1\.00\n')
+        self.assertNotIn('run 1:', result.stdout)
+        self.assertNotIn('report:', result.stdout)
+
     def test_without_a_doc_every_doc_with_cases_is_evaluated(self):
         self.publish(self.cases('billing', {'charges-once': case('Charge once.')}))
         self.sync('update')

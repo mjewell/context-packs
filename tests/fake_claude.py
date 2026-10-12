@@ -33,12 +33,16 @@ def reads(prompt, text, cwd, seen=()):
 
 
 def grade(grader, seen, read):
+    """Whether the grader passes, and its explanation, worded as the real command words it."""
     fields, _ = front(grader.read_text())
     if fields['type'] == 'regex':
-        return fields['pattern'] in seen
+        found = fields['pattern'] in seen
+        return found, f'/{fields["pattern"]}/ {"matched" if found else "did not match"} the run'
     assert fields['type'] == 'tool_used' and fields['tool'] == 'Read', fields
     count = sum(bool(re.search(fields['input_match'], json.dumps({'file_path': path}))) for path in read)
-    return int(fields.get('min', 1)) <= count <= int(fields.get('max', count))
+    low, high = int(fields.get('min', 1)), fields.get('max')
+    passed = low <= count <= (int(high) if high else count)
+    return passed, f'Read called {count}x (expected {low}..{high or "∞"})'
 
 
 args = sys.argv[1:]
@@ -60,9 +64,14 @@ for case in sorted({p.parent for p in (plugin / 'evals').rglob('*') if p.name in
         seen = context + ''.join(f'\n{path.relative_to(cwd)}\n{path.read_text()}'
                                  for path in sorted(Path(cwd).rglob('*')) if path.is_file())
         read = list(reads(prompt, context, cwd))
-        score = float(all(grade(grader, seen, read) for grader in sorted((case / 'graders').glob('*.md'))))
+        graders = [(grader.stem, *grade(grader, seen, read)) for grader in sorted((case / 'graders').glob('*.md'))]
+        score = float(all(passed for _, passed, _ in graders))
     named = (case / 'case.yaml').is_file() and re.search(r'^name: (.*)$', (case / 'case.yaml').read_text(), re.M)
     cases.append({'name': named.group(1) if named else case.name, 'aggregates': {'score': score},
-                  'arms': {'with': [{'score': score, 'error': None}]}})
+                  'arms': {'with': [{'score': score, 'error': None,
+                                     'graders': [{'name': name, 'passed': passed, 'explanation': why}
+                                                 for name, passed, why in graders]}]}})
 
 Path(args[args.index('--json') + 1]).write_text(json.dumps({'cases': cases}))
+if '--report' in args:
+    Path(args[args.index('--report') + 1]).write_text('<html>report</html>')
