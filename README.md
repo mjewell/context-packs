@@ -144,7 +144,7 @@ The imported pack becomes a pack nested in yours, with the import pack's `when` 
 - With a `when`, it gets a row in your pack's table, pointing at `docs/agents/packs/project/typescript/pack.md`, which holds its rules and its own table.
 - Without one, its rules and table are pasted into your pack's block, after your pack's own.
 
-The `when` is yours to change, and so is anything you write below the front matter, which comes before the imported rules. The tool keeps the rest: `update` moves `ref`, and `remove typescript` deletes the folder. An import pack's folder holds only its `pack.md`, its name can't be used by another pack in the repo, and only a pack read from a folder on disk, such as your project's own docs, can hold one.
+[The example](docs/example.md#choosing-when-a-pack-loads) imports a pack this way, step by step. The `when` is yours to change, and so is anything you write below the front matter, which comes before the imported rules. The tool keeps the rest: `update` moves `ref`, and `remove typescript` deletes the folder. An import pack's folder holds only its `pack.md`, its name can't be used by another pack in the repo, and only a pack read from a folder on disk, such as your project's own docs, can hold one.
 
 ## Let your agent run it
 
