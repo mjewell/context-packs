@@ -5,7 +5,7 @@ import re
 import sys
 from typing import Dict, List, NamedTuple
 
-from packs import PACKS, Pack, local
+from packs import PACKS, Pack
 
 HEADER = 'header'
 HEADER_START = '<!-- context-packs:start header -->\n'
@@ -14,7 +14,8 @@ HEADER_RULES = (
     'Context packs bring shared rules and docs in from elsewhere. Each pack has a block in this file holding its rules '
     'and a table of its context docs, and a doc may hold a table of its own. Before starting work that a row in any '
     f"of these tables matches, read its doc. A pack's block, and everything under `{PACKS.as_posix()}/`, are "
-    "generated from the `from` and `path` in the block's start marker: change them there, never here.\n")
+    "generated from the folder its start marker names, and the import pack there if it has one: change them there, "
+    "never here.\n")
 BLOCK = re.compile(r'^<!-- context-packs:start (\S+)((?: \S+)*) -->\n(.*?)'
                    r'^<!-- context-packs:end sha256:([0-9a-f]{12}) -->\n?', re.MULTILINE | re.DOTALL)
 
@@ -45,22 +46,13 @@ def snapshot(folder):
 
 
 def marked_pack(file, name, marker):
+    """The pack a block's start marker names, by the folder on disk holding it."""
     pairs = [field.split('=', 1) for field in marker.split()]
     fields = dict(p for p in pairs if len(p) == 2)
-    origin = fields.get('from')
-    if origin and local(origin) and 'ref' in fields:
-        sys.exit(f'context-packs: {file}: the {name} block\'s start marker pins {origin} to a ref, but a path is a '
-                 'folder on disk, read from its working tree. To pin the pack, use its git URL instead.')
-    if 'docs' in fields:
-        sys.exit(f'context-packs: {file}: the {name} block\'s start marker has docs={fields["docs"]}, but '
-                 'context-packs no longer picks nested packs: every nested pack is installed with its parent. Remove '
-                 'docs= from the marker, and install a part a repo chooses as a pack of its own.')
-    if (len(fields) != len(pairs) or set(fields) - {'from', 'path', 'ref'} or not origin
-            or local(origin) == ('ref' in fields)):
-        sys.exit(f'context-packs: {file}: the {name} block\'s start marker needs from=<git URL> and '
-                 'ref=<tag or commit>, or from=<path> for a folder on disk, plus path=<folder> unless the pack is the '
-                 'whole repo. Fix the marker, then sync again.')
-    return Pack(name, origin, fields.get('path', ''), fields.get('ref'))
+    if len(fields) != len(pairs) or set(fields) != {'path'}:
+        sys.exit(f'context-packs: {file}: the {name} block\'s start marker needs path=<folder>, the folder on disk '
+                 'holding the pack, and nothing else. Fix the marker, then sync again.')
+    return Pack(name, '.', fields['path'], None)
 
 
 def read(file):

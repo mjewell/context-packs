@@ -16,24 +16,26 @@ def at(pack):
 def changes(found, after, blocks, created, linked, imported_before=(), imported_after=()):
     """Lines describing what the sync did: whether it created AGENTS.md and linked CLAUDE.md to it, how the packs
     found in the instructions file became the packs after it, with blocks the text the sync wrote for each, and how
-    the import packs found became the ones after it."""
+    the import packs found became the ones after it. A marker naming an import pack is reported with its pin."""
     before = found.packs
     old = {p.name: p for p in before}
     new = {p.name for p in after}
+    pinned_before = {i.holder: i.pack for i in imported_before if not i.id}
+    pinned = {i.holder: i.pack for i in imported_after if not i.id}
     lines = (['Created AGENTS.md'] * created + ['Linked CLAUDE.md to AGENTS.md'] * linked
              + ['Updated the header block'] * (not created and found.blocks[HEADER] != blocks[HEADER]))
     for pack in after:
-        was = old.get(pack.name)
-        if not was:
-            lines.append(f'{pack.name}: added{at(pack)}')
-        elif was.ref != pack.ref:
-            lines.append(f'{pack.name}: {short(was.ref)} → {short(pack.ref)}')
+        pin, was_pin = pinned.get(pack.name, pack), pinned_before.get(pack.name, pack)
+        if pack.name not in old:
+            lines.append(f'{pack.name}: added{at(pin)}')
+        elif was_pin.ref != pin.ref:
+            lines.append(f'{pack.name}: {short(was_pin.ref)} → {short(pin.ref)}')
         elif found.blocks[pack.name] != blocks[pack.name]:
             lines.append(f'{pack.name}: changed')
     lines += [f'{p.name}: removed' for p in before if p.name not in new]
-    was = {i.pack.name: i.pack for i in imported_before}
-    now = {i.pack.name for i in imported_after}
-    for pack in (i.pack for i in imported_after):
+    was = {i.pack.name: i.pack for i in imported_before if i.id}
+    now = {i.pack.name for i in imported_after if i.id}
+    for pack in (i.pack for i in imported_after if i.id):
         if pack.name not in was:
             lines.append(f'{pack.name}: added{at(pack)}')
         elif was[pack.name].ref != pack.ref:
@@ -41,5 +43,5 @@ def changes(found, after, blocks, created, linked, imported_before=(), imported_
     lines += [f'{name}: removed' for name in was if name not in now]
     if lines:
         return lines
-    pins = [*after, *(i.pack for i in imported_after)]
+    pins = [pinned.get(p.name, p) for p in after] + [i.pack for i in imported_after if i.id]
     return [f'Nothing changed: {", ".join(p.name + at(p) for p in pins) or "no packs installed"}']

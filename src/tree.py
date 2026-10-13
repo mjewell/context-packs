@@ -9,13 +9,6 @@ from typing import NamedTuple, Tuple
 from packs import Pack
 
 FRONT = re.compile(r'---\n(.*?)\n---\n', re.DOTALL)
-# Front matter keys context-packs once took, and what replaced each, so a pack still using one hears why it stopped
-# instead of being told to update context-packs.
-REMOVED = {
-    'inline': 'A nested pack gets a row from its `when`, and rules every session needs go in its parent\'s pack.md.',
-    'optional': 'Every nested pack is installed with its parent, so make a part a repo chooses a pack of its own, in a '
-                'folder outside its parent\'s, which the repo installs with add.',
-}
 
 
 class Doc(NamedTuple):
@@ -37,11 +30,10 @@ class Node(NamedTuple):
 
     @property
     def row(self):
-        """Whether the pack gets a row pointing at its index, rather than having its rules and table pasted into the
-        block for the installed pack, or after the rules and table of the pack importing it. Every nested pack has a
-        when, so only an installed or imported pack without one is pasted, and a pack renders the same installed on
-        its own as inside another."""
-        return 'when' in self.fields
+        """Whether the pack gets a row pointing at its index, rather than having its rules and table pasted into its
+        block, or after the rules and table of the pack holding it: it does when it has a when other than always.
+        A pack renders the same installed on its own as inside another."""
+        return self.fields.get('when', 'always') != 'always'
 
     def nested(self):
         """Every pack nested in this one, at any depth, parents before their children."""
@@ -72,9 +64,6 @@ def front(text, where, keys):
     fields = dict(p for p in pairs if len(p) == 2)
     if len(fields) != len(pairs):
         sys.exit(f'context-packs: {where} has front matter that isn\'t `key: value` lines.')
-    for key in sorted(set(fields) & set(REMOVED)):
-        sys.exit(f'context-packs: {where} has {key}: {fields[key]}, but context-packs no longer supports `{key}`. '
-                 f'{REMOVED[key]} Remove the line.')
     unknown = sorted(set(fields) - set(keys))
     if unknown:
         sys.exit(f'context-packs: {where} has front matter context-packs doesn\'t know: {", ".join(unknown)}. '
@@ -91,9 +80,6 @@ def load(folder, pack, id='', imported=None):
         return f'{(Path(pack.path) / path).as_posix()} in {pack.origin}'
 
     home = Path(id)
-    if not id and (folder / 'agents.md').is_file():
-        sys.exit(f'context-packs: {where("agents.md")} holds rules under the name packs used before 0.2.0. Rename it '
-                 'to pack.md in the pack, or run update to move to a version of the pack that has one.')
     pack_md = folder / home / 'pack.md'
     fields, rules = front(pack_md.read_text(encoding='utf-8'), where(home / 'pack.md'),
                           ('when',)) if pack_md.is_file() else ({}, '')
@@ -162,13 +148,14 @@ def table(title, rows):
 
 
 def render(node, pack):
-    """The node's rules, then its table: a row for each of its docs, each pack nested in it and each pack it imports
-    with a when. Each pack it imports without one is rendered the same way after it."""
+    """The node's rules, then its table: a row for each of its docs, and for each pack nested in it or imported
+    into it that gets one. Each of those packs that doesn't is rendered the same way after it."""
     rows = sorted([(d.path[:-len('.md')], d.when, pack.synced / d.path) for d in node.docs]
-                  + [(c.id, c.fields['when'], index(c, pack)) for c in node.children]
+                  + [(c.id, c.fields['when'], index(c, pack)) for c in node.children if c.row]
                   + [(i.id, i.root.fields['when'], index(i.root, i.pack)) for i in node.imports if i.root.row])
     title = f'{pack.name}/{node.id}' if node.id else pack.name
-    pasted = [render(i.root, i.pack) for i in node.imports if not i.root.row]
+    pasted = ([render(c, pack) for c in node.children if not c.row]
+              + [render(i.root, i.pack) for i in node.imports if not i.root.row])
     return '\n'.join(part for part in (node.rules, table(title, [r[1:] for r in rows]), *pasted) if part)
 
 
