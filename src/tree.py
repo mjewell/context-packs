@@ -12,7 +12,7 @@ FRONT = re.compile(r'---\n(.*?)\n---\n', re.DOTALL)
 # Front matter keys context-packs once took, and what replaced each, so a pack still using one hears why it stopped
 # instead of being told to update context-packs.
 REMOVED = {
-    'inline': 'A nested pack gets a row from its `when`, and rules every session needs go in its parent\'s pack.md.',
+    'inline': 'Give the pack `when: always` to paste it into its parent instead of giving it a row.',
     'optional': 'Every nested pack is installed with its parent, so make a part a repo chooses a pack of its own, in a '
                 'folder outside its parent\'s, which the repo installs with add.',
 }
@@ -37,11 +37,10 @@ class Node(NamedTuple):
 
     @property
     def row(self):
-        """Whether the pack gets a row pointing at its index, rather than having its rules and table pasted into the
-        block for the installed pack, or after the rules and table of the pack importing it. Every nested pack has a
-        when, so only an installed or imported pack without one is pasted, and a pack renders the same installed on
-        its own as inside another."""
-        return 'when' in self.fields
+        """Whether the pack gets a row pointing at its index, rather than having its rules and table pasted into its
+        block, or after the rules and table of the pack holding it: it does when it has a when other than always.
+        A pack renders the same installed on its own as inside another."""
+        return self.fields.get('when', 'always') != 'always'
 
     def nested(self):
         """Every pack nested in this one, at any depth, parents before their children."""
@@ -162,13 +161,14 @@ def table(title, rows):
 
 
 def render(node, pack):
-    """The node's rules, then its table: a row for each of its docs, each pack nested in it and each pack it imports
-    with a when. Each pack it imports without one is rendered the same way after it."""
+    """The node's rules, then its table: a row for each of its docs, and for each pack nested in it or imported
+    into it that gets one. Each of those packs that doesn't is rendered the same way after it."""
     rows = sorted([(d.path[:-len('.md')], d.when, pack.synced / d.path) for d in node.docs]
-                  + [(c.id, c.fields['when'], index(c, pack)) for c in node.children]
+                  + [(c.id, c.fields['when'], index(c, pack)) for c in node.children if c.row]
                   + [(i.id, i.root.fields['when'], index(i.root, i.pack)) for i in node.imports if i.root.row])
     title = f'{pack.name}/{node.id}' if node.id else pack.name
-    pasted = [render(i.root, i.pack) for i in node.imports if not i.root.row]
+    pasted = ([render(c, pack) for c in node.children if not c.row]
+              + [render(i.root, i.pack) for i in node.imports if not i.root.row])
     return '\n'.join(part for part in (node.rules, table(title, [r[1:] for r in rows]), *pasted) if part)
 
 

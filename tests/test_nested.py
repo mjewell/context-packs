@@ -65,6 +65,17 @@ class NestedPackTests(SyncCase):
                       '<!-- context-packs:end',
                       self.agents_md.read_text())
 
+    def test_nested_pack_whose_when_is_always_is_pasted_after_its_parent(self):
+        self.publish({'frontend/pack.md': doc('always', 'Keep components small.\n')})
+
+        result = self.add()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('| Writing tests | `docs/agents/packs/house-rules/testing.md` |\n\n'
+                      'Keep components small.\n\n## house-rules/frontend context\n', self.agents_md.read_text())
+        self.assertFalse((self.synced / 'frontend.md').exists())
+        self.assertTrue((self.synced / 'frontend' / 'react.md').exists())
+
     def test_nested_packs_index_holds_its_rules_and_table_without_front_matter(self):
         result = self.add()
 
@@ -188,6 +199,7 @@ class RemovedInlineTests(SyncCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn('context/typescript/pack.md', result.stderr)
         self.assertIn('no longer supports `inline`', result.stderr)
+        self.assertIn('when: always', result.stderr)
         self.assertNotIn('update context-packs', result.stderr)
         self.assertFalse(self.agents_md.exists())
 

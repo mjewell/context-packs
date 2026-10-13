@@ -1,4 +1,5 @@
 """Context packs: where each comes from, and its content once fetched."""
+import os
 from pathlib import Path
 import re
 import sys
@@ -11,6 +12,11 @@ PACKS = Path('docs/agents/packs')
 # A git URL, as git tells one from a path: it has a scheme, such as https:// or file://, or is scp-like, such as
 # git@github.com:acme/rules.git, with a colon before any slash.
 GIT_URL = re.compile(r'[A-Za-z][A-Za-z0-9+.-]*://|[^/]+:')
+
+
+def folder(origin, path):
+    """The folder on disk a marker names for a pack read from origin's path, relative to the synced repo."""
+    return Path(os.path.normpath(Path(origin, path))).as_posix()
 
 
 def local(origin):
@@ -30,12 +36,11 @@ class Pack(NamedTuple):
     home: Optional[Path] = None
 
     def start(self):
-        fields = ([f'from={self.origin}'] + [f'path={self.path}'] * bool(self.path)
-                  + [f'ref={self.ref}'] * bool(self.ref))
-        if any(re.search(r'\s', field) for field in fields):
-            sys.exit(f'context-packs: the {self.name} pack\'s {" ".join(fields)} has whitespace, '
-                     'which its marker can\'t hold.')
-        return f'<!-- context-packs:start {" ".join([self.name, *fields])} -->\n'
+        """The start marker of the block for this pack, which a marker names by the folder on disk holding it."""
+        if re.search(r'\s', self.path):
+            sys.exit(f'context-packs: the {self.name} pack\'s folder, {self.path}, has whitespace, which its marker '
+                     'can\'t hold.')
+        return f'<!-- context-packs:start {self.name} path={self.path} -->\n'
 
     @property
     def local(self):

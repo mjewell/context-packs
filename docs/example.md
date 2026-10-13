@@ -83,11 +83,21 @@ auth: added @ e60c2aa
 $ npx context-packs add frontend https://github.com/acme/agent-context.git --path frontend --ref frontend-v1.4.0
 frontend: added @ frontend-v1.4.0
 
-$ npx context-packs add project . --path docs/agents/project
+$ npx context-packs add project docs/agents/project
 project: added
 ```
 
-`auth` is pinned to the auth service's latest commit, and `frontend` to its release tag. `project` is read from the web app's own working tree, so it has no pin. The web app doesn't install `backend` or `database`, so their rules stay out of its sessions. An API service would install those two, plus `auth`.
+`auth` and `frontend` come from git, so each gets an import pack in `docs/agents/`, which says where the pack comes from and what it's pinned to: `auth` to the auth service's latest commit, and `frontend` to its release tag. `docs/agents/auth/pack.md`:
+
+```markdown
+---
+from: https://github.com/acme/auth-service.git
+path: agent-pack
+ref: e60c2aac61c0e51fd90cf1406318dd785884bb19
+---
+```
+
+`project` is read from the web app's own working tree, so it has no import pack and no pin. The web app doesn't install `backend` or `database`, so their rules stay out of its sessions. An API service would install those two, plus `auth`.
 
 ## What they generate
 
@@ -96,6 +106,8 @@ acme/web-app
 ├── AGENTS.md                          # generated
 ├── CLAUDE.md -> AGENTS.md             # generated
 └── docs/agents/
+    ├── auth/pack.md                   # import pack: where auth comes from, and its pin
+    ├── frontend/pack.md               # import pack for frontend
     ├── packs/                         # generated
     │   ├── auth/
     │   │   ├── permissions.md
@@ -119,10 +131,10 @@ The docs under `packs/` are copies of the docs in each pack's repo. `AGENTS.md`,
 <!-- context-packs:start header -->
 ## Context Packs
 
-Context packs bring shared rules and docs in from elsewhere. Each pack has a block in this file holding its rules and a table of its context docs, and a doc may hold a table of its own. Before starting work that a row in any of these tables matches, read its doc. A pack's block, and everything under `docs/agents/packs/`, are generated from the `from` and `path` in the block's start marker: change them there, never here.
-<!-- context-packs:end sha256:9ca6e3aa65e7 -->
+Context packs bring shared rules and docs in from elsewhere. Each pack has a block in this file holding its rules and a table of its context docs, and a doc may hold a table of its own. Before starting work that a row in any of these tables matches, read its doc. A pack's block, and everything under `docs/agents/packs/`, are generated from the folder its start marker names, and the import pack there if it has one: change them there, never here.
+<!-- context-packs:end sha256:e2f7f6f4ae0e -->
 
-<!-- context-packs:start auth from=https://github.com/acme/auth-service.git path=agent-pack ref=e60c2aac61c0e51fd90cf1406318dd785884bb19 -->
+<!-- context-packs:start auth path=docs/agents/auth -->
 Never log tokens, session IDs or passwords, even at debug level.
 
 ## auth context
@@ -133,7 +145,7 @@ Never log tokens, session IDs or passwords, even at debug level.
 | Reading the signed-in user, or changing sign-in or sign-out | `docs/agents/packs/auth/sessions.md` |
 <!-- context-packs:end sha256:3ccb7c0b8f64 -->
 
-<!-- context-packs:start frontend from=https://github.com/acme/agent-context.git path=frontend ref=frontend-v1.4.0 -->
+<!-- context-packs:start frontend path=docs/agents/frontend -->
 Build UI from `@acme/ui` components; don't style raw HTML elements. Every user-facing string goes through `t()`.
 
 ## frontend context
@@ -145,7 +157,7 @@ Build UI from `@acme/ui` components; don't style raw HTML elements. Every user-f
 | Writing or changing React components | `docs/agents/packs/frontend/react.md` |
 <!-- context-packs:end sha256:94fffbdf036a -->
 
-<!-- context-packs:start project from=. path=docs/agents/project -->
+<!-- context-packs:start project path=docs/agents/project -->
 ## project context
 
 | When | Read |
@@ -175,7 +187,7 @@ Asked to add a sign-up form, the agent matches "Building or changing a form" and
 
 ## Choosing when a pack loads
 
-The web app keeps its sessions table in a small `db/` folder, so it wants the database team's rules, but only when it touches that folder. Installed in `AGENTS.md`, the `database` pack would paste its rules into every session, since its `pack.md` has no `when`: its team wrote it for API services, where nearly every task touches the database. So the web app imports it into its own docs instead, with a `when` of its own:
+The web app keeps its sessions table in a small `db/` folder, so it wants the database team's rules, but only when it touches that folder. Added as it is, the `database` pack would paste its rules into every session, since its `pack.md` has no `when`: its team wrote it for API services, where nearly every task touches the database. So the web app adds it with a `when` of its own, and keeps its import pack in its own docs, so its row joins the `project` table. Without `--into`, it would get a block of its own holding the same row.
 
 ```console
 $ npx context-packs add database https://github.com/acme/agent-context.git --path database --ref database-v2.0.0 --into docs/agents/project --when 'Editing `db/**`'
@@ -197,7 +209,7 @@ ref: database-v2.0.0
 The database rules stay out of `AGENTS.md`. The `project` block gets one row for them instead:
 
 ```markdown
-<!-- context-packs:start project from=. path=docs/agents/project -->
+<!-- context-packs:start project path=docs/agents/project -->
 ## project context
 
 | When | Read |

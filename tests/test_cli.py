@@ -14,9 +14,9 @@ HEADER = ('<!-- context-packs:start header -->\n'
           'Context packs bring shared rules and docs in from elsewhere. Each pack has a block in this file holding its '
           "rules and a table of its context docs, and a doc may hold a table of its own. Before starting work that a "
           "row in any of these tables matches, read its doc. A pack's block, and everything under "
-          "`docs/agents/packs/`, are generated from the `from` and `path` in the block's start marker: change them "
-          "there, never here.\n"
-          '<!-- context-packs:end sha256:9ca6e3aa65e7 -->\n')
+          "`docs/agents/packs/`, are generated from the folder its start marker names, and the import pack there if "
+          "it has one: change them there, never here.\n"
+          '<!-- context-packs:end sha256:e2f7f6f4ae0e -->\n')
 EMPTY_HEADER = '<!-- context-packs:start header -->\n<!-- context-packs:end sha256:e3b0c44298fc -->\n'
 EMPTY_END = '<!-- context-packs:end sha256:e3b0c44298fc -->\n'
 END = '<!-- context-packs:end sha256:d3e10247057e -->\n'
@@ -71,13 +71,17 @@ class SyncCase(unittest.TestCase):
         git(checkout, 'tag', name)
         git(checkout, 'push', '--quiet', 'origin', name)
 
-    def start(self, ref=None):
-        ref = ref or git(self.source, 'rev-parse', 'HEAD')
-        return f'<!-- context-packs:start house-rules from={self.origin} path=context ref={ref} -->\n'
+    def start(self, name='house-rules'):
+        return f'<!-- context-packs:start {name} path=docs/agents/{name} -->\n'
 
-    def rules(self, ref=None):
+    def rules(self):
         """AGENTS.md as a sync writes it from the pack's rules 'Prefer small PRs.', with no docs."""
-        return HEADER + '\n' + self.start(ref) + 'Prefer small PRs.\n' + END
+        return HEADER + '\n' + self.start() + 'Prefer small PRs.\n' + END
+
+    def pin(self, name='house-rules'):
+        """The ref the pack's import pack pins it to."""
+        text = (self.repo / 'docs' / 'agents' / name / 'pack.md').read_text()
+        return next(line[len('ref: '):] for line in text.split('\n') if line.startswith('ref: '))
 
     def sync(self, *args, cwd=None):
         return subprocess.run([sys.executable, str(CLI), *args], cwd=cwd or self.repo,
@@ -278,7 +282,8 @@ class AddRemoveTests(SyncCase):
         result = self.add('--ref', first[:7])
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual((self.repo / 'AGENTS.md').read_text(), self.rules(first))
+        self.assertEqual((self.repo / 'AGENTS.md').read_text(), self.rules())
+        self.assertEqual(self.pin(), first)
 
     def test_add_with_a_branch_as_the_ref_stops_untouched(self):
         result = self.add('--ref', 'main')
@@ -305,7 +310,7 @@ class AddRemoveTests(SyncCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.repo / 'AGENTS.md').read_text(),
-                         HEADER + '\n<!-- context-packs:start team from=. path=team-rules -->\nUse pnpm.\n'
+                         HEADER + '\n<!-- context-packs:start team path=team-rules -->\nUse pnpm.\n'
                          '<!-- context-packs:end sha256:8deb5dab0c1e -->\n')
 
     def test_remove_drops_the_packs_block_and_docs(self):
@@ -346,7 +351,7 @@ class LocalPackTests(SyncCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.agents_md.read_text(),
-                         HEADER + '\n<!-- context-packs:start project from=. path=docs/agents/project -->\n'
+                         HEADER + '\n<!-- context-packs:start project path=docs/agents/project -->\n'
                          '## project context\n\n| When | Read |\n|---|---|\n'
                          '| Deploying | `docs/agents/project/deploy/index.md` |\n'
                          '| Changing the design | `docs/agents/project/design.md` |\n'
@@ -393,7 +398,7 @@ class SiblingPackTests(SyncCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.agents_md.read_text(),
-                         HEADER + '\n<!-- context-packs:start house-rules from=../house-rules path=context -->\n'
+                         HEADER + '\n<!-- context-packs:start house-rules path=../house-rules/context -->\n'
                          'Prefer tiny PRs.\n\n## house-rules context\n\n| When | Read |\n|---|---|\n'
                          '| Writing tests | `../house-rules/context/testing.md` |\n'
                          '<!-- context-packs:end sha256:086f3e8c8f8a -->\n')
@@ -433,19 +438,19 @@ class SiblingPackTests(SyncCase):
         result = self.sync('add', 'house-rules', str(self.source), '--path', 'context')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(f'from={self.source} path=context -->\nPrefer tiny PRs.\n', self.agents_md.read_text())
+        self.assertIn(f'path={self.source}/context -->\nPrefer tiny PRs.\n', self.agents_md.read_text())
         self.assertIn(f'| Writing tests | `{self.source}/context/testing.md` |', self.agents_md.read_text())
         self.assertFalse((self.repo / 'docs' / 'agents' / 'packs').exists())
 
-    def test_marker_pinning_a_folder_on_disk_stops_the_sync(self):
+    def test_marker_with_a_field_other_than_path_stops_the_sync(self):
         self.add_sibling()
-        before = self.agents_md.read_text().replace('path=context -->', f'path=context ref={"a" * 40} -->')
+        before = self.agents_md.read_text().replace('/context -->', f'/context ref={"a" * 40} -->')
         self.agents_md.write_text(before)
 
         result = self.sync()
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn('use its git URL', result.stderr)
+        self.assertIn('path=<folder>', result.stderr)
         self.assertEqual(self.agents_md.read_text(), before)
 
     def test_scp_style_origin_is_a_git_url(self):
@@ -516,7 +521,8 @@ class PinningTests(SyncCase):
         result = self.sync()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.agents_md.read_text(), self.rules(self.pinned))
+        self.assertEqual(self.agents_md.read_text(), self.rules())
+        self.assertEqual(self.pin(), self.pinned)
 
     def test_update_takes_the_packs_latest_rules_and_keeps_the_repos_own_text(self):
         self.agents_md.write_text('# Repo\n\n' + self.agents_md.read_text() + '\nUse pnpm.\n')
@@ -526,29 +532,32 @@ class PinningTests(SyncCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.agents_md.read_text(),
-                         '# Repo\n\n' + HEADER + '\n' + self.start(latest) + 'Prefer small PRs.\nWrite tests first.\n'
+                         '# Repo\n\n' + HEADER + '\n' + self.start() + 'Prefer small PRs.\nWrite tests first.\n'
                          '<!-- context-packs:end sha256:e9cecd87d052 -->\n\nUse pnpm.\n')
+        self.assertEqual(self.pin(), latest)
 
     def test_ref_missing_from_the_origin_stops_the_sync_untouched(self):
-        missing = self.agents_md.read_text().replace(self.pinned, '0' * 40)
-        self.agents_md.write_text(missing)
+        import_md = self.repo / 'docs' / 'agents' / 'house-rules' / 'pack.md'
+        import_md.write_text(import_md.read_text().replace(self.pinned, '0' * 40))
+        before = self.agents_md.read_text()
 
         result = self.sync()
 
         self.assertEqual(result.returncode, 1)
         self.assertIn('0' * 40, result.stderr)
-        self.assertEqual(self.agents_md.read_text(), missing)
+        self.assertEqual(self.agents_md.read_text(), before)
 
-    def test_pack_block_without_a_ref_stops_the_sync_untouched(self):
-        unpinned = self.agents_md.read_text().replace(f' ref={self.pinned}', '')
-        self.agents_md.write_text(unpinned)
+    def test_import_pack_without_a_ref_stops_the_sync_untouched(self):
+        import_md = self.repo / 'docs' / 'agents' / 'house-rules' / 'pack.md'
+        import_md.write_text(import_md.read_text().replace(f'ref: {self.pinned}\n', ''))
+        before = self.agents_md.read_text()
 
         result = self.sync()
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn('house-rules', result.stderr)
-        self.assertIn('ref=', result.stderr)
-        self.assertEqual(self.agents_md.read_text(), unpinned)
+        self.assertIn('docs/agents/house-rules/pack.md', result.stderr)
+        self.assertIn('ref', result.stderr)
+        self.assertEqual(self.agents_md.read_text(), before)
 
     def test_update_with_a_ref_pins_the_pack_there(self):
         self.share('Prefer small PRs.\nWrite tests first.\n')
@@ -557,7 +566,8 @@ class PinningTests(SyncCase):
         result = self.sync('update', 'house-rules', '--ref', 'v1.0.0')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(self.start('v1.0.0') + 'Prefer small PRs.\nWrite tests first.\n', self.agents_md.read_text())
+        self.assertIn(self.start() + 'Prefer small PRs.\nWrite tests first.\n', self.agents_md.read_text())
+        self.assertEqual(self.pin(), 'v1.0.0')
 
     def test_update_with_a_ref_needs_exactly_one_pack(self):
         before = self.agents_md.read_text()
@@ -586,7 +596,8 @@ class VersionTests(SyncCase):
         self.agents_md = self.repo / 'AGENTS.md'
 
     def test_add_with_a_tag_pins_the_pack_to_the_tag(self):
-        self.assertEqual(self.agents_md.read_text(), self.rules('v1.2.0'))
+        self.assertEqual(self.agents_md.read_text(), self.rules())
+        self.assertEqual(self.pin(), 'v1.2.0')
 
     def test_update_moves_to_the_newest_release_in_the_series(self):
         self.share('Prefer small PRs.\nWrite tests first.\n')
@@ -599,7 +610,8 @@ class VersionTests(SyncCase):
         result = self.sync('update')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(self.start('v1.10.0') + 'Prefer small PRs.\nWrite tests first.\n', self.agents_md.read_text())
+        self.assertIn(self.start() + 'Prefer small PRs.\nWrite tests first.\n', self.agents_md.read_text())
+        self.assertEqual(self.pin(), 'v1.10.0')
 
     def test_update_keeps_the_tag_when_no_release_is_newer(self):
         self.share('Prefer tiny PRs.\n')
@@ -607,7 +619,8 @@ class VersionTests(SyncCase):
         result = self.sync('update')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.agents_md.read_text(), self.rules('v1.2.0'))
+        self.assertEqual(self.agents_md.read_text(), self.rules())
+        self.assertEqual(self.pin(), 'v1.2.0')
 
 
 class SeveralPacksTests(SyncCase):
@@ -625,15 +638,13 @@ class SeveralPacksTests(SyncCase):
     def add_acme(self, *args):
         return self.sync('add', 'acme', str(self.acme_origin), '--path', 'plugins/x', *args)
 
-    def acme_start(self, ref):
-        return f'<!-- context-packs:start acme from={self.acme_origin} path=plugins/x ref={ref} -->\n'
 
     def test_added_pack_gets_its_own_block_after_the_others(self):
         result = self.add_acme()
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.agents_md.read_text(),
-                         self.rules() + '\n' + self.acme_start(self.acme_ref) + 'Use acme.\n\n## acme context\n\n'
+                         self.rules() + '\n' + self.start('acme') + 'Use acme.\n\n## acme context\n\n'
                          '| When | Read |\n|---|---|\n| Deploying | `docs/agents/packs/acme/deploy.md` |\n'
                          '<!-- context-packs:end sha256:7f810f66be5d -->\n')
         self.assertEqual((self.repo / 'docs' / 'agents' / 'packs' / 'acme' / 'deploy.md').read_text(),
@@ -647,9 +658,9 @@ class SeveralPacksTests(SyncCase):
         result = self.sync('update')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        text = self.agents_md.read_text()
-        self.assertIn(self.start(latest), text)
-        self.assertIn(self.acme_start(acme_latest) + 'Use acme v2.\n', text)
+        self.assertIn(self.start('acme') + 'Use acme v2.\n', self.agents_md.read_text())
+        self.assertEqual(self.pin(), latest)
+        self.assertEqual(self.pin('acme'), acme_latest)
 
     def test_update_by_name_moves_only_that_pack(self):
         self.add_acme()
@@ -659,9 +670,8 @@ class SeveralPacksTests(SyncCase):
         result = self.sync('update', 'acme')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        text = self.agents_md.read_text()
-        self.assertIn(self.rules(git(self.source, 'rev-parse', 'HEAD~1')), text)
-        self.assertIn(self.acme_start(acme_latest), text)
+        self.assertEqual(self.pin(), git(self.source, 'rev-parse', 'HEAD~1'))
+        self.assertEqual(self.pin('acme'), acme_latest)
 
     def test_list_shows_every_pack_without_its_nested_packs(self):
         acme_ref = self.publish({'billing/pack.md': '---\nwhen: Editing billing\n---\nCharge once.\n'},
