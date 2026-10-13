@@ -11,10 +11,12 @@ import re
 import shutil
 import sys
 
+import evaluate
 import imports
 import origins
 import report
-from blocks import HEADER, HEADER_RULES, HEADER_START, block, instructions, region, snapshot
+import sync
+from blocks import HEADER, instructions, region
 from packs import PACKS, Pack, fetch, local
 import tree
 
@@ -40,7 +42,7 @@ def apply(args, found, imported):
         else:
             ref = origins.pin(args.origin, args.ref) if args.ref else origins.tip(args.origin)
         packs.append(Pack(args.name, args.origin, args.path, ref))
-    named = [args.name] if args.command == 'remove' else getattr(args, 'names', [])
+    named = [args.name] if args.command in ('remove', 'eval') else getattr(args, 'names', [])
     unknown = [n for n in named if n not in names + imported]
     if unknown:
         sys.exit(f'context-packs: {args.dir} has no pack named {", ".join(unknown)}. '
@@ -112,7 +114,16 @@ def main():
     update.add_argument('names', nargs='*', help='the packs to update; all of them if left out')
     update.add_argument('--ref', help='a tag or commit to pin the one named pack to instead')
     commands.add_parser('list', help='list the packs, where each comes from, and its pin')
-    args = parser.parse_args()
+    evals = commands.add_parser('eval', help="run a pack's eval cases with each doc, and again without it, through "
+                                             'claude plugin eval; pass it options after --')
+    evals.add_argument('name', help='the pack, by its name in AGENTS.md')
+    evals.add_argument('doc', nargs='?', help='the doc whose cases to run, by its path in the pack without .md; '
+                                              'every doc with cases if left out')
+    argv = sys.argv[1:]
+    split = argv.index('--') if '--' in argv else len(argv)
+    args, options = parser.parse_args(argv[:split]), argv[split + 1:]
+    if split < len(argv) and args.command != 'eval':
+        parser.error('only eval takes options after --, which it passes to claude plugin eval')
     repo = args.dir
     if not repo.is_dir():
         sys.exit(f'context-packs: {repo} is not a folder')
@@ -126,38 +137,25 @@ def main():
 
     with contextlib.ExitStack() as stack:
         folders = {p.name: fetch(repo, p, stack) for p in packs}
-        imported = {p.name: {} for p in packs if p.local}
-        for i in known:
-            source = fetch(repo, i.pack, stack)
-            fields, rules = i.front()
-            root = tree.load(source, i.pack)
-            root = root._replace(fields=fields, rules='\n'.join(r for r in (rules, root.rules) if r))
-            imported[i.holder][i.id] = tree.Imported(i.id, i.pack, root, source)
+        imported = imports.trees(repo, packs, known, stack)
         roots = {p.name: tree.load(folders[p.name], p, imported=imported.get(p.name)) for p in packs}
         if args.command == 'list':
             show(packs, known)
+            return
+        if args.command == 'eval':
+            evaluate.evaluate(repo, file, found, packs, folders, imported, args.name, args.doc, options)
             return
 
         for gone in {p.name for p in found.packs} - {p.name for p in packs}:
             if (repo / PACKS / gone).exists():
                 shutil.rmtree(repo / PACKS / gone)
-        blocks = {HEADER: block(HEADER_START, HEADER_RULES)}
-        for pack in packs:
-            root = roots[pack.name]
-            generated = repo / PACKS / pack.name
-            if generated.exists():
-                shutil.rmtree(generated)
-            tree.write(root, pack, folders[pack.name], repo)
-            blocks[pack.name] = block(pack.start(), tree.body(root, pack), snapshot(generated))
-        if (repo / PACKS).is_dir() and not any((repo / PACKS).iterdir()):
-            (repo / PACKS).rmdir()
-        for pack_md, text in edits:
-            if text is None:
+        text, blocks = sync.write(repo, found, packs, folders, roots)
+        for pack_md, pack_md_text in edits:
+            if pack_md_text is None:
                 shutil.rmtree(repo / pack_md.parent)
             else:
                 (repo / pack_md).parent.mkdir(parents=True, exist_ok=True)
-                (repo / pack_md).write_text(text, encoding='utf-8')
-        text = found.text[:found.start] + '\n'.join(blocks.values()) + found.text[found.end:]
+                (repo / pack_md).write_text(pack_md_text, encoding='utf-8')
         created = not file.exists()
         file.write_bytes(text.encode('utf-8'))
         # A new AGENTS.md gets CLAUDE.md linked to it, so Claude Code reads it too. A repo that already has its own
