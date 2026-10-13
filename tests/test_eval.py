@@ -279,6 +279,38 @@ class LocalPackEvalTests(EvalCase):
 
 
 
+class ImportPackEvalTests(EvalCase):
+    """Evals in a repo whose own docs hold an import pack."""
+
+    def setUp(self):
+        super().setUp()
+        self.publish({'pack.md': 'Prefer small PRs.\n'})
+        docs = self.repo / 'docs' / 'agents' / 'project'
+        docs.mkdir(parents=True)
+        (docs / 'deploying.md').write_text('---\nwhen: Deploying\n---\nShip it.\n')
+        files = {**case('docs/agents/project/deploying.md'),
+                 'graders/content.md': '---\ntype: regex\npattern: Ship it.\n---\n'}
+        for path, text in files.items():
+            (docs / '.evals' / 'deploying' / 'ships-it' / path).parent.mkdir(parents=True, exist_ok=True)
+            (docs / '.evals' / 'deploying' / 'ships-it' / path).write_text(text)
+        self.sync('add', 'project', '.', '--path', 'docs/agents/project')
+        imported = self.sync('add', 'house-rules', str(self.origin), '--path', 'context',
+                             '--into', 'docs/agents/project')
+        self.assertEqual(imported.returncode, 0, imported.stderr)
+
+    def test_pack_holding_an_import_pack_is_evaluated(self):
+        result = self.eval('project', 'deploying')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertRegex(result.stdout, r'ships-it +0\.00 +1\.00')
+
+    def test_eval_of_an_import_pack_stops(self):
+        result = self.eval('house-rules')
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('house-rules is an import pack', result.stderr)
+
+
 class RepoEvalsTests(EvalCase):
     """The tests on this repo's own project docs, which double as the example of the format."""
 

@@ -137,19 +137,13 @@ def main():
 
     with contextlib.ExitStack() as stack:
         folders = {p.name: fetch(repo, p, stack) for p in packs}
-        imported = {p.name: {} for p in packs if p.local}
-        for i in known:
-            source = fetch(repo, i.pack, stack)
-            fields, rules = i.front()
-            root = tree.load(source, i.pack)
-            root = root._replace(fields=fields, rules='\n'.join(r for r in (rules, root.rules) if r))
-            imported[i.holder][i.id] = tree.Imported(i.id, i.pack, root, source)
+        imported = imports.trees(repo, packs, known, stack)
         roots = {p.name: tree.load(folders[p.name], p, imported=imported.get(p.name)) for p in packs}
         if args.command == 'list':
             show(packs, known)
             return
         if args.command == 'eval':
-            evaluate.evaluate(repo, file, found, packs, folders, args.name, args.doc, options)
+            evaluate.evaluate(repo, file, found, packs, folders, imported, args.name, args.doc, options)
             return
 
         for gone in {p.name for p in found.packs} - {p.name for p in packs}:

@@ -44,8 +44,8 @@ class Tests(NamedTuple):
     triggers: Optional[Path]
 
 
-def tests(root, folder, installed):
-    """Each doc's tests, by the doc's path in the pack, from the installed packs' .evals folders."""
+def tests(root, folder):
+    """Each doc's tests, by the doc's path in the pack, from the .evals folders of the pack and those nested in it."""
     found = {}
 
     def doc_for(path, docs, home, node):
@@ -56,7 +56,7 @@ def tests(root, folder, installed):
                      f'{doc} isn\'t one. A doc\'s tests go in {EVALS}/<doc>/ beside it.')
         return doc
 
-    for node in [root] + [n for n in root.nested() if n.id in installed]:
+    for node in [root, *root.nested()]:
         home = folder / node.id / EVALS
         docs = {d.path for d in node.docs}
         for case in sorted({p.parent for p in home.rglob('*') if p.name in CASE_FILES}):
@@ -153,7 +153,7 @@ def scheduling(options):
     return passed, pool, model
 
 
-def render(repo, file, found, packs, folders, into):
+def render(repo, file, found, packs, folders, imported, into):
     """Write the repo's instructions file into the folder into as a sync writes it from the packs' content in
     folders, with every file its tables point at, and return the packs as written. A pack read from a folder outside
     the repo is copied in like a pack from git, since a run's working directory holds nothing outside it, so its rows
@@ -163,12 +163,11 @@ def render(repo, file, found, packs, folders, into):
     rendered = [p._replace(origin=(repo / p.origin).resolve().as_uri())
                 if p.local and inside not in [path, *path.parents] else p
                 for p, path in ((p, (repo / p.synced).resolve()) for p in packs)]
-    roots = {p.name: tree.load(folders[p.name], p) for p in rendered}
-    installed = {p.name: tree.installs(roots[p.name], p) for p in rendered}
-    text, _ = sync.write(into, found, rendered, folders, roots, installed)
+    roots = {p.name: tree.load(folders[p.name], p, imported=imported.get(p.name)) for p in rendered}
+    text, _ = sync.write(into, found, rendered, folders, roots)
     for pack in (p for p in rendered if p.local):
         root = roots[pack.name]
-        for node in [root] + [n for n in root.nested() if n.id in installed[pack.name]]:
+        for node in [root, *root.nested()]:
             for path in node.files:
                 target = into / pack.synced / path
                 target.parent.mkdir(parents=True, exist_ok=True)
@@ -177,12 +176,17 @@ def render(repo, file, found, packs, folders, into):
     return rendered
 
 
-def evaluate(repo, file, found, packs, folders, name, doc, options):
+def evaluate(repo, file, found, packs, folders, imported, name, doc, options):
     """Run the tests for doc in the pack named name, or for every doc of it that has tests, and print each case's
-    score with and without the doc, and each trigger's score."""
-    pack = next(p for p in packs if p.name == name)
-    root = tree.load(folders[name], pack)
-    by_doc = tests(root, folders[name], tree.installs(root, pack))
+    score with and without the doc, and each trigger's score. imported holds the packs the import packs name, by the
+    pack holding each."""
+    pack = next((p for p in packs if p.name == name), None)
+    if not pack:
+        sys.exit(f'context-packs: {name} is an import pack, and eval runs the tests of a pack installed in AGENTS.md, '
+                 'which an import pack\'s tests don\'t sync with. Install the pack on its own in an empty folder, '
+                 'and run eval there.')
+    root = tree.load(folders[name], pack, imported=imported.get(name))
+    by_doc = tests(root, folders[name])
     if doc:
         if f'{doc}.md' not in by_doc:
             sys.exit(f'context-packs: {name} has no tests for {doc}. Docs with tests: '
@@ -194,7 +198,7 @@ def evaluate(repo, file, found, packs, folders, name, doc, options):
     # Kept, so the reports and transcripts claude plugin eval writes into each plugin stay readable.
     work = Path(tempfile.mkdtemp(prefix='context-packs-eval-'))
     full = work / 'full'
-    run_pack = next(p for p in render(repo, file, found, packs, folders, full) if p.name == name)
+    run_pack = next(p for p in render(repo, file, found, packs, folders, imported, full) if p.name == name)
     jobs = []
     for path, doc_tests in sorted(by_doc.items()):
         slug = path[:-len('.md')].replace('/', '-')
@@ -206,7 +210,7 @@ def evaluate(repo, file, found, packs, folders, name, doc, options):
             shutil.copytree(folders[name], content, ignore=shutil.ignore_patterns('.*'))
             (content / path).unlink()
             without = work / f'without-{slug}'
-            render(repo, file, found, packs, {**folders, name: content}, without)
+            render(repo, file, found, packs, {**folders, name: content}, imported, without)
             jobs += [Job(path, case, 'without', without) for case in doc_tests.cases]
         jobs += [Job(path, case, 'with', full) for case in doc_tests.cases + triggers]
 

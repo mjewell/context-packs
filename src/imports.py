@@ -7,7 +7,7 @@ import sys
 from typing import NamedTuple
 
 import origins
-from packs import Pack, local
+from packs import Pack, fetch, local
 import tree
 
 KEYS = ('when', 'from', 'path', 'ref')
@@ -66,6 +66,19 @@ def find(repo, packs):
                          f'its pack.md. Move {", ".join(others)} beside it.')
             found.append(parse(holder, holder.synced / rel, text))
     return found
+
+
+def trees(repo, packs, known, stack):
+    """For each pack that can hold import packs, those read from a folder on disk, the packs its import packs name,
+    loaded with the import packs' fields and rules, by id."""
+    imported = {p.name: {} for p in packs if p.local}
+    for i in known:
+        source = fetch(repo, i.pack, stack)
+        fields, rules = i.front()
+        root = tree.load(source, i.pack)
+        root = root._replace(fields=fields, rules='\n'.join(r for r in (rules, root.rules) if r))
+        imported[i.holder][i.id] = tree.Imported(i.id, i.pack, root, source)
+    return imported
 
 
 def within(folder, outer):
