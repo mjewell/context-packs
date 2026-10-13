@@ -69,21 +69,17 @@ when: Writing or changing tests
 
 A nested pack gets a row too, from the `when` in its `pack.md`, pointing at a generated index that holds its rules and a table of its own docs and nested packs. Each nested pack is a read an agent makes before reaching the docs inside it, so nest only where a subtree is big and its `when` is sharp, and use plain folders to group the rest. Files other than `.md` files, such as code examples, are copied along with the docs beside them.
 
-A nested pack's `pack.md` takes two more fields:
-
-- `optional: true` leaves it out unless a repo picks it with `--docs`. Without it, the nested pack is installed whenever its parent is.
-- `inline: true` pastes its rules and table after its parent's instead of giving it a row, for rules that apply whenever a repo has the nested pack, like a language's. An inline pack that isn't optional needs no `when`.
+A nested pack's `pack.md` takes one more field: `optional: true` leaves it out unless a repo picks it with `--docs`. Without it, the nested pack is installed whenever its parent is.
 
 ```markdown
 ---
 when: Working in a TypeScript repo
 optional: true
-inline: true
 ---
 Prefer unions to enums.
 ```
 
-Any folder with a `pack.md` can also be installed on its own, as its own pack, and it renders the way it would inside its parent. If its `pack.md` has a `when` and isn't inline, its block in `AGENTS.md` is a one-row table pointing at a generated index of its rules, so installing just `typescript` still loads its rules only when a row matches. Without a `when`, or with `inline: true`, its rules are pasted into the block. `optional` doesn't apply, since installing it is the pick.
+Any folder with a `pack.md` can also be installed on its own, as its own pack, and it renders the way it would inside its parent. If its `pack.md` has a `when`, its block in `AGENTS.md` is a one-row table pointing at a generated index of its rules, so installing just `typescript` still loads its rules only when a row matches. Without a `when`, its rules are pasted into the block. `optional` doesn't apply, since installing it is the pick.
 
 Keep `pack.md` short, since every session loads it.
 

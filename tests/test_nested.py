@@ -274,73 +274,31 @@ class PickTests(SyncCase):
         self.assertIn('testing', result.stderr)
 
 
-class InlineTests(SyncCase):
-    """A nested pack with inline: true, whose rules and table follow its parent's instead of taking a row."""
+class RemovedInlineTests(SyncCase):
+    """A pack.md still saying inline: true, which context-packs no longer supports."""
 
     def setUp(self):
         super().setUp()
         self.publish({
             'pack.md': 'Prefer small PRs.\n',
-            'testing.md': doc('Writing tests'),
-            'typescript/pack.md': doc('Working in a TypeScript repo', 'Prefer unions.\n', optional='true',
-                                      inline='true'),
-            'typescript/types.md': doc('Declaring types'),
-            'typescript/react/pack.md': doc('Writing React components', 'Use hooks.\n'),
+            'typescript/pack.md': doc('Working in a TypeScript repo', 'Prefer unions.\n', inline='true'),
         })
-        self.synced = self.repo / 'docs' / 'agents' / 'packs' / 'house-rules'
         self.agents_md = self.repo / 'AGENTS.md'
 
-    def test_picked_inline_pack_follows_its_parent_in_the_block(self):
-        result = self.add('--docs', 'typescript')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(self.start().replace(' -->', ' docs=typescript -->') + 'Prefer small PRs.\n\n'
-                      '## house-rules context\n\n| When | Read |\n|---|---|\n'
-                      '| Writing tests | `docs/agents/packs/house-rules/testing.md` |\n\n'
-                      'Prefer unions.\n\n## house-rules/typescript context\n\n| When | Read |\n|---|---|\n'
-                      '| Writing React components | `docs/agents/packs/house-rules/typescript/react.md` |\n'
-                      '| Declaring types | `docs/agents/packs/house-rules/typescript/types.md` |\n'
-                      '<!-- context-packs:end',
-                      self.agents_md.read_text())
-
-    def test_inline_pack_gets_no_index_of_its_own(self):
-        result = self.add('--docs', 'typescript')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(sorted(p.relative_to(self.synced).as_posix() for p in self.synced.rglob('*') if p.is_file()),
-                         ['testing.md', 'typescript/react.md', 'typescript/types.md'])
-
-    def test_inline_pack_left_unpicked_adds_nothing(self):
-        result = self.add()
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn('unions', self.agents_md.read_text())
-
-    def test_inline_pack_that_isnt_optional_needs_no_when_line(self):
-        self.publish({'style/pack.md': '---\ninline: true\n---\nUse tabs.\n'})
-
-        result = self.add()
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('Use tabs.\n', self.agents_md.read_text())
-
-    def test_list_shows_an_inline_pack_without_a_when_line(self):
-        self.publish({'style/pack.md': '---\ninline: true\n---\nUse tabs.\n'})
-        self.add()
-
-        result = self.sync('list')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('  [x] style\n', result.stdout)
-
-    def test_inline_other_than_true_stops_the_sync(self):
-        self.publish({'typescript/pack.md': doc('Working in a TypeScript repo', inline='yes')})
-
+    def test_inline_in_a_nested_pack_stops_the_sync_saying_what_replaced_it(self):
         result = self.add()
 
         self.assertEqual(result.returncode, 1)
         self.assertIn('context/typescript/pack.md', result.stderr)
-        self.assertIn('inline', result.stderr)
+        self.assertIn('no longer supports `inline`', result.stderr)
+        self.assertNotIn('update context-packs', result.stderr)
+        self.assertFalse(self.agents_md.exists())
+
+    def test_inline_in_a_pack_installed_alone_stops_the_sync(self):
+        result = self.sync('add', 'typescript', str(self.origin), '--path', 'context/typescript')
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('no longer supports `inline`', result.stderr)
 
 
 class OverlapTests(SyncCase):
@@ -397,7 +355,6 @@ class InstallPointTests(SyncCase):
             'pack.md': 'Prefer small PRs.\n',
             'typescript/pack.md': doc('Editing `**/*.ts`', 'Prefer unions.\n', optional='true'),
             'typescript/types.md': doc('Declaring types'),
-            'style/pack.md': '---\ninline: true\n---\nUse tabs.\n',
         })
         self.agents_md = self.repo / 'AGENTS.md'
         self.synced = self.repo / 'docs' / 'agents' / 'packs' / 'typescript'
@@ -420,12 +377,6 @@ class InstallPointTests(SyncCase):
         self.assertEqual((self.synced / 'pack.md').read_text(),
                          'Prefer unions.\n\n## typescript context\n\n| When | Read |\n|---|---|\n'
                          '| Declaring types | `docs/agents/packs/typescript/types.md` |\n')
-
-    def test_inline_pack_gets_its_rules_in_its_block(self):
-        result = self.add_folder('style')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(' -->\nUse tabs.\n<!-- context-packs:end', self.agents_md.read_text())
 
     def test_nested_pack_named_pack_beside_a_root_index_stops_the_sync(self):
         self.publish({'typescript/pack/pack.md': doc('Packaging')})

@@ -9,6 +9,11 @@ from typing import NamedTuple, Tuple
 from packs import PACKS
 
 FRONT = re.compile(r'---\n(.*?)\n---\n', re.DOTALL)
+# Front matter keys context-packs once took, and what replaced each, so a pack still using one hears why it stopped
+# instead of being told to update context-packs.
+REMOVED = {
+    'inline': 'A nested pack gets a row from its `when`, and rules every session needs go in its parent\'s pack.md.',
+}
 
 
 class Doc(NamedTuple):
@@ -32,15 +37,11 @@ class Node(NamedTuple):
         return 'optional' in self.fields
 
     @property
-    def inline(self):
-        return 'inline' in self.fields
-
-    @property
     def row(self):
-        """Whether the pack gets a row pointing at its index, rather than having its rules and table pasted into its
-        parent's, or into the block for the installed pack. Its parent is wherever it's installed, so a pack renders
-        the same installed on its own as inside another."""
-        return 'when' in self.fields and not self.inline
+        """Whether the pack gets a row pointing at its index, rather than having its rules and table pasted into the
+        block for the installed pack. Every nested pack has a when, so only an installed pack without one is pasted,
+        and a pack renders the same installed on its own as inside another."""
+        return 'when' in self.fields
 
     def nested(self):
         """Every pack nested in this one, at any depth, parents before their children."""
@@ -56,10 +57,13 @@ def front(text, where, keys):
     fields = dict(p for p in pairs if len(p) == 2)
     if len(fields) != len(pairs):
         sys.exit(f'context-packs: {where} has front matter that isn\'t `key: value` lines.')
+    for key in sorted(set(fields) & set(REMOVED)):
+        sys.exit(f'context-packs: {where} has {key}: {fields[key]}, but context-packs no longer supports `{key}`. '
+                 f'{REMOVED[key]} Remove the line.')
     unknown = sorted(set(fields) - set(keys))
     if unknown:
         sys.exit(f'context-packs: {where} has front matter context-packs doesn\'t know: {", ".join(unknown)}. '
-                 'A doc takes only `when`, and a pack.md takes `when`, `optional` and `inline`. Remove it, or update '
+                 'A doc takes only `when`, and a pack.md takes `when` and `optional`. Remove it, or update '
                  'context-packs if the pack needs a newer version.')
     return fields, text[match.end():] if match else text
 
@@ -75,14 +79,13 @@ def load(folder, pack, id=''):
                  'to pack.md in the pack, or run update to move to a version of the pack that has one.')
     pack_md = folder / home / 'pack.md'
     fields, rules = front(pack_md.read_text(encoding='utf-8'), where(home / 'pack.md'),
-                          ('when', 'optional', 'inline')) if pack_md.is_file() else ({}, '')
-    for key, without in (('optional', 'installed whenever its parent is'), ('inline', 'that gets a row')):
-        if fields.get(key, 'true') != 'true':
-            sys.exit(f'context-packs: {where(home / "pack.md")} has {key}: {fields[key]}, but {key} takes only '
-                     f'true. Leave it out for a pack {without}.')
-    # A nested pack's when is its row in its parent's table, or what list shows for an optional one, so only an
-    # inline pack that isn't optional goes without. The installed pack needs none: without one, it's pasted in.
-    if id and 'when' not in fields and not ('inline' in fields and 'optional' not in fields):
+                          ('when', 'optional')) if pack_md.is_file() else ({}, '')
+    if fields.get('optional', 'true') != 'true':
+        sys.exit(f'context-packs: {where(home / "pack.md")} has optional: {fields["optional"]}, but optional takes '
+                 'only true. Leave it out for a pack installed whenever its parent is.')
+    # A nested pack's when is its row in its parent's table. The installed pack needs none: without one, it's pasted
+    # in.
+    if id and 'when' not in fields:
         sys.exit(f'context-packs: {where(home / "pack.md")} must start with front matter saying when to read it, '
                  'since it\'s nested in another pack:\n\n---\nwhen: Editing `web/**`\n---')
     # The end marker has to start its own line, or the next sync can't find the block.
@@ -147,14 +150,12 @@ def table(title, rows):
 
 
 def render(node, pack, installed):
-    """The node's rules, then its table: a row for each of its docs and for each installed pack nested in it that
-    gets one. The others are rendered the same way after it."""
+    """The node's rules, then its table: a row for each of its docs and for each installed pack nested in it."""
     children = [c for c in node.children if c.id in installed]
     rows = sorted([(d.path[:-len('.md')], d.when, pack.synced / d.path) for d in node.docs]
-                  + [(c.id, c.fields['when'], index(c, pack)) for c in children if c.row])
+                  + [(c.id, c.fields['when'], index(c, pack)) for c in children])
     title = f'{pack.name}/{node.id}' if node.id else pack.name
-    pasted = [render(c, pack, installed) for c in children if not c.row]
-    return '\n'.join(part for part in (node.rules, table(title, [r[1:] for r in rows]), *pasted) if part)
+    return '\n'.join(part for part in (node.rules, table(title, [r[1:] for r in rows])) if part)
 
 
 def body(root, pack, installed):
