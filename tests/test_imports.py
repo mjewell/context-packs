@@ -125,6 +125,20 @@ class ImportTests(ImportPackCase):
                          '| When | Read |\n|---|---|\n'
                          '| Writing tests | `docs/agents/packs/project/review/house-rules/testing.md` |\n')
 
+    def test_import_pack_moved_into_a_nested_pack_renders_there(self):
+        self.import_rules()
+        (self.docs / 'review').mkdir()
+        (self.docs / 'review' / 'pack.md').write_text(doc('Reviewing code', 'Read the tests first.\n'))
+        shutil.move(str(self.import_md.parent), str(self.docs / 'review' / 'house-rules'))
+
+        result = self.sync()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn('Prefer small PRs.', self.agents_md.read_text())
+        self.assertIn('Read the tests first.\n\nPrefer small PRs.\n',
+                      (self.repo / 'docs' / 'agents' / 'packs' / 'project' / 'review.md').read_text())
+        self.assertFalse(self.generated.exists())
+
     def test_update_moves_the_import_packs_pin_and_keeps_the_rest_of_it(self):
         self.import_rules('--when', 'Reviewing a PR')
         self.import_md.write_text(self.import_md.read_text() + 'Small means under 200 lines.\n')
@@ -336,6 +350,37 @@ class InstallTests(SyncCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(self.import_md.parent.exists())
         self.assertNotIn('house-rules', self.agents_md.read_text())
+
+    def moved_into_project(self):
+        docs = self.repo / 'docs' / 'agents' / 'project'
+        docs.mkdir(parents=True)
+        (docs / 'design.md').write_text(doc('Changing the design'))
+        self.sync('add', 'project', 'docs/agents/project')
+        self.add()
+        shutil.move(str(self.import_md.parent), str(docs / 'house-rules'))
+        return docs / 'house-rules'
+
+    def test_marker_whose_folder_moved_stops_and_says_to_remove_it(self):
+        self.moved_into_project()
+        before = self.agents_md.read_text()
+
+        result = self.sync()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("house-rules pack's folder, docs/agents/house-rules, isn't there", result.stderr)
+        self.assertIn('remove house-rules', result.stderr)
+        self.assertEqual(self.agents_md.read_text(), before)
+
+    def test_remove_after_moving_a_pack_into_another_keeps_it_there(self):
+        moved = self.moved_into_project()
+
+        result = self.sync('remove', 'house-rules')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((moved / 'pack.md').exists())
+        self.assertNotIn(self.start(), self.agents_md.read_text())
+        self.assertIn('| Changing the design | `docs/agents/project/design.md` |\n\nPrefer small PRs.\n',
+                      self.agents_md.read_text())
 
     def test_remove_keeps_the_folder_of_a_pack_on_disk(self):
         docs = self.repo / 'docs' / 'agents' / 'project'

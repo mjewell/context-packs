@@ -147,6 +147,8 @@ npx context-packs add typescript https://github.com/acme/agent-context.git --pat
 
 That writes `docs/agents/project/typescript/pack.md`, and the pack renders like a pack nested in yours, with no block of its own: a row in your pack's table, pointing at `docs/agents/packs/project/typescript/pack.md`, which holds its rules and its own table. Without a `when`, its rules and table would be pasted after your pack's own.
 
+**Moving a pack.** Each marker in `AGENTS.md` names a root pack's folder, and the packs nested in it, yours or imported, render in its block. Inside a root, move a pack to any depth and resync, and it renders where it now sits. After moving a root pack, change `path=` in its start marker, or, if you moved it into another pack, run `remove <name>`: the block goes, and the moved folder stays. A pack moved out of every root drops out of `AGENTS.md`, as a doc moved out of a pack does.
+
 [The example](docs/example.md#choosing-when-a-pack-loads) imports a pack this way, step by step. The tool keeps `from`, `path` and `ref`: `update` moves `ref`, and `remove typescript` deletes the folder. An import pack's folder holds only its `pack.md`, its name can't be used by another pack in the repo, and a pack from git can't hold one.
 
 ## Let your agent run it

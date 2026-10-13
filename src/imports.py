@@ -99,9 +99,10 @@ def within(path, outer):
     return path == outer or outer in path.parents
 
 
-def apply(args, repo, packs, known):
+def apply(args, repo, markers, packs, known):
     """The markers' packs and the import packs once the command has run, and the files to write for the import
-    packs, as (pack.md, text) pairs, with None for text deleting the import pack's folder."""
+    packs, as (pack.md, text) pairs, with None for text deleting the import pack's folder. markers names the packs
+    the markers named before it ran."""
     packs, known, edits = list(packs), list(known), []
     named = {i.holder for i in known if not i.id}
     if args.command == 'add' and local(args.origin):
@@ -113,6 +114,8 @@ def apply(args, repo, packs, known):
             sys.exit(f'context-packs: {args.origin} is a folder on disk, which syncs from its working tree, so '
                      'it takes no --ref.')
         packs.append(Pack(args.name, '.', folder(args.origin, args.path), None))
+        if not (repo / packs[-1].path).is_dir():
+            sys.exit(f'context-packs: {packs[-1].path} isn\'t a folder, relative to {repo}.')
         known += find(repo, packs[-1:])
     if args.command == 'add' and not local(args.origin):
         into = args.into or INTO
@@ -130,10 +133,14 @@ def apply(args, repo, packs, known):
             packs.append(holder)
         known.append(parse(holder, file, text))
         edits.append((file, text))
-    if args.command == 'remove':
-        # The import packs held by a pack of yours leave with it, but their files are yours, so they stay.
-        edits += [(i.file, None) for i in known if i.pack.name == args.name]
-        known = [i for i in known if args.name not in (i.pack.name, i.holder)]
+    if args.command == 'remove' and args.name in markers:
+        # Only the import pack the marker names goes. Those its folder holds leave the sync with it, but their files
+        # are the repo's, so they stay, as does one moved out of its folder that still has its name.
+        edits += [(i.file, None) for i in known if i.holder == args.name and not i.id]
+        known = [i for i in known if i.holder != args.name]
+    elif args.command == 'remove':
+        edits += [(i.file, None) for i in known if i.id and i.pack.name == args.name]
+        known = [i for i in known if not (i.id and i.pack.name == args.name)]
     if args.command == 'update':
         for n, imported in enumerate(known):
             pack = imported.pack

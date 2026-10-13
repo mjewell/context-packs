@@ -41,6 +41,17 @@ def apply(args, found, imported):
     return packs
 
 
+def located(repo, packs, edits):
+    """Stop unless every marker names a folder that's there, or one the command is about to write, saying how to fix
+    one that was moved or deleted."""
+    written = {pack_md.parent.as_posix() for pack_md, text in edits if text is not None}
+    for pack in packs:
+        if not (repo / pack.path).is_dir() and pack.path not in written:
+            sys.exit(f'context-packs: the {pack.name} pack\'s folder, {pack.path}, isn\'t there. If you moved it, change '
+                     'path= in its start marker to where it is now. If you moved it into another pack, or deleted it, '
+                     f'run `context-packs remove {pack.name}`.')
+
+
 def check(packs, known):
     """Stop unless every pack, import packs included, has a name of its own and a folder no other holds."""
     names = [p.name for p in packs] + [i.pack.name for i in known if i.id]
@@ -103,7 +114,8 @@ def main():
     found = region(repo, file)
     before = imports.find(repo, found.packs)
     packs = apply(args, found, [i.pack.name for i in before if i.id])
-    packs, known, edits = imports.apply(args, repo, packs, before)
+    packs, known, edits = imports.apply(args, repo, [p.name for p in found.packs], packs, before)
+    located(repo, packs, edits)
     check(packs, known)
 
     with contextlib.ExitStack() as stack:
