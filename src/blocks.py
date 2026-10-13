@@ -51,13 +51,16 @@ def marked_pack(file, name, marker):
     if origin and local(origin) and 'ref' in fields:
         sys.exit(f'context-packs: {file}: the {name} block\'s start marker pins {origin} to a ref, but a path is a '
                  'folder on disk, read from its working tree. To pin the pack, use its git URL instead.')
-    if (len(fields) != len(pairs) or set(fields) - {'from', 'path', 'ref', 'docs'} or not origin
+    if 'docs' in fields:
+        sys.exit(f'context-packs: {file}: the {name} block\'s start marker has docs={fields["docs"]}, but '
+                 'context-packs no longer picks nested packs: every nested pack is installed with its parent. Remove '
+                 'docs= from the marker, and install a part a repo chooses as a pack of its own.')
+    if (len(fields) != len(pairs) or set(fields) - {'from', 'path', 'ref'} or not origin
             or local(origin) == ('ref' in fields)):
         sys.exit(f'context-packs: {file}: the {name} block\'s start marker needs from=<git URL> and '
                  'ref=<tag or commit>, or from=<path> for a folder on disk, plus path=<folder> unless the pack is the '
-                 'whole repo, and docs=<nested packs> for the optional ones picked. Fix the marker, then sync again.')
-    docs = tuple(fields['docs'].split(',')) if 'docs' in fields else ()
-    return Pack(name, origin, fields.get('path', ''), fields.get('ref'), docs)
+                 'whole repo. Fix the marker, then sync again.')
+    return Pack(name, origin, fields.get('path', ''), fields.get('ref'))
 
 
 def read(file):

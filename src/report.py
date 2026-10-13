@@ -13,10 +13,6 @@ def at(pack):
     return f' @ {short(pack.ref)}' if pack.ref else ''
 
 
-def sets(names):
-    return ', '.join(names) or 'none'
-
-
 def changes(found, after, blocks, created, linked):
     """Lines describing what the sync did: whether it created AGENTS.md and linked CLAUDE.md to it, and how the
     packs found in the instructions file became the packs after it, with blocks the text the sync wrote for each."""
@@ -28,11 +24,9 @@ def changes(found, after, blocks, created, linked):
     for pack in after:
         was = old.get(pack.name)
         if not was:
-            lines.append(f'{pack.name}: added{at(pack)}' + f' (docs: {sets(pack.docs)})' * bool(pack.docs))
+            lines.append(f'{pack.name}: added{at(pack)}')
         elif was.ref != pack.ref:
             lines.append(f'{pack.name}: {short(was.ref)} → {short(pack.ref)}')
-        elif was.docs != pack.docs:
-            lines.append(f'{pack.name}: nested packs {sets(was.docs)} → {sets(pack.docs)}')
         elif found.blocks[pack.name] != blocks[pack.name]:
             lines.append(f'{pack.name}: changed')
     lines += [f'{p.name}: removed' for p in before if p.name not in new]

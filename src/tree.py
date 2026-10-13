@@ -13,6 +13,8 @@ FRONT = re.compile(r'---\n(.*?)\n---\n', re.DOTALL)
 # instead of being told to update context-packs.
 REMOVED = {
     'inline': 'A nested pack gets a row from its `when`, and rules every session needs go in its parent\'s pack.md.',
+    'optional': 'Every nested pack is installed with its parent, so make a part a repo chooses a pack of its own, in a '
+                'folder outside its parent\'s, which the repo installs with add.',
 }
 
 
@@ -31,10 +33,6 @@ class Node(NamedTuple):
     docs: Tuple[Doc, ...]
     files: Tuple[str, ...]
     children: Tuple['Node', ...]
-
-    @property
-    def optional(self):
-        return 'optional' in self.fields
 
     @property
     def row(self):
@@ -63,7 +61,7 @@ def front(text, where, keys):
     unknown = sorted(set(fields) - set(keys))
     if unknown:
         sys.exit(f'context-packs: {where} has front matter context-packs doesn\'t know: {", ".join(unknown)}. '
-                 'A doc takes only `when`, and a pack.md takes `when` and `optional`. Remove it, or update '
+                 'A doc and a pack.md take only `when`. Remove it, or update '
                  'context-packs if the pack needs a newer version.')
     return fields, text[match.end():] if match else text
 
@@ -79,10 +77,7 @@ def load(folder, pack, id=''):
                  'to pack.md in the pack, or run update to move to a version of the pack that has one.')
     pack_md = folder / home / 'pack.md'
     fields, rules = front(pack_md.read_text(encoding='utf-8'), where(home / 'pack.md'),
-                          ('when', 'optional')) if pack_md.is_file() else ({}, '')
-    if fields.get('optional', 'true') != 'true':
-        sys.exit(f'context-packs: {where(home / "pack.md")} has optional: {fields["optional"]}, but optional takes '
-                 'only true. Leave it out for a pack installed whenever its parent is.')
+                          ('when',)) if pack_md.is_file() else ({}, '')
     # A nested pack's when is its row in its parent's table. The installed pack needs none: without one, it's pasted
     # in.
     if id and 'when' not in fields:
@@ -119,25 +114,6 @@ def load(folder, pack, id=''):
     return Node(id, fields, rules, tuple(docs), tuple(files), tuple(children))
 
 
-def installs(root, pack):
-    """The ids of the packs nested in root that a sync installs: each one picked or above a picked one, and each
-    one not optional whose parent is installed."""
-    nested = {n.id for n in root.nested()}
-    unknown = sorted(set(pack.docs) - nested)
-    if unknown:
-        sys.exit(f'context-packs: {pack.name} has no nested pack named {", ".join(unknown)}. '
-                 f'Its nested packs: {", ".join(sorted(nested)) or "none"}. Choose from those with --docs.')
-    parts = [pick.split('/') for pick in pack.docs]
-    wanted = {'/'.join(p[:i]) for p in parts for i in range(1, len(p) + 1)}
-
-    def visit(node):
-        for child in node.children:
-            if not child.optional or child.id in wanted:
-                yield child.id
-                yield from visit(child)
-    return set(visit(root))
-
-
 def index(node, pack):
     """Where a pack's generated index sits: pack.md for the installed pack, since no doc can have that name."""
     return PACKS / pack.name / f'{node.id or "pack"}.md'
@@ -149,24 +125,23 @@ def table(title, rows):
             + ''.join(f'| {when} | `{path.as_posix()}` |\n' for when, path in rows)) if rows else ''
 
 
-def render(node, pack, installed):
-    """The node's rules, then its table: a row for each of its docs and for each installed pack nested in it."""
-    children = [c for c in node.children if c.id in installed]
+def render(node, pack):
+    """The node's rules, then its table: a row for each of its docs and for each pack nested in it."""
     rows = sorted([(d.path[:-len('.md')], d.when, pack.synced / d.path) for d in node.docs]
-                  + [(c.id, c.fields['when'], index(c, pack)) for c in children])
+                  + [(c.id, c.fields['when'], index(c, pack)) for c in node.children])
     title = f'{pack.name}/{node.id}' if node.id else pack.name
     return '\n'.join(part for part in (node.rules, table(title, [r[1:] for r in rows])) if part)
 
 
-def body(root, pack, installed):
+def body(root, pack):
     """The installed pack's block: a row pointing at its index if it gets one, else its rules and table."""
-    return table(pack.name, [(root.fields['when'], index(root, pack))]) if root.row else render(root, pack, installed)
+    return table(pack.name, [(root.fields['when'], index(root, pack))]) if root.row else render(root, pack)
 
 
-def write(root, pack, installed, source, repo):
-    """Copy the installed packs' files from source into repo, unless the pack is in repo already, and write the
-    index of each installed pack that gets a row."""
-    for node in [root] + [n for n in root.nested() if n.id in installed]:
+def write(root, pack, source, repo):
+    """Copy the packs' files from source into repo, unless the pack is in repo already, and write the index of each
+    pack that gets a row."""
+    for node in [root, *root.nested()]:
         copies = [] if pack.local else [(source / path, repo / pack.synced / path) for path in node.files]
         for origin, target in copies:
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -174,4 +149,4 @@ def write(root, pack, installed, source, repo):
         if node.row:
             target = repo / index(node, pack)
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(render(node, pack, installed), encoding='utf-8')
+            target.write_text(render(node, pack), encoding='utf-8')

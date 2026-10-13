@@ -18,7 +18,7 @@ Never log tokens, session IDs or passwords, even at debug level.
 | Reading the signed-in user, or changing sign-in or sign-out | `docs/agents/packs/auth/sessions.md` |
 <!-- context-packs:end sha256:3ccb7c0b8f64 -->
 
-<!-- context-packs:start frontend from=https://github.com/acme/agent-context.git path=frontend ref=frontend-v1.4.0 docs=react -->
+<!-- context-packs:start frontend from=https://github.com/acme/agent-context.git path=frontend ref=frontend-v1.4.0 -->
 Build UI from `@acme/ui` components; don't style raw HTML elements. Every user-facing string goes through `t()`.
 
 ## frontend context
@@ -69,17 +69,9 @@ when: Writing or changing tests
 
 A nested pack gets a row too, from the `when` in its `pack.md`, pointing at a generated index that holds its rules and a table of its own docs and nested packs. Each nested pack is a read an agent makes before reaching the docs inside it, so nest only where a subtree is big and its `when` is sharp, and use plain folders to group the rest. Files other than `.md` files, such as code examples, are copied along with the docs beside them.
 
-A nested pack's `pack.md` takes one more field: `optional: true` leaves it out unless a repo picks it with `--docs`. Without it, the nested pack is installed whenever its parent is.
+A nested pack is installed whenever its parent is. A part only some repos want, such as a language's rules, goes in a pack of its own, in a folder beside its parent's rather than inside it, and those repos install it with `add`.
 
-```markdown
----
-when: Working in a TypeScript repo
-optional: true
----
-Prefer unions to enums.
-```
-
-Any folder with a `pack.md` can also be installed on its own, as its own pack, and it renders the way it would inside its parent. If its `pack.md` has a `when`, its block in `AGENTS.md` is a one-row table pointing at a generated index of its rules, so installing just `typescript` still loads its rules only when a row matches. Without a `when`, its rules are pasted into the block. `optional` doesn't apply, since installing it is the pick.
+Any folder with a `pack.md` can also be installed on its own, as its own pack, and it renders the way it would inside its parent. If its `pack.md` has a `when`, its block in `AGENTS.md` is a one-row table pointing at a generated index of its rules, so installing just `typescript` still loads its rules only when a row matches. Without a `when`, its rules are pasted into the block.
 
 Keep `pack.md` short, since every session loads it.
 
@@ -153,12 +145,11 @@ Each command syncs the current folder, or `--dir <folder>`, and prints what chan
 | Command | Does |
 |---|---|
 | *(none)* | Resyncs every pack at its pinned ref |
-| `add <name> <origin> [--path P] [--ref R] [--docs a,b]` | Installs a pack, pinned to the origin's latest commit or to `--ref`, with the optional nested packs in `--docs` |
+| `add <name> <origin> [--path P] [--ref R]` | Installs a pack, pinned to the origin's latest commit or to `--ref` |
 | `remove <name>` | Uninstalls a pack |
 | `update [name…]` | Moves packs to their latest version |
 | `update <name> --ref R` | Pins one pack to a tag or commit |
-| `docs <name> a,b` | Replaces the optional nested packs a pack installs, each named by its path such as `typescript/react` (`''` for none). Picking one installs the packs above it |
-| `list` | Lists each pack and its nested packs as a tree, marking the installed ones |
+| `list` | Lists each pack, where it comes from, and its pin |
 
 **Pinning.** `--ref` takes a tag or a commit, never a branch, since a branch moves. `update` moves a pack pinned to a commit to the tip of the default branch, and one pinned to a release tag (a prefix and dot-separated numbers, such as `v1.2.0` or `acme-v3`) to the newest release with the same prefix, skipping pre-releases. Other tags stay put. A pack in a folder on disk, such as `.` or `../agent-rules`, isn't pinned.
 

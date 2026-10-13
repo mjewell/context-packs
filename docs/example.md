@@ -51,12 +51,11 @@ acme/agent-context
 
 Each team tags its own releases with a prefix, such as `frontend-v1.4.0` and `database-v2.0.0`, so `update` moves each pack along its own series.
 
-`react/pack.md` is optional, so a repo only gets it by asking for it:
+`react/pack.md` starts with front matter saying when to read it, like a doc:
 
 ```markdown
 ---
 when: Writing or changing React components
-optional: true
 ---
 Fetch data with the React Query hooks in `src/api/`, never in `useEffect`.
 ```
@@ -80,8 +79,8 @@ Created AGENTS.md
 Linked CLAUDE.md to AGENTS.md
 auth: added @ e60c2aa
 
-$ npx context-packs add frontend https://github.com/acme/agent-context.git --path frontend --ref frontend-v1.4.0 --docs react
-frontend: added @ frontend-v1.4.0 (docs: react)
+$ npx context-packs add frontend https://github.com/acme/agent-context.git --path frontend --ref frontend-v1.4.0
+frontend: added @ frontend-v1.4.0
 
 $ npx context-packs add project . --path docs/agents/project
 project: added
@@ -133,7 +132,7 @@ Never log tokens, session IDs or passwords, even at debug level.
 | Reading the signed-in user, or changing sign-in or sign-out | `docs/agents/packs/auth/sessions.md` |
 <!-- context-packs:end sha256:3ccb7c0b8f64 -->
 
-<!-- context-packs:start frontend from=https://github.com/acme/agent-context.git path=frontend ref=frontend-v1.4.0 docs=react -->
+<!-- context-packs:start frontend from=https://github.com/acme/agent-context.git path=frontend ref=frontend-v1.4.0 -->
 Build UI from `@acme/ui` components; don't style raw HTML elements. Every user-facing string goes through `t()`.
 
 ## frontend context
