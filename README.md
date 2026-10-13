@@ -141,7 +141,7 @@ ref: 3f2a9c1e0b7d4a6f8e5c2b1a9d8e7f6c5b4a3d2e
 
 The imported pack becomes a pack nested in yours, with the import pack's `when` in place of its own:
 
-- With a `when`, it gets a row in your pack's table, pointing at `docs/agents/packs/typescript/pack.md`, which holds its rules and its own table.
+- With a `when`, it gets a row in your pack's table, pointing at `docs/agents/packs/project/typescript/pack.md`, which holds its rules and its own table.
 - Without one, its rules and table are pasted into your pack's block, after your pack's own.
 
 The `when` is yours to change, and so is anything you write below the front matter, which comes before the imported rules. The tool keeps the rest: `update` moves `ref`, and `remove typescript` deletes the folder. An import pack's folder holds only its `pack.md`, its name can't be used by another pack in the repo, and only a pack read from a folder on disk, such as your project's own docs, can hold one.

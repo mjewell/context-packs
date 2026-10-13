@@ -20,11 +20,14 @@ def local(origin):
 
 
 class Pack(NamedTuple):
-    """Where a pack comes from: a folder in a git repo pinned to a commit, or a folder on disk."""
+    """Where a pack comes from: a folder in a git repo pinned to a commit, or a folder on disk. home is where the
+    sync writes its files, if not docs/agents/packs/<name>: an import pack's place in the generated folder of the pack
+    holding it."""
     name: str
     origin: str
     path: str
     ref: Optional[str]
+    home: Optional[Path] = None
 
     def start(self):
         fields = ([f'from={self.origin}'] + [f'path={self.path}'] * bool(self.path)
@@ -39,10 +42,15 @@ class Pack(NamedTuple):
         return local(self.origin)
 
     @property
+    def generated(self):
+        """The folder the sync writes the pack's files into, relative to the synced repo."""
+        return self.home or PACKS / self.name
+
+    @property
     def synced(self):
-        """Where the pack's docs sit, relative to the synced repo: copied into its own folder, or where they are for
-        a local pack."""
-        return Path(self.origin, self.path) if self.local else PACKS / self.name
+        """Where the pack's docs sit, relative to the synced repo: copied into its generated folder, or where they are
+        for a local pack."""
+        return Path(self.origin, self.path) if self.local else self.generated
 
 
 def fetch(repo, pack, stack):

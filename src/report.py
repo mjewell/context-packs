@@ -13,9 +13,10 @@ def at(pack):
     return f' @ {short(pack.ref)}' if pack.ref else ''
 
 
-def changes(found, after, blocks, created, linked):
-    """Lines describing what the sync did: whether it created AGENTS.md and linked CLAUDE.md to it, and how the
-    packs found in the instructions file became the packs after it, with blocks the text the sync wrote for each."""
+def changes(found, after, blocks, created, linked, imported_before=(), imported_after=()):
+    """Lines describing what the sync did: whether it created AGENTS.md and linked CLAUDE.md to it, how the packs
+    found in the instructions file became the packs after it, with blocks the text the sync wrote for each, and how
+    the import packs found became the ones after it."""
     before = found.packs
     old = {p.name: p for p in before}
     new = {p.name for p in after}
@@ -30,6 +31,15 @@ def changes(found, after, blocks, created, linked):
         elif found.blocks[pack.name] != blocks[pack.name]:
             lines.append(f'{pack.name}: changed')
     lines += [f'{p.name}: removed' for p in before if p.name not in new]
+    was = {i.pack.name: i.pack for i in imported_before}
+    now = {i.pack.name for i in imported_after}
+    for pack in (i.pack for i in imported_after):
+        if pack.name not in was:
+            lines.append(f'{pack.name}: added{at(pack)}')
+        elif was[pack.name].ref != pack.ref:
+            lines.append(f'{pack.name}: {short(was[pack.name].ref)} → {short(pack.ref)}')
+    lines += [f'{name}: removed' for name in was if name not in now]
     if lines:
         return lines
-    return [f'Nothing changed: {", ".join(p.name + at(p) for p in after) or "no packs installed"}']
+    pins = [*after, *(i.pack for i in imported_after)]
+    return [f'Nothing changed: {", ".join(p.name + at(p) for p in pins) or "no packs installed"}']
