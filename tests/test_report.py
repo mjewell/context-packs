@@ -17,16 +17,6 @@ class ReportTests(SyncCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, f'house-rules: added @ {self.first[:7]}\n')
 
-    def test_add_names_the_nested_packs_it_picked(self):
-        self.doc_set('typescript', {'pack.md': '---\nwhen: Editing `**/*.ts`\noptional: true\n---\nType it.\n'})
-        latest = self.doc_set('skills',
-                              {'pack.md': '---\nwhen: Editing skills\noptional: true\n---\nKeep skills short.\n'})
-
-        result = self.add('--docs', 'typescript,skills')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, f'house-rules: added @ {latest[:7]} (docs: skills, typescript)\n')
-
     def test_remove_names_the_pack(self):
         self.add()
 
@@ -69,17 +59,6 @@ class ReportTests(SyncCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, 'Nothing changed: no packs installed\n')
-
-    def test_docs_shows_the_picks_before_and_after(self):
-        self.doc_set('typescript', {'pack.md': '---\nwhen: Editing `**/*.ts`\noptional: true\n---\nType it.\n'})
-        self.doc_set('skills', {'pack.md': '---\nwhen: Editing skills\noptional: true\n---\nKeep skills short.\n'})
-        self.add('--docs', 'skills')
-
-        widened = self.sync('docs', 'house-rules', 'skills,typescript')
-        emptied = self.sync('docs', 'house-rules', '')
-
-        self.assertEqual(widened.stdout, 'house-rules: nested packs skills → skills, typescript\n')
-        self.assertEqual(emptied.stdout, 'house-rules: nested packs skills, typescript → none\n')
 
     def project_doc(self, name, when):
         docs = self.repo / 'docs' / 'agents' / 'project'

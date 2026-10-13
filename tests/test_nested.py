@@ -119,15 +119,6 @@ class NestedPackTests(SyncCase):
         self.assertIn('context/testing.md', result.stderr)
         self.assertIn('tier', result.stderr)
 
-    def test_optional_other_than_true_stops_the_sync(self):
-        self.publish({'frontend/pack.md': doc('Editing `web/**`', optional='false')})
-
-        result = self.add()
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('context/frontend/pack.md', result.stderr)
-        self.assertFalse(self.agents_md.exists())
-
     def test_stray_file_in_the_synced_folder_stops_the_sync(self):
         self.add()
         (self.synced / '.DS_Store').write_text('')
@@ -148,199 +139,63 @@ class NestedPackTests(SyncCase):
         self.assertFalse(self.agents_md.exists())
 
 
-class PickTests(SyncCase):
-    """Nested packs marked optional: true, which a repo picks with --docs or the docs command."""
+class RemovedOptionalTests(SyncCase):
+    """A pack.md still saying optional: true, or a marker still picking nested packs, which context-packs no longer
+    supports."""
 
     def setUp(self):
         super().setUp()
-        self.publish({
-            'pack.md': 'Prefer small PRs.\n',
-            'testing.md': doc('Writing tests', 'Test behavior.\n'),
-            'skills/pack.md': doc('Editing `**/SKILL.md`', 'Keep skills short.\n', optional='true'),
-            'typescript/pack.md': doc('Editing `**/*.ts`', 'Prefer unions.\n', optional='true'),
-            'typescript/types.md': doc('Declaring types'),
-            'typescript/lint/pack.md': doc('Configuring ESLint', 'Lint in CI.\n'),
-            'typescript/react/pack.md': doc('Writing React components', 'Use hooks.\n', optional='true'),
-        })
-        self.synced = self.repo / 'docs' / 'agents' / 'packs' / 'house-rules'
+        self.publish({'pack.md': 'Prefer small PRs.\n', 'testing.md': doc('Writing tests')})
         self.agents_md = self.repo / 'AGENTS.md'
 
-    def installed(self):
-        return sorted(p.relative_to(self.synced).as_posix() for p in self.synced.rglob('*') if p.is_file())
-
-    def test_optional_nested_pack_is_left_out_unless_picked(self):
-        result = self.add()
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.installed(), ['testing.md'])
-        self.assertNotIn('skills', self.agents_md.read_text())
-
-    def test_picked_nested_pack_gets_its_row_and_index(self):
-        result = self.add('--docs', 'skills')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.installed(), ['skills.md', 'testing.md'])
-        self.assertIn('| Editing `**/SKILL.md` | `docs/agents/packs/house-rules/skills.md` |\n',
-                      self.agents_md.read_text())
-
-    def test_picked_pack_brings_its_children_but_not_its_optional_ones(self):
-        result = self.add('--docs', 'typescript')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.installed(), ['testing.md', 'typescript.md', 'typescript/lint.md', 'typescript/types.md'])
-
-    def test_picking_a_deeper_pack_pulls_in_the_packs_above_it(self):
-        result = self.add('--docs', 'typescript/react')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.installed(), ['testing.md', 'typescript.md', 'typescript/lint.md',
-                                            'typescript/react.md', 'typescript/types.md'])
-        self.assertIn(' docs=typescript/react -->', self.agents_md.read_text())
-
-    def test_packs_left_out_of_the_choice_are_removed(self):
-        self.add('--docs', 'skills,typescript')
-
-        result = self.sync('docs', 'house-rules', 'skills')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.installed(), ['skills.md', 'testing.md'])
-        self.assertNotIn('typescript', self.agents_md.read_text())
-
-    def test_unknown_pick_stops_the_sync_and_names_the_nested_packs(self):
-        result = self.add('--docs', 'python')
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('python', result.stderr)
-        self.assertIn('skills, typescript, typescript/lint, typescript/react', result.stderr)
-        self.assertFalse(self.agents_md.exists())
-
-    def test_picked_pack_gone_from_the_origin_stops_the_update(self):
-        self.add('--docs', 'skills')
-        self.publish({'skills': None})
-
-        result = self.sync('update')
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('skills', result.stderr)
-        self.assertTrue((self.synced / 'skills.md').exists())
-
-    def test_list_shows_the_nested_packs_as_a_tree_and_why_each_is_installed(self):
-        self.add('--docs', 'skills,typescript/react')
-
-        result = self.sync('list')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout,
-                         f'house-rules  {self.origin}  context @ {git(self.source, "rev-parse", "HEAD")}\n'
-                         '  [x] skills: Editing `**/SKILL.md`\n'
-                         '  [x] typescript (needed by typescript/react): Editing `**/*.ts`\n'
-                         '    [x] typescript/lint: Configuring ESLint\n'
-                         '    [x] typescript/react: Writing React components\n')
-
-    def test_list_leaves_a_pack_unmarked_when_its_parent_isnt_installed(self):
-        self.add()
-
-        result = self.sync('list')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue(result.stdout.endswith('  [ ] typescript: Editing `**/*.ts`\n'
-                                               '    [ ] typescript/lint: Configuring ESLint\n'
-                                               '    [ ] typescript/react: Writing React components\n'),
-                        result.stdout)
-
-    def test_update_keeps_the_picks_and_updates_them(self):
-        self.add('--docs', 'skills')
-        self.publish({'skills/pack.md': doc('Editing `**/SKILL.md`', 'Keep skills shorter.\n')})
-
-        result = self.sync('update')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.installed(), ['skills.md', 'testing.md'])
-        self.assertTrue((self.synced / 'skills.md').read_text().startswith('Keep skills shorter.\n'))
-
-    def test_picking_nothing_removes_the_nested_packs(self):
-        self.add('--docs', 'skills')
-
-        result = self.sync('docs', 'house-rules', '')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.installed(), ['testing.md'])
-        self.assertNotIn('docs=', self.agents_md.read_text())
-
-    def test_picking_a_doc_stops_the_sync(self):
-        result = self.add('--docs', 'testing')
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('testing', result.stderr)
-
-
-class InlineTests(SyncCase):
-    """A nested pack with inline: true, whose rules and table follow its parent's instead of taking a row."""
-
-    def setUp(self):
-        super().setUp()
-        self.publish({
-            'pack.md': 'Prefer small PRs.\n',
-            'testing.md': doc('Writing tests'),
-            'typescript/pack.md': doc('Working in a TypeScript repo', 'Prefer unions.\n', optional='true',
-                                      inline='true'),
-            'typescript/types.md': doc('Declaring types'),
-            'typescript/react/pack.md': doc('Writing React components', 'Use hooks.\n'),
-        })
-        self.synced = self.repo / 'docs' / 'agents' / 'packs' / 'house-rules'
-        self.agents_md = self.repo / 'AGENTS.md'
-
-    def test_picked_inline_pack_follows_its_parent_in_the_block(self):
-        result = self.add('--docs', 'typescript')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(self.start().replace(' -->', ' docs=typescript -->') + 'Prefer small PRs.\n\n'
-                      '## house-rules context\n\n| When | Read |\n|---|---|\n'
-                      '| Writing tests | `docs/agents/packs/house-rules/testing.md` |\n\n'
-                      'Prefer unions.\n\n## house-rules/typescript context\n\n| When | Read |\n|---|---|\n'
-                      '| Writing React components | `docs/agents/packs/house-rules/typescript/react.md` |\n'
-                      '| Declaring types | `docs/agents/packs/house-rules/typescript/types.md` |\n'
-                      '<!-- context-packs:end',
-                      self.agents_md.read_text())
-
-    def test_inline_pack_gets_no_index_of_its_own(self):
-        result = self.add('--docs', 'typescript')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(sorted(p.relative_to(self.synced).as_posix() for p in self.synced.rglob('*') if p.is_file()),
-                         ['testing.md', 'typescript/react.md', 'typescript/types.md'])
-
-    def test_inline_pack_left_unpicked_adds_nothing(self):
-        result = self.add()
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn('unions', self.agents_md.read_text())
-
-    def test_inline_pack_that_isnt_optional_needs_no_when_line(self):
-        self.publish({'style/pack.md': '---\ninline: true\n---\nUse tabs.\n'})
-
-        result = self.add()
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('Use tabs.\n', self.agents_md.read_text())
-
-    def test_list_shows_an_inline_pack_without_a_when_line(self):
-        self.publish({'style/pack.md': '---\ninline: true\n---\nUse tabs.\n'})
-        self.add()
-
-        result = self.sync('list')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('  [x] style\n', result.stdout)
-
-    def test_inline_other_than_true_stops_the_sync(self):
-        self.publish({'typescript/pack.md': doc('Working in a TypeScript repo', inline='yes')})
+    def test_optional_in_a_nested_pack_stops_the_sync_saying_what_replaced_it(self):
+        self.publish({'typescript/pack.md': doc('Editing `**/*.ts`', 'Prefer unions.\n', optional='true')})
 
         result = self.add()
 
         self.assertEqual(result.returncode, 1)
         self.assertIn('context/typescript/pack.md', result.stderr)
-        self.assertIn('inline', result.stderr)
+        self.assertIn('no longer supports `optional`', result.stderr)
+        self.assertNotIn('update context-packs', result.stderr)
+        self.assertFalse(self.agents_md.exists())
+
+    def test_marker_picking_nested_packs_stops_the_sync(self):
+        self.add()
+        text = self.agents_md.read_text()
+        self.agents_md.write_text(text.replace(' -->\nPrefer', ' docs=typescript -->\nPrefer', 1))
+
+        result = self.sync()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('house-rules', result.stderr)
+        self.assertIn('no longer picks nested packs', result.stderr)
+
+
+class RemovedInlineTests(SyncCase):
+    """A pack.md still saying inline: true, which context-packs no longer supports."""
+
+    def setUp(self):
+        super().setUp()
+        self.publish({
+            'pack.md': 'Prefer small PRs.\n',
+            'typescript/pack.md': doc('Working in a TypeScript repo', 'Prefer unions.\n', inline='true'),
+        })
+        self.agents_md = self.repo / 'AGENTS.md'
+
+    def test_inline_in_a_nested_pack_stops_the_sync_saying_what_replaced_it(self):
+        result = self.add()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('context/typescript/pack.md', result.stderr)
+        self.assertIn('no longer supports `inline`', result.stderr)
+        self.assertNotIn('update context-packs', result.stderr)
+        self.assertFalse(self.agents_md.exists())
+
+    def test_inline_in_a_pack_installed_alone_stops_the_sync(self):
+        result = self.sync('add', 'typescript', str(self.origin), '--path', 'context/typescript')
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('no longer supports `inline`', result.stderr)
 
 
 class OverlapTests(SyncCase):
@@ -395,9 +250,8 @@ class InstallPointTests(SyncCase):
         super().setUp()
         self.publish({
             'pack.md': 'Prefer small PRs.\n',
-            'typescript/pack.md': doc('Editing `**/*.ts`', 'Prefer unions.\n', optional='true'),
+            'typescript/pack.md': doc('Editing `**/*.ts`', 'Prefer unions.\n'),
             'typescript/types.md': doc('Declaring types'),
-            'style/pack.md': '---\ninline: true\n---\nUse tabs.\n',
         })
         self.agents_md = self.repo / 'AGENTS.md'
         self.synced = self.repo / 'docs' / 'agents' / 'packs' / 'typescript'
@@ -420,12 +274,6 @@ class InstallPointTests(SyncCase):
         self.assertEqual((self.synced / 'pack.md').read_text(),
                          'Prefer unions.\n\n## typescript context\n\n| When | Read |\n|---|---|\n'
                          '| Declaring types | `docs/agents/packs/typescript/types.md` |\n')
-
-    def test_inline_pack_gets_its_rules_in_its_block(self):
-        result = self.add_folder('style')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(' -->\nUse tabs.\n<!-- context-packs:end', self.agents_md.read_text())
 
     def test_nested_pack_named_pack_beside_a_root_index_stops_the_sync(self):
         self.publish({'typescript/pack/pack.md': doc('Packaging')})
@@ -477,22 +325,6 @@ class LocalNestedPackTests(SyncCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn('docs/agents/packs/project', result.stderr)
         self.assertEqual(self.index.read_text(), 'Edited here.\n')
-
-    def test_local_optional_nested_pack_is_left_out_unless_picked(self):
-        (self.docs / 'deploy' / 'pack.md').write_text(doc('Deploying', 'Ship on green.\n', optional='true'))
-
-        left_out = self.add_project()
-
-        self.assertEqual(left_out.returncode, 0, left_out.stderr)
-        self.assertNotIn('Deploying', (self.repo / 'AGENTS.md').read_text())
-        self.assertFalse(self.index.exists())
-
-        picked = self.sync('docs', 'project', 'deploy')
-
-        self.assertEqual(picked.returncode, 0, picked.stderr)
-        self.assertIn('<!-- context-packs:start project from=. path=docs/agents/project docs=deploy -->\n',
-                      (self.repo / 'AGENTS.md').read_text())
-        self.assertTrue(self.index.exists())
 
     def test_editing_a_local_nested_packs_rules_regenerates_its_index_on_resync(self):
         self.add_project()

@@ -6,9 +6,16 @@ import shutil
 import sys
 from typing import NamedTuple, Tuple
 
-from packs import PACKS
+from packs import Pack
 
 FRONT = re.compile(r'---\n(.*?)\n---\n', re.DOTALL)
+# Front matter keys context-packs once took, and what replaced each, so a pack still using one hears why it stopped
+# instead of being told to update context-packs.
+REMOVED = {
+    'inline': 'A nested pack gets a row from its `when`, and rules every session needs go in its parent\'s pack.md.',
+    'optional': 'Every nested pack is installed with its parent, so make a part a repo chooses a pack of its own, in a '
+                'folder outside its parent\'s, which the repo installs with add.',
+}
 
 
 class Doc(NamedTuple):
@@ -26,27 +33,36 @@ class Node(NamedTuple):
     docs: Tuple[Doc, ...]
     files: Tuple[str, ...]
     children: Tuple['Node', ...]
-
-    @property
-    def optional(self):
-        return 'optional' in self.fields
-
-    @property
-    def inline(self):
-        return 'inline' in self.fields
+    imports: Tuple['Imported', ...] = ()
 
     @property
     def row(self):
-        """Whether the pack gets a row pointing at its index, rather than having its rules and table pasted into its
-        parent's, or into the block for the installed pack. Its parent is wherever it's installed, so a pack renders
-        the same installed on its own as inside another."""
-        return 'when' in self.fields and not self.inline
+        """Whether the pack gets a row pointing at its index, rather than having its rules and table pasted into the
+        block for the installed pack, or after the rules and table of the pack importing it. Every nested pack has a
+        when, so only an installed or imported pack without one is pasted, and a pack renders the same installed on
+        its own as inside another."""
+        return 'when' in self.fields
 
     def nested(self):
         """Every pack nested in this one, at any depth, parents before their children."""
         for child in self.children:
             yield child
             yield from child.nested()
+
+
+class Imported(NamedTuple):
+    """The pack an import pack names, at the import pack's id in the pack holding it: its root carries the import
+    pack's fields and rules in place of its own, and source is the folder holding its content."""
+    id: str
+    pack: Pack
+    root: Node
+    source: Path
+
+
+def imports_a_pack(text):
+    """Whether a pack.md's front matter names a pack to import."""
+    match = FRONT.match(text)
+    return bool(match) and any(line.startswith('from: ') for line in match.group(1).split('\n'))
 
 
 def front(text, where, keys):
@@ -56,16 +72,21 @@ def front(text, where, keys):
     fields = dict(p for p in pairs if len(p) == 2)
     if len(fields) != len(pairs):
         sys.exit(f'context-packs: {where} has front matter that isn\'t `key: value` lines.')
+    for key in sorted(set(fields) & set(REMOVED)):
+        sys.exit(f'context-packs: {where} has {key}: {fields[key]}, but context-packs no longer supports `{key}`. '
+                 f'{REMOVED[key]} Remove the line.')
     unknown = sorted(set(fields) - set(keys))
     if unknown:
         sys.exit(f'context-packs: {where} has front matter context-packs doesn\'t know: {", ".join(unknown)}. '
-                 'A doc takes only `when`, and a pack.md takes `when`, `optional` and `inline`. Remove it, or update '
-                 'context-packs if the pack needs a newer version.')
+                 f'It takes only {", ".join(f"`{k}`" for k in keys)}. Remove it, or update context-packs if the '
+                 'pack needs a newer version.')
     return fields, text[match.end():] if match else text
 
 
-def load(folder, pack, id=''):
-    """The pack in folder/id and the packs nested in it, with folder holding the pack fetched from pack."""
+def load(folder, pack, id='', imported=None):
+    """The pack in folder/id and the packs nested in it, with folder holding the pack fetched from pack. imported
+    holds the packs its import packs name, by their ids, for a pack that can hold import packs, and is None for any
+    other."""
     def where(path):
         return f'{(Path(pack.path) / path).as_posix()} in {pack.origin}'
 
@@ -75,14 +96,10 @@ def load(folder, pack, id=''):
                  'to pack.md in the pack, or run update to move to a version of the pack that has one.')
     pack_md = folder / home / 'pack.md'
     fields, rules = front(pack_md.read_text(encoding='utf-8'), where(home / 'pack.md'),
-                          ('when', 'optional', 'inline')) if pack_md.is_file() else ({}, '')
-    for key, without in (('optional', 'installed whenever its parent is'), ('inline', 'that gets a row')):
-        if fields.get(key, 'true') != 'true':
-            sys.exit(f'context-packs: {where(home / "pack.md")} has {key}: {fields[key]}, but {key} takes only '
-                     f'true. Leave it out for a pack {without}.')
-    # A nested pack's when is its row in its parent's table, or what list shows for an optional one, so only an
-    # inline pack that isn't optional goes without. The installed pack needs none: without one, it's pasted in.
-    if id and 'when' not in fields and not ('inline' in fields and 'optional' not in fields):
+                          ('when',)) if pack_md.is_file() else ({}, '')
+    # A nested pack's when is its row in its parent's table. The installed pack needs none: without one, it's pasted
+    # in.
+    if id and 'when' not in fields:
         sys.exit(f'context-packs: {where(home / "pack.md")} must start with front matter saying when to read it, '
                  'since it\'s nested in another pack:\n\n---\nwhen: Editing `web/**`\n---')
     # The end marker has to start its own line, or the next sync can't find the block.
@@ -96,11 +113,18 @@ def load(folder, pack, id=''):
             if entry.name.startswith('.') or path == home / 'pack.md':
                 continue
             if entry.is_dir() and (entry / 'pack.md').is_file():
+                # A pack that can hold import packs has them passed in, as the command leaves them, so the ones on
+                # disk are skipped.
+                if imports_a_pack((entry / 'pack.md').read_text(encoding='utf-8')):
+                    if imported is None:
+                        sys.exit(f'context-packs: {where(path / "pack.md")} imports a pack, but only a pack read from '
+                                 'a folder on disk, installed in AGENTS.md, can hold import packs.')
+                    continue
                 twin = path.parent / f'{entry.name}.md'
                 if (folder / twin).is_file():
                     sys.exit(f'context-packs: {where(path)} holds a pack.md and sits beside {where(twin)}, so its '
                              f'index and that doc would both be {twin.as_posix()}. Rename one.')
-                children.append(load(folder, pack, path.as_posix()))
+                children.append(load(folder, pack, path.as_posix(), imported))
             elif entry.is_dir():
                 walk(path)
             else:
@@ -113,31 +137,22 @@ def load(folder, pack, id=''):
                     docs.append(Doc(path.as_posix(), doc_fields['when']))
 
     walk(home)
-    return Node(id, fields, rules, tuple(docs), tuple(files), tuple(children))
+    node = Node(id, fields, rules, tuple(docs), tuple(files), tuple(children))
+    return attach(node, imported) if imported and not id else node
 
 
-def installs(root, pack):
-    """The ids of the packs nested in root that a sync installs: each one picked or above a picked one, and each
-    one not optional whose parent is installed."""
-    nested = {n.id for n in root.nested()}
-    unknown = sorted(set(pack.docs) - nested)
-    if unknown:
-        sys.exit(f'context-packs: {pack.name} has no nested pack named {", ".join(unknown)}. '
-                 f'Its nested packs: {", ".join(sorted(nested)) or "none"}. Choose from those with --docs.')
-    parts = [pick.split('/') for pick in pack.docs]
-    wanted = {'/'.join(p[:i]) for p in parts for i in range(1, len(p) + 1)}
-
-    def visit(node):
-        for child in node.children:
-            if not child.optional or child.id in wanted:
-                yield child.id
-                yield from visit(child)
-    return set(visit(root))
+def attach(node, imported):
+    """node with each of the imported packs, by id, given to the deepest pack whose folder holds its import pack."""
+    children, rest = [], dict(imported)
+    for child in node.children:
+        under = {i: rest.pop(i) for i in sorted(rest) if i.startswith(f'{child.id}/')}
+        children.append(attach(child, under))
+    return node._replace(children=tuple(children), imports=tuple(rest[i] for i in sorted(rest)))
 
 
 def index(node, pack):
     """Where a pack's generated index sits: pack.md for the installed pack, since no doc can have that name."""
-    return PACKS / pack.name / f'{node.id or "pack"}.md'
+    return pack.generated / f'{node.id or "pack"}.md'
 
 
 def table(title, rows):
@@ -146,26 +161,26 @@ def table(title, rows):
             + ''.join(f'| {when} | `{path.as_posix()}` |\n' for when, path in rows)) if rows else ''
 
 
-def render(node, pack, installed):
-    """The node's rules, then its table: a row for each of its docs and for each installed pack nested in it that
-    gets one. The others are rendered the same way after it."""
-    children = [c for c in node.children if c.id in installed]
+def render(node, pack):
+    """The node's rules, then its table: a row for each of its docs, each pack nested in it and each pack it imports
+    with a when. Each pack it imports without one is rendered the same way after it."""
     rows = sorted([(d.path[:-len('.md')], d.when, pack.synced / d.path) for d in node.docs]
-                  + [(c.id, c.fields['when'], index(c, pack)) for c in children if c.row])
+                  + [(c.id, c.fields['when'], index(c, pack)) for c in node.children]
+                  + [(i.id, i.root.fields['when'], index(i.root, i.pack)) for i in node.imports if i.root.row])
     title = f'{pack.name}/{node.id}' if node.id else pack.name
-    pasted = [render(c, pack, installed) for c in children if not c.row]
+    pasted = [render(i.root, i.pack) for i in node.imports if not i.root.row]
     return '\n'.join(part for part in (node.rules, table(title, [r[1:] for r in rows]), *pasted) if part)
 
 
-def body(root, pack, installed):
+def body(root, pack):
     """The installed pack's block: a row pointing at its index if it gets one, else its rules and table."""
-    return table(pack.name, [(root.fields['when'], index(root, pack))]) if root.row else render(root, pack, installed)
+    return table(pack.name, [(root.fields['when'], index(root, pack))]) if root.row else render(root, pack)
 
 
-def write(root, pack, installed, source, repo):
-    """Copy the installed packs' files from source into repo, unless the pack is in repo already, and write the
-    index of each installed pack that gets a row."""
-    for node in [root] + [n for n in root.nested() if n.id in installed]:
+def write(root, pack, source, repo):
+    """Copy the packs' files from source into repo, unless the pack is in repo already, and write the index of each
+    pack that gets a row."""
+    for node in [root, *root.nested()]:
         copies = [] if pack.local else [(source / path, repo / pack.synced / path) for path in node.files]
         for origin, target in copies:
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -173,4 +188,6 @@ def write(root, pack, installed, source, repo):
         if node.row:
             target = repo / index(node, pack)
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(render(node, pack, installed), encoding='utf-8')
+            target.write_text(render(node, pack), encoding='utf-8')
+        for imported in node.imports:
+            write(imported.root, imported.pack, imported.source, repo)

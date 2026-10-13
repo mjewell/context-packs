@@ -619,7 +619,6 @@ class SeveralPacksTests(SyncCase):
         self.acme_ref = self.publish({
             'pack.md': 'Use acme.\n',
             'deploy.md': '---\nwhen: Deploying\n---\nShip it.\n',
-            'billing/pack.md': '---\nwhen: Editing billing\noptional: true\n---\nCharge once.\n',
         }, checkout=self.acme, folder='plugins/x')
         self.agents_md = self.repo / 'AGENTS.md'
 
@@ -664,27 +663,17 @@ class SeveralPacksTests(SyncCase):
         self.assertIn(self.rules(git(self.source, 'rev-parse', 'HEAD~1')), text)
         self.assertIn(self.acme_start(acme_latest), text)
 
-    def test_picking_nested_packs_changes_only_the_named_pack(self):
+    def test_list_shows_every_pack_without_its_nested_packs(self):
+        acme_ref = self.publish({'billing/pack.md': '---\nwhen: Editing billing\n---\nCharge once.\n'},
+                                checkout=self.acme, folder='plugins/x')
         self.add_acme()
-
-        result = self.sync('docs', 'acme', 'billing')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(sorted(p.name for p in (self.repo / 'docs' / 'agents' / 'packs' / 'acme').iterdir()),
-                         ['billing.md', 'deploy.md'])
-        self.assertTrue(self.agents_md.read_text().startswith(self.rules()))
-
-    def test_list_shows_every_pack_and_its_nested_packs(self):
-        self.add_acme('--docs', 'billing')
 
         result = self.sync('list')
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout,
                          f'house-rules  {self.origin}  context @ {git(self.source, "rev-parse", "HEAD")}\n'
-                         f'acme  {self.acme_origin}  plugins/x @ {self.acme_ref}\n'
-                         '  [x] billing: Editing billing\n')
-
+                         f'acme  {self.acme_origin}  plugins/x @ {acme_ref}\n')
 
 if __name__ == '__main__':
     unittest.main()

@@ -39,7 +39,8 @@ acme/agent-context
 ├── backend/
 │   └── pack.md
 ├── database/
-│   └── pack.md
+│   ├── pack.md
+│   └── migrations.md
 └── frontend/
     ├── pack.md
     ├── accessibility.md
@@ -51,12 +52,11 @@ acme/agent-context
 
 Each team tags its own releases with a prefix, such as `frontend-v1.4.0` and `database-v2.0.0`, so `update` moves each pack along its own series.
 
-`react/pack.md` is optional, so a repo only gets it by asking for it:
+`react/pack.md` starts with front matter saying when to read it, like a doc:
 
 ```markdown
 ---
 when: Writing or changing React components
-optional: true
 ---
 Fetch data with the React Query hooks in `src/api/`, never in `useEffect`.
 ```
@@ -80,8 +80,8 @@ Created AGENTS.md
 Linked CLAUDE.md to AGENTS.md
 auth: added @ e60c2aa
 
-$ npx context-packs add frontend https://github.com/acme/agent-context.git --path frontend --ref frontend-v1.4.0 --docs react
-frontend: added @ frontend-v1.4.0 (docs: react)
+$ npx context-packs add frontend https://github.com/acme/agent-context.git --path frontend --ref frontend-v1.4.0
+frontend: added @ frontend-v1.4.0
 
 $ npx context-packs add project . --path docs/agents/project
 project: added
@@ -133,7 +133,7 @@ Never log tokens, session IDs or passwords, even at debug level.
 | Reading the signed-in user, or changing sign-in or sign-out | `docs/agents/packs/auth/sessions.md` |
 <!-- context-packs:end sha256:3ccb7c0b8f64 -->
 
-<!-- context-packs:start frontend from=https://github.com/acme/agent-context.git path=frontend ref=frontend-v1.4.0 docs=react -->
+<!-- context-packs:start frontend from=https://github.com/acme/agent-context.git path=frontend ref=frontend-v1.4.0 -->
 Build UI from `@acme/ui` components; don't style raw HTML elements. Every user-facing string goes through `t()`.
 
 ## frontend context
@@ -172,6 +172,55 @@ Fetch data with the React Query hooks in `src/api/`, never in `useEffect`.
 Every session loads `AGENTS.md`: the header, the auth and frontend rules, and the three tables. That's a few dozen lines, however many docs sit behind them.
 
 Asked to add a sign-up form, the agent matches "Building or changing a form" and reads `forms.md`. Adding a submit button also matches "Adding anything a user can click…", so it reads `accessibility.md`. Because the form is a React component, it reads `react.md`, which gives it the data-fetching rule and one more row to check. It never reads `deploys.md` or the auth docs, since nothing in the task matches them.
+
+## Choosing when a pack loads
+
+The web app keeps its sessions table in a small `db/` folder, so it wants the database team's rules, but only when it touches that folder. Installed in `AGENTS.md`, the `database` pack would paste its rules into every session, since its `pack.md` has no `when`: its team wrote it for API services, where nearly every task touches the database. So the web app imports it into its own docs instead, with a `when` of its own:
+
+```console
+$ npx context-packs add database https://github.com/acme/agent-context.git --path database --ref database-v2.0.0 --into docs/agents/project --when 'Editing `db/**`'
+project: changed
+database: added @ database-v2.0.0
+```
+
+That writes an import pack, `docs/agents/project/database/pack.md`. The `when` is the web app's to change, and `update` moves the `ref`:
+
+```markdown
+---
+when: Editing `db/**`
+from: https://github.com/acme/agent-context.git
+path: database
+ref: database-v2.0.0
+---
+```
+
+The database rules stay out of `AGENTS.md`. The `project` block gets one row for them instead:
+
+```markdown
+<!-- context-packs:start project from=. path=docs/agents/project -->
+## project context
+
+| When | Read |
+|---|---|
+| Editing `db/**` | `docs/agents/packs/project/database/pack.md` |
+| Deploying, or changing the deploy pipeline | `docs/agents/project/deploys.md` |
+| Adding a page or route | `docs/agents/project/routes.md` |
+<!-- context-packs:end sha256:d176ee0f53de -->
+```
+
+The row points at a generated index of the pack's rules and table, which only a session editing `db/` reads:
+
+```markdown
+Every query goes through the repositories in `src/db/`. Never write SQL in a request handler.
+
+## database context
+
+| When | Read |
+|---|---|
+| Writing or changing a migration | `docs/agents/packs/project/database/migrations.md` |
+```
+
+The pack's docs are copied beside the index, into `docs/agents/packs/project/database/`. An API service that installs the same pack in its `AGENTS.md` still gets the rules in every session: how a pack loads is each repo's call.
 
 ## Later
 

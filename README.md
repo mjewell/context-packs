@@ -18,7 +18,7 @@ Never log tokens, session IDs or passwords, even at debug level.
 | Reading the signed-in user, or changing sign-in or sign-out | `docs/agents/packs/auth/sessions.md` |
 <!-- context-packs:end sha256:3ccb7c0b8f64 -->
 
-<!-- context-packs:start frontend from=https://github.com/acme/agent-context.git path=frontend ref=frontend-v1.4.0 docs=react -->
+<!-- context-packs:start frontend from=https://github.com/acme/agent-context.git path=frontend ref=frontend-v1.4.0 -->
 Build UI from `@acme/ui` components; don't style raw HTML elements. Every user-facing string goes through `t()`.
 
 ## frontend context
@@ -69,21 +69,9 @@ when: Writing or changing tests
 
 A nested pack gets a row too, from the `when` in its `pack.md`, pointing at a generated index that holds its rules and a table of its own docs and nested packs. Each nested pack is a read an agent makes before reaching the docs inside it, so nest only where a subtree is big and its `when` is sharp, and use plain folders to group the rest. Files other than `.md` files, such as code examples, are copied along with the docs beside them.
 
-A nested pack's `pack.md` takes two more fields:
+A nested pack is installed whenever its parent is. A part only some repos want, such as a language's rules, goes in a pack of its own, in a folder beside its parent's rather than inside it, and those repos install it with `add`.
 
-- `optional: true` leaves it out unless a repo picks it with `--docs`. Without it, the nested pack is installed whenever its parent is.
-- `inline: true` pastes its rules and table after its parent's instead of giving it a row, for rules that apply whenever a repo has the nested pack, like a language's. An inline pack that isn't optional needs no `when`.
-
-```markdown
----
-when: Working in a TypeScript repo
-optional: true
-inline: true
----
-Prefer unions to enums.
-```
-
-Any folder with a `pack.md` can also be installed on its own, as its own pack, and it renders the way it would inside its parent. If its `pack.md` has a `when` and isn't inline, its block in `AGENTS.md` is a one-row table pointing at a generated index of its rules, so installing just `typescript` still loads its rules only when a row matches. Without a `when`, or with `inline: true`, its rules are pasted into the block. `optional` doesn't apply, since installing it is the pick.
+Any folder with a `pack.md` can also be installed on its own, as its own pack, and it renders the way it would inside its parent. If its `pack.md` has a `when`, its block in `AGENTS.md` is a one-row table pointing at a generated index of its rules, so installing just `typescript` still loads its rules only when a row matches. Without a `when`, its rules are pasted into the block.
 
 Keep `pack.md` short, since every session loads it.
 
@@ -131,6 +119,33 @@ npx context-packs add project . --path docs/agents/project
 
 Its table points at the docs where they are, and only its nested packs' indexes are generated, into `docs/agents/packs/<name>/`. Resync after adding a doc or changing a `when:` line or a nested pack's rules.
 
+## Decide when a pack loads
+
+A pack's author decides how it loads: its rules are pasted into `AGENTS.md`, or, if its `pack.md` has a `when`, it gets a row and loads only when that matches. To make that call yourself, import the pack into your own docs instead of installing it on its own:
+
+```bash
+npx context-packs add typescript https://github.com/acme/agent-context.git --path typescript \
+  --into docs/agents/project --when 'Editing `**/*.ts`'
+```
+
+This writes an import pack, `docs/agents/project/typescript/pack.md`, and syncs:
+
+```markdown
+---
+when: Editing `**/*.ts`
+from: https://github.com/acme/agent-context.git
+path: typescript
+ref: 3f2a9c1e0b7d4a6f8e5c2b1a9d8e7f6c5b4a3d2e
+---
+```
+
+The imported pack becomes a pack nested in yours, with the import pack's `when` in place of its own:
+
+- With a `when`, it gets a row in your pack's table, pointing at `docs/agents/packs/project/typescript/pack.md`, which holds its rules and its own table.
+- Without one, its rules and table are pasted into your pack's block, after your pack's own.
+
+[The example](docs/example.md#choosing-when-a-pack-loads) imports a pack this way, step by step. The `when` is yours to change, and so is anything you write below the front matter, which comes before the imported rules. The tool keeps the rest: `update` moves `ref`, and `remove typescript` deletes the folder. An import pack's folder holds only its `pack.md`, its name can't be used by another pack in the repo, and only a pack read from a folder on disk, such as your project's own docs, can hold one.
+
 ## Let your agent run it
 
 The `context-packs` skill lets you skip the commands: ask Claude Code or Codex in plain words, and it runs them, shows you what changed, and leaves the result uncommitted for you to review. Install it for every project:
@@ -157,12 +172,12 @@ Each command syncs the current folder, or `--dir <folder>`, and prints what chan
 | Command | Does |
 |---|---|
 | *(none)* | Resyncs every pack at its pinned ref |
-| `add <name> <origin> [--path P] [--ref R] [--docs a,b]` | Installs a pack, pinned to the origin's latest commit or to `--ref`, with the optional nested packs in `--docs` |
-| `remove <name>` | Uninstalls a pack |
+| `add <name> <origin> [--path P] [--ref R]` | Installs a pack, pinned to the origin's latest commit or to `--ref` |
+| `add <name> <origin> --into F [--path P] [--ref R] [--when W]` | Imports a pack into the pack read from folder `F`, writing an import pack at `F/<name>/pack.md` |
+| `remove <name>` | Uninstalls a pack, or deletes an import pack |
 | `update [name…]` | Moves packs to their latest version |
 | `update <name> --ref R` | Pins one pack to a tag or commit |
-| `docs <name> a,b` | Replaces the optional nested packs a pack installs, each named by its path such as `typescript/react` (`''` for none). Picking one installs the packs above it |
-| `list` | Lists each pack and its nested packs as a tree, marking the installed ones |
+| `list` | Lists each pack, where it comes from, and its pin, with its import packs under it |
 
 **Pinning.** `--ref` takes a tag or a commit, never a branch, since a branch moves. `update` moves a pack pinned to a commit to the tip of the default branch, and one pinned to a release tag (a prefix and dot-separated numbers, such as `v1.2.0` or `acme-v3`) to the newest release with the same prefix, skipping pre-releases. Other tags stay put. A pack in a folder on disk, such as `.` or `../agent-rules`, isn't pinned.
 

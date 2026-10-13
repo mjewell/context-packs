@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 import sys
 import tempfile
-from typing import NamedTuple, Optional, Tuple
+from typing import NamedTuple, Optional
 
 import origins
 
@@ -20,17 +20,18 @@ def local(origin):
 
 
 class Pack(NamedTuple):
-    """Where a pack comes from, a folder in a git repo pinned to a commit or a folder on disk, and the optional nested
-    packs the repo picked from it."""
+    """Where a pack comes from: a folder in a git repo pinned to a commit, or a folder on disk. home is where the
+    sync writes its files, if not docs/agents/packs/<name>: an import pack's place in the generated folder of the pack
+    holding it."""
     name: str
     origin: str
     path: str
     ref: Optional[str]
-    docs: Tuple[str, ...] = ()
+    home: Optional[Path] = None
 
     def start(self):
         fields = ([f'from={self.origin}'] + [f'path={self.path}'] * bool(self.path)
-                  + [f'ref={self.ref}'] * bool(self.ref) + [f'docs={",".join(self.docs)}'] * bool(self.docs))
+                  + [f'ref={self.ref}'] * bool(self.ref))
         if any(re.search(r'\s', field) for field in fields):
             sys.exit(f'context-packs: the {self.name} pack\'s {" ".join(fields)} has whitespace, '
                      'which its marker can\'t hold.')
@@ -41,10 +42,15 @@ class Pack(NamedTuple):
         return local(self.origin)
 
     @property
+    def generated(self):
+        """The folder the sync writes the pack's files into, relative to the synced repo."""
+        return self.home or PACKS / self.name
+
+    @property
     def synced(self):
-        """Where the pack's docs sit, relative to the synced repo: copied into its own folder, or where they are for
-        a local pack."""
-        return Path(self.origin, self.path) if self.local else PACKS / self.name
+        """Where the pack's docs sit, relative to the synced repo: copied into its generated folder, or where they are
+        for a local pack."""
+        return Path(self.origin, self.path) if self.local else self.generated
 
 
 def fetch(repo, pack, stack):

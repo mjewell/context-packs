@@ -1,6 +1,6 @@
 ---
 name: context-packs
-description: Sync context packs, which are shared agent rules and docs kept in other git repos, into a repo's AGENTS.md, and add, remove, update or pick nested packs for them. Use when asked to update a repo's shared rules or context packs, install or remove a pack, or change which of a pack's optional nested packs a repo has.
+description: Sync context packs, which are shared agent rules and docs kept in other git repos, into a repo's AGENTS.md, and add, remove or update them. Use when asked to update a repo's shared rules or context packs, or install or remove a pack.
 ---
 
 # Context packs
@@ -17,10 +17,10 @@ Done when the target repo's packs are what the user asked for and synced, any wo
    git -C <repo> status --short -- AGENTS.md CLAUDE.md docs/agents/packs
    ```
 4. Run the command the request calls for. When the tool exits with an error, show the user the message; it says what to fix.
-   - **Install a pack:** `add <name> <git URL> [--path <folder in the repo>] [--ref <tag or commit>] [--docs a,b]`. Ask for the name if the user didn't give one. Without `--ref` the pack follows the origin's default branch. In place of the git URL, a path, such as `../agent-rules`, names a folder on disk. It's read as it is, never pinned, so it takes no `--ref`. Any folder in a pack that holds a `pack.md` can be installed on its own, but not alongside a pack from the same origin whose folder holds it or sits inside it.
+   - **Install a pack:** `add <name> <git URL> [--path <folder in the repo>] [--ref <tag or commit>]`. Ask for the name if the user didn't give one. Without `--ref` the pack follows the origin's default branch. In place of the git URL, a path, such as `../agent-rules`, names a folder on disk. It's read as it is, never pinned, so it takes no `--ref`. Any folder in a pack that holds a `pack.md` can be installed on its own, but not alongside a pack from the same origin whose folder holds it or sits inside it.
+   - **Decide when a pack loads, instead of leaving it to its author:** import it into a pack read from a folder on disk, usually the repo's own docs (`from=.`): `add <name> <git URL> [--path <folder>] [--ref <tag or commit>] --into <folder in that pack> [--when <when>]`. It writes an import pack at `<folder>/<name>/pack.md`. With `--when`, the pack gets a row; without it, its rules are pasted into the pack holding it. Afterwards the user owns its `when` and any rules below its front matter, and `update` and `remove` take its name like any pack's. Install a pack that has no folder on disk to hold it into first, such as with `add project . --path docs/agents/project`.
    - **Remove a pack:** `remove <name>`.
    - **Take the latest:** `update`, or `update <name>…` for some packs. A pack pinned to a commit moves to the default branch's tip, and one pinned to a release tag to the newest release with the same prefix. `update <name> --ref <tag or commit>` pins one pack somewhere specific.
-   - **Change nested packs:** run `list`, then `docs <name> a,b`, passing every nested pack the repo picks, by its path in the pack such as `typescript/react` (`''` for none). Picking one installs the packs above it, so pass only the deepest ones wanted. In `list`, each pack's line is `name  origin  path @ ref`, followed by its nested packs as an indented tree: `[x] path: when` for an installed one, `[ ] path: when` for an optional one that isn't, and `(needed by …)` for an optional one installed because a pack inside it was picked.
    - **Add or drop one of the repo's own context docs:** a pack in the repo itself (`from=.` in its marker) reads its docs from its folder, so add or delete the doc there, give a new one a `when:` line in its front matter, and resync with no command.
    - **Resync without changing anything:** no command.
 5. If the repo's `AGENTS.md` or `CLAUDE.md` exists without context-packs blocks, the tool stops, names the file, and prints two lines. When it names both files, ask the user which should hold the packs. Paste the lines into that file, after its intro and before its project-specific sections, then run the command again.
