@@ -5,10 +5,10 @@ Syncs context packs, which are shared agent rules and docs kept in git repos, in
 <!-- context-packs:start header -->
 ## Context Packs
 
-Context packs bring shared rules and docs in from elsewhere. Each pack has a block in this file holding its rules and a table of its context docs, and a doc may hold a table of its own. Before starting work that a row in any of these tables matches, read its doc. A pack's block, and everything under `docs/agents/packs/`, are generated from the `from` and `path` in the block's start marker: change them there, never here.
-<!-- context-packs:end sha256:9ca6e3aa65e7 -->
+Context packs bring shared rules and docs in from elsewhere. Each pack has a block in this file holding its rules and a table of its context docs, and a doc may hold a table of its own. Before starting work that a row in any of these tables matches, read its doc. A pack's block, and everything under `docs/agents/packs/`, are generated from the folder its start marker names, and the import pack there if it has one: change them there, never here.
+<!-- context-packs:end sha256:e2f7f6f4ae0e -->
 
-<!-- context-packs:start core from=https://github.com/mjewell/agent-config.git path=packs/core ref=8cb959c8e7ba24db6ae2ac779e682b412fe9ff41 -->
+<!-- context-packs:start core path=docs/agents/core -->
 ## Collaboration
 
 I'm an experienced full-stack engineer, expert in TypeScript and React — skip basic explanations unless I ask.
@@ -84,7 +84,7 @@ Edit only files I own. Plugins, synced skills, and installed dependencies belong
 | Writing commit messages, PR titles or descriptions, or anything else others will read without session context | `docs/agents/packs/core/writing-for-humans.md` |
 <!-- context-packs:end sha256:8f5d0c4be047 -->
 
-<!-- context-packs:start project from=. path=docs/agents/project -->
+<!-- context-packs:start project path=docs/agents/project -->
 ## project context
 
 | When | Read |
