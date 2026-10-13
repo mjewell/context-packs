@@ -8,7 +8,7 @@ from typing import NamedTuple, Optional
 
 import origins
 
-PACKS = Path('docs/agents/packs')
+PACKS = Path('docs/agents/generated')
 # A git URL, as git tells one from a path: it has a scheme, such as https:// or file://, or is scp-like, such as
 # git@github.com:acme/rules.git, with a colon before any slash.
 GIT_URL = re.compile(r'[A-Za-z][A-Za-z0-9+.-]*://|[^/]+:')
@@ -27,7 +27,7 @@ def local(origin):
 
 class Pack(NamedTuple):
     """Where a pack comes from: a folder in a git repo pinned to a commit, or a folder on disk. home is where the
-    sync writes its files, if not docs/agents/packs/<name>: an import pack's place in the generated folder of the pack
+    sync writes its files, if not docs/agents/generated/<name>: an import pack's place in the generated folder of the pack
     holding it."""
     name: str
     origin: str

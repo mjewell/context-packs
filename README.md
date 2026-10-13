@@ -14,8 +14,8 @@ Never log tokens, session IDs or passwords, even at debug level.
 
 | When | Read |
 |---|---|
-| Adding an endpoint, or checking what a user may do | `docs/agents/packs/auth/permissions.md` |
-| Reading the signed-in user, or changing sign-in or sign-out | `docs/agents/packs/auth/sessions.md` |
+| Adding an endpoint, or checking what a user may do | `docs/agents/generated/auth/permissions.md` |
+| Reading the signed-in user, or changing sign-in or sign-out | `docs/agents/generated/auth/sessions.md` |
 <!-- context-packs:end sha256:3ccb7c0b8f64 -->
 
 <!-- context-packs:start frontend path=docs/agents/frontend -->
@@ -25,9 +25,9 @@ Build UI from `@acme/ui` components; don't style raw HTML elements. Every user-f
 
 | When | Read |
 |---|---|
-| Adding anything a user can click, type into or focus | `docs/agents/packs/frontend/accessibility.md` |
-| Building or changing a form | `docs/agents/packs/frontend/forms.md` |
-| Writing or changing React components | `docs/agents/packs/frontend/react.md` |
+| Adding anything a user can click, type into or focus | `docs/agents/generated/frontend/accessibility.md` |
+| Building or changing a form | `docs/agents/generated/frontend/forms.md` |
+| Writing or changing React components | `docs/agents/generated/frontend/react.md` |
 <!-- context-packs:end sha256:94fffbdf036a -->
 ```
 
@@ -100,7 +100,7 @@ ref: e60c2aac61c0e51fd90cf1406318dd785884bb19
 ---
 ```
 
-Then it adds a block for the pack to your instruction file, creating `AGENTS.md` if you have none, and copies the pack's docs into `docs/agents/packs/<name>/`. Commit the result. To keep the import pack somewhere else, pass `--into <folder>`.
+Then it adds a block for the pack to your instruction file, creating `AGENTS.md` if you have none, and copies the pack's docs into `docs/agents/generated/<name>/`. Commit the result. To keep the import pack somewhere else, pass `--into <folder>`.
 
 **Already have an `AGENTS.md` or `CLAUDE.md`?** Keep it. The first run prints two marker lines. Paste them wherever the packs should go, then run it again. If you have both files, paste them into the one that should hold the packs. The packs are synced in at that spot, and the rest of the file stays yours: no sync ever changes it. From then on, the file holding the packs is the one synced.
 
@@ -127,7 +127,7 @@ Any name and folder work. We suggest `project` and `docs/agents/project`:
 npx context-packs add project docs/agents/project
 ```
 
-Its block's start marker records the folder, `<!-- context-packs:start project path=docs/agents/project -->`. Its table points at the docs where they are, and only its nested packs' indexes are generated, into `docs/agents/packs/<name>/`. Resync after adding a doc or changing a `when:` line or a nested pack's rules.
+Its block's start marker records the folder, `<!-- context-packs:start project path=docs/agents/project -->`. Its table points at the docs where they are, and only its nested packs' indexes are generated, into `docs/agents/generated/<name>/`. Resync after adding a doc or changing a `when:` line or a nested pack's rules.
 
 ## Decide when a pack loads
 
@@ -145,7 +145,7 @@ npx context-packs add typescript https://github.com/acme/agent-context.git --pat
   --into docs/agents/project --when 'Editing `**/*.ts`'
 ```
 
-That writes `docs/agents/project/typescript/pack.md`, and the pack renders like a pack nested in yours, with no block of its own: a row in your pack's table, pointing at `docs/agents/packs/project/typescript/pack.md`, which holds its rules and its own table. Without a `when`, its rules and table would be pasted after your pack's own.
+That writes `docs/agents/project/typescript/pack.md`, and the pack renders like a pack nested in yours, with no block of its own: a row in your pack's table, pointing at `docs/agents/generated/project/typescript/pack.md`, which holds its rules and its own table. Without a `when`, its rules and table would be pasted after your pack's own.
 
 **Moving a pack.** Each marker in `AGENTS.md` names a root pack's folder, and the packs nested in it, yours or imported, render in its block. Inside a root, move a pack to any depth and resync, and it renders where it now sits. After moving a root pack, change `path=` in its start marker, or, if you moved it into another pack, run `remove <name>`: the block goes, and the moved folder stays. A pack moved out of every root drops out of `AGENTS.md`, as a doc moved out of a pack does.
 
@@ -186,6 +186,6 @@ Each command syncs the current folder, or `--dir <folder>`, and prints what chan
 
 **Pinning.** `--ref` takes a tag or a commit, never a branch, since a branch moves. `update` moves a pack pinned to a commit to the tip of the default branch, and one pinned to a release tag (a prefix and dot-separated numbers, such as `v1.2.0` or `acme-v3`) to the newest release with the same prefix, skipping pre-releases. Other tags stay put. A pack in a folder on disk, such as `.` or `../agent-rules`, isn't pinned.
 
-**Edits stay upstream.** Each block ends with a hash of its text and the files under its `docs/agents/packs/<name>/`. If either was edited in the repo, the sync stops and says what to fix: change the pack in its origin, then `update`.
+**Edits stay upstream.** Each block ends with a hash of its text and the files under its `docs/agents/generated/<name>/`. If either was edited in the repo, the sync stops and says what to fix: change the pack in its origin, then `update`.
 
 **Contributing.** [design.md](docs/agents/project/design.md) explains the choices behind the format. Run the tests with `python3 -m unittest discover tests`.

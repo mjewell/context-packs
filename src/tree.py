@@ -9,13 +9,6 @@ from typing import NamedTuple, Tuple
 from packs import Pack
 
 FRONT = re.compile(r'---\n(.*?)\n---\n', re.DOTALL)
-# Front matter keys context-packs once took, and what replaced each, so a pack still using one hears why it stopped
-# instead of being told to update context-packs.
-REMOVED = {
-    'inline': 'Give the pack `when: always` to paste it into its parent instead of giving it a row.',
-    'optional': 'Every nested pack is installed with its parent, so make a part a repo chooses a pack of its own, in a '
-                'folder outside its parent\'s, which the repo installs with add.',
-}
 
 
 class Doc(NamedTuple):
@@ -71,9 +64,6 @@ def front(text, where, keys):
     fields = dict(p for p in pairs if len(p) == 2)
     if len(fields) != len(pairs):
         sys.exit(f'context-packs: {where} has front matter that isn\'t `key: value` lines.')
-    for key in sorted(set(fields) & set(REMOVED)):
-        sys.exit(f'context-packs: {where} has {key}: {fields[key]}, but context-packs no longer supports `{key}`. '
-                 f'{REMOVED[key]} Remove the line.')
     unknown = sorted(set(fields) - set(keys))
     if unknown:
         sys.exit(f'context-packs: {where} has front matter context-packs doesn\'t know: {", ".join(unknown)}. '
@@ -90,9 +80,6 @@ def load(folder, pack, id='', imported=None):
         return f'{(Path(pack.path) / path).as_posix()} in {pack.origin}'
 
     home = Path(id)
-    if not id and (folder / 'agents.md').is_file():
-        sys.exit(f'context-packs: {where("agents.md")} holds rules under the name packs used before 0.2.0. Rename it '
-                 'to pack.md in the pack, or run update to move to a version of the pack that has one.')
     pack_md = folder / home / 'pack.md'
     fields, rules = front(pack_md.read_text(encoding='utf-8'), where(home / 'pack.md'),
                           ('when',)) if pack_md.is_file() else ({}, '')

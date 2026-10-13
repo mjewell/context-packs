@@ -5,7 +5,7 @@ import re
 import sys
 from typing import Dict, List, NamedTuple
 
-from packs import PACKS, Pack, folder, local
+from packs import PACKS, Pack
 
 HEADER = 'header'
 HEADER_START = '<!-- context-packs:start header -->\n'
@@ -46,24 +46,13 @@ def snapshot(folder):
 
 
 def marked_pack(file, name, marker):
-    """The pack a block's start marker names, by the folder on disk holding it. A marker from before 0.6.0 that names
-    its folder with from= is read the same way, and written in the new form by the sync."""
+    """The pack a block's start marker names, by the folder on disk holding it."""
     pairs = [field.split('=', 1) for field in marker.split()]
     fields = dict(p for p in pairs if len(p) == 2)
-    if 'docs' in fields:
-        sys.exit(f'context-packs: {file}: the {name} block\'s start marker has docs={fields["docs"]}, but '
-                 'context-packs no longer picks nested packs: every nested pack is installed with its parent. Remove '
-                 'docs= from the marker, and install a part a repo chooses as a pack of its own.')
-    origin = fields.get('from')
-    if origin and not local(origin):
-        sys.exit(f'context-packs: {file}: the {name} block\'s start marker names {origin}, a git URL. A pack from '
-                 f'git now lives in an import pack, which the marker names by its folder. Delete the {name} block '
-                 f'and {(PACKS / name).as_posix()}/, then add it again to write one.')
-    keys = {'from', 'path'} if origin else {'path'}
-    if len(fields) != len(pairs) or set(fields) - keys or not (origin or 'path' in fields):
+    if len(fields) != len(pairs) or set(fields) != {'path'}:
         sys.exit(f'context-packs: {file}: the {name} block\'s start marker needs path=<folder>, the folder on disk '
-                 'holding the pack. Fix the marker, then sync again.')
-    return Pack(name, '.', folder(origin or '.', fields.get('path', '')), None)
+                 'holding the pack, and nothing else. Fix the marker, then sync again.')
+    return Pack(name, '.', fields['path'], None)
 
 
 def read(file):

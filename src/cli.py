@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Sync context packs into a repository, or any folder such as the one above the repositories: each pack's rules as a
 block in AGENTS.md, after a header block explaining context packs, and each pack's docs and the indexes of the packs
-nested in it in docs/agents/packs/<pack>/."""
+nested in it in docs/agents/generated/<pack>/."""
 import argparse
 import contextlib
 import itertools
@@ -88,7 +88,7 @@ def main():
                                      description='leave out the command to resync every pack at its pinned ref')
     add = commands.add_parser('add', help='install a pack: one from git as an import pack pinned to its origin\'s '
                                           'latest commit or to --ref, or a folder on disk where it is')
-    add.add_argument('name', help='what to call the pack in AGENTS.md and docs/agents/packs/')
+    add.add_argument('name', help='what to call the pack in AGENTS.md and docs/agents/generated/')
     add.add_argument('origin', help='a git URL, or the path of a folder on disk, such as docs/agents/project or '
                                     '../agent-config')
     add.add_argument('--path', default='', help='the folder in the origin holding the pack, if not its root')

@@ -14,9 +14,9 @@ HEADER = ('<!-- context-packs:start header -->\n'
           'Context packs bring shared rules and docs in from elsewhere. Each pack has a block in this file holding its '
           "rules and a table of its context docs, and a doc may hold a table of its own. Before starting work that a "
           "row in any of these tables matches, read its doc. A pack's block, and everything under "
-          "`docs/agents/packs/`, are generated from the folder its start marker names, and the import pack there if "
+          "`docs/agents/generated/`, are generated from the folder its start marker names, and the import pack there if "
           "it has one: change them there, never here.\n"
-          '<!-- context-packs:end sha256:e2f7f6f4ae0e -->\n')
+          '<!-- context-packs:end sha256:7b25770825f6 -->\n')
 EMPTY_HEADER = '<!-- context-packs:start header -->\n<!-- context-packs:end sha256:e3b0c44298fc -->\n'
 EMPTY_END = '<!-- context-packs:end sha256:e3b0c44298fc -->\n'
 END = '<!-- context-packs:end sha256:d3e10247057e -->\n'
@@ -224,14 +224,14 @@ class SyncTests(SyncCase):
 
     def test_pack_folder_without_a_block_stops_the_sync_and_names_it(self):
         self.sync()
-        stray = self.repo / 'docs' / 'agents' / 'packs' / 'acme' / 'index.md'
+        stray = self.repo / 'docs' / 'agents' / 'generated' / 'acme' / 'index.md'
         stray.parent.mkdir(parents=True)
         stray.write_text('Use acme.\n')
 
         result = self.sync()
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn('docs/agents/packs/acme', result.stderr)
+        self.assertIn('docs/agents/generated/acme', result.stderr)
         self.assertTrue(stray.exists())
 
     def test_shared_rules_without_a_final_newline_still_resync(self):
@@ -321,7 +321,7 @@ class AddRemoveTests(SyncCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.repo / 'AGENTS.md').read_text(), HEADER)
-        self.assertFalse((self.repo / 'docs' / 'agents' / 'packs').exists())
+        self.assertFalse((self.repo / 'docs' / 'agents' / 'generated').exists())
 
     def test_remove_of_a_pack_not_installed_stops(self):
         self.sync()
@@ -356,7 +356,7 @@ class LocalPackTests(SyncCase):
                          '| Deploying | `docs/agents/project/deploy/index.md` |\n'
                          '| Changing the design | `docs/agents/project/design.md` |\n'
                          '<!-- context-packs:end sha256:c6b4d20cb496 -->\n')
-        self.assertFalse((self.repo / 'docs' / 'agents' / 'packs').exists())
+        self.assertFalse((self.repo / 'docs' / 'agents' / 'generated').exists())
 
     def test_editing_a_local_doc_needs_no_resync(self):
         self.add_project()
@@ -402,7 +402,7 @@ class SiblingPackTests(SyncCase):
                          'Prefer tiny PRs.\n\n## house-rules context\n\n| When | Read |\n|---|---|\n'
                          '| Writing tests | `../house-rules/context/testing.md` |\n'
                          '<!-- context-packs:end sha256:086f3e8c8f8a -->\n')
-        self.assertFalse((self.repo / 'docs' / 'agents' / 'packs').exists())
+        self.assertFalse((self.repo / 'docs' / 'agents' / 'generated').exists())
 
     def test_editing_a_sibling_doc_needs_no_resync(self):
         self.add_sibling()
@@ -440,7 +440,7 @@ class SiblingPackTests(SyncCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(f'path={self.source}/context -->\nPrefer tiny PRs.\n', self.agents_md.read_text())
         self.assertIn(f'| Writing tests | `{self.source}/context/testing.md` |', self.agents_md.read_text())
-        self.assertFalse((self.repo / 'docs' / 'agents' / 'packs').exists())
+        self.assertFalse((self.repo / 'docs' / 'agents' / 'generated').exists())
 
     def test_marker_with_a_field_other_than_path_stops_the_sync(self):
         self.add_sibling()
@@ -478,12 +478,12 @@ class PackShapeTests(SyncCase):
         result = self.add()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual((self.repo / 'docs' / 'agents' / 'packs' / 'house-rules' / 'billing.md').read_text(),
+        self.assertEqual((self.repo / 'docs' / 'agents' / 'generated' / 'house-rules' / 'billing.md').read_text(),
                          '---\nwhen: Billing\n---\nCharge once.\n')
         self.assertEqual((self.repo / 'AGENTS.md').read_text(),
                          HEADER + '\n' + self.start() + '## house-rules context\n\n| When | Read |\n|---|---|\n'
-                         '| Billing | `docs/agents/packs/house-rules/billing.md` |\n'
-                         '<!-- context-packs:end sha256:47388956ddb5 -->\n')
+                         '| Billing | `docs/agents/generated/house-rules/billing.md` |\n'
+                         '<!-- context-packs:end sha256:b31fd76d40dc -->\n')
         self.assertEqual(self.sync().returncode, 0)
 
     def test_front_matter_key_the_tool_doesnt_know_stops_the_sync(self):
@@ -495,18 +495,6 @@ class PackShapeTests(SyncCase):
         self.assertIn('context/billing.md', result.stderr)
         self.assertIn('owner', result.stderr)
         self.assertFalse((self.repo / 'AGENTS.md').exists())
-
-    def test_rules_in_agents_md_stop_the_sync_and_say_to_rename_it(self):
-        self.publish({'agents.md': 'Prefer small PRs.\n'})
-
-        result = self.add()
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('context/agents.md', result.stderr)
-        self.assertIn('pack.md', result.stderr)
-        self.assertIn('update', result.stderr)
-        self.assertFalse((self.repo / 'AGENTS.md').exists())
-
 
 class PinningTests(SyncCase):
     def setUp(self):
@@ -645,9 +633,9 @@ class SeveralPacksTests(SyncCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.agents_md.read_text(),
                          self.rules() + '\n' + self.start('acme') + 'Use acme.\n\n## acme context\n\n'
-                         '| When | Read |\n|---|---|\n| Deploying | `docs/agents/packs/acme/deploy.md` |\n'
-                         '<!-- context-packs:end sha256:7f810f66be5d -->\n')
-        self.assertEqual((self.repo / 'docs' / 'agents' / 'packs' / 'acme' / 'deploy.md').read_text(),
+                         '| When | Read |\n|---|---|\n| Deploying | `docs/agents/generated/acme/deploy.md` |\n'
+                         '<!-- context-packs:end sha256:daefc2dc146d -->\n')
+        self.assertEqual((self.repo / 'docs' / 'agents' / 'generated' / 'acme' / 'deploy.md').read_text(),
                          '---\nwhen: Deploying\n---\nShip it.\n')
 
     def test_update_moves_every_pinned_pack(self):
