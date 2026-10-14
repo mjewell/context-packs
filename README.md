@@ -43,6 +43,30 @@ Build UI from `@acme/ui` components; don't style raw HTML elements. Every user-f
 
 Run it with `npx context-packs`, or [let your agent run it](#let-your-agent-run-it). It needs `git`, Node 18+ and Python 3.9+; on macOS, the command line tools provide both `git` and Python.
 
+## How it works
+
+An agent reads `AGENTS.md` in every session. Three rules decide what else it reads, and when:
+
+- **A `when` puts content behind a lookup.** It becomes a row in a table, and the agent reads it only when the work matches. Every doc has one.
+- **`when: always`, or no `when` on an added pack, inlines it.** Only a `pack.md` can be inlined: its rules sit wherever its parent's do, all the way up to `AGENTS.md` itself for an added pack.
+- **A `pack.md` starts a new table** for the docs in its folder. A folder without one is just for organization: its docs join the nearest pack's table.
+
+This is the idea behind OpenAI's [Harness engineering](https://openai.com/index/harness-engineering/): keep `AGENTS.md` a short map that points to deeper docs. context-packs builds that map from each doc's `when:` line, and shares it across repos.
+
+## Common setups
+
+| You want | Do |
+|---|---|
+| Rules every session sees, for this repo only | Write them in `AGENTS.md`, outside the packs' blocks. Your own pack's `pack.md` works too, but needs a resync after each edit |
+| Docs read only when relevant, for this repo only | Put them in a folder, each with a `when:` line, and [`add <name> <folder>`](#sync-your-projects-own-docs) once |
+| Rules and docs shared across repos | [Write a pack](#write-a-pack) in any git repo, and [`add <name> <git-url> --path <folder>`](#sync-a-pack-from-another-repo) in each repo |
+| A shared pack, loaded the way its author suggests | `add` it |
+| A shared pack's rules in every session | `add … --when always` |
+| A shared pack behind a row you choose | `add … --when '<when>'` |
+| Shared packs as rows in your own pack's table, not blocks of their own | [`add … --into <your pack's folder>`](#decide-when-a-pack-loads), where your pack is one you've added from a folder |
+| A pinned version, or the latest | `add … --ref <tag or commit>`, or [`update`](#reference) |
+| To keep the `AGENTS.md` or `CLAUDE.md` you have | Run it once, paste the two marker lines it prints, and run it again |
+
 ## Write a pack
 
 A pack is a folder in any git repo. `pack.md` holds the rules every session sees, and every other `.md` file is a doc that only gets read when it's relevant. A folder holding a `pack.md` of its own is a nested pack, and a folder without one just groups files:
@@ -131,7 +155,7 @@ Its block's start marker records the folder, `<!-- context-packs:start project p
 
 ## Decide when a pack loads
 
-A pack's author suggests how it loads: if its `pack.md` has a `when`, it gets a row and loads only when that matches, and otherwise its rules are inlined into every session. An import pack follows that suggestion, which moves with `update`. To decide for yourself, add a line to its front matter and resync:
+A pack's author suggests how it loads: if its `pack.md` has a `when`, it gets a row and loads only when that matches, and otherwise its rules are inlined into every session. An import pack follows that suggestion, which moves with `update`. So `when` in a pack you write decides how it loads, while `when` in an import pack overrides its author's, and leaving it out keeps theirs. To decide for yourself, add a line to its front matter and resync:
 
 - `when: <when>` gives the pack a row with your `when`, whatever its author suggested.
 - `when: always` inlines its rules into every session, even if its author gave it a `when`.
@@ -169,6 +193,14 @@ Then ask things like:
 - "Sync our project docs"
 
 In Claude Code, `/context-packs` invokes it directly.
+
+## Why not skills?
+
+A doc with a `when` looks like a skill with a description. Skills suit procedures: steps to follow, scripts to run, a command to invoke. For what an agent should know before it starts, a table in `AGENTS.md` works better:
+
+- **It gets read.** An agent reads `AGENTS.md` in every session, and is told to read a doc when its row matches. Whether a skill runs is the agent's call: in [Vercel's evals](https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals), skills went unused in over half the cases, and an index of docs in `AGENTS.md` beat them.
+- **It nests.** Every skill's description sits in every session. A nested pack puts a whole subtree behind one row.
+- **Rules and docs live together.** Rules every session needs are inlined beside the table, from the same pack.
 
 ## Reference
 
