@@ -123,7 +123,7 @@ acme/web-app
         └── routes.md
 ```
 
-The web app had no instruction file yet, so the first `add` created `AGENTS.md` and linked `CLAUDE.md` to it. If it already had an `AGENTS.md` or `CLAUDE.md`, the packs would go into that file, wherever you placed two marker lines, and everything already in it would stay. See [Already have an `AGENTS.md` or `CLAUDE.md`?](../README.md#sync-a-pack-from-another-repo)
+The web app had no instruction file yet, so the first `add` created `AGENTS.md` and linked `CLAUDE.md` to it. If it already had an `AGENTS.md` or `CLAUDE.md`, the packs would go into that file, wherever you placed two marker lines, and everything already in it would stay. See [Already have an `AGENTS.md` or `CLAUDE.md`?](reference.md#already-have-an-agentsmd-or-claudemd)
 
 The docs under `generated/` are copies of the docs in each pack's repo. `AGENTS.md`, in full:
 
