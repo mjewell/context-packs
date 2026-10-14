@@ -55,7 +55,7 @@ class ImportTests(ImportPackCase):
                          '| Writing tests | `docs/agents/generated/project/house-rules/testing.md` |\n')
         self.assertEqual((self.generated / 'testing.md').read_text(), doc('Writing tests', 'Test behavior.\n'))
 
-    def test_import_pack_without_a_when_is_pasted_after_its_parent(self):
+    def test_import_pack_without_a_when_is_inlined_after_its_parent(self):
         result = self.import_rules()
 
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -84,7 +84,7 @@ class ImportTests(ImportPackCase):
                       self.agents_md.read_text())
         self.assertNotIn('Working on anything', self.agents_md.read_text())
 
-    def test_when_always_pastes_the_pack_in_even_with_its_authors_when(self):
+    def test_when_always_inlines_the_pack_even_with_its_authors_when(self):
         self.ref = self.share(doc('Working on anything', 'Prefer small PRs.\n'))
 
         result = self.import_rules('--when', 'always')

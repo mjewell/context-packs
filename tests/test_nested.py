@@ -65,7 +65,7 @@ class NestedPackTests(SyncCase):
                       '<!-- context-packs:end',
                       self.agents_md.read_text())
 
-    def test_nested_pack_whose_when_is_always_is_pasted_after_its_parent(self):
+    def test_nested_pack_whose_when_is_always_is_inlined_after_its_parent(self):
         self.publish({'frontend/pack.md': doc('always', 'Keep components small.\n')})
 
         result = self.add()
@@ -119,6 +119,16 @@ class NestedPackTests(SyncCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn('context/frontend/css/grid.md', result.stderr)
+        self.assertFalse(self.agents_md.exists())
+
+    def test_doc_whose_when_is_always_stops_the_sync(self):
+        self.publish({'testing.md': doc('always', 'Test behavior.\n')})
+
+        result = self.add()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('context/testing.md', result.stderr)
+        self.assertIn('pack.md', result.stderr)
         self.assertFalse(self.agents_md.exists())
 
     def test_tier_on_a_doc_stops_the_sync(self):
