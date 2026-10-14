@@ -65,7 +65,7 @@ class NestedPackTests(SyncCase):
                       '<!-- context-packs:end',
                       self.agents_md.read_text())
 
-    def test_nested_pack_whose_when_is_always_is_pasted_after_its_parent(self):
+    def test_nested_pack_whose_when_is_always_is_inlined_after_its_parent(self):
         self.publish({'frontend/pack.md': doc('always', 'Keep components small.\n')})
 
         result = self.add()

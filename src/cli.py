@@ -96,7 +96,7 @@ def main():
     add.add_argument('--into', help=f'the folder to write a pack from git\'s import pack into, as <folder>/<name>/; '
                                     f'{imports.INTO} if left out. Inside a pack of yours, the pack syncs in that '
                                     'pack\'s block')
-    add.add_argument('--when', help="a pack from git's when, in place of its author's: a row, or always to paste it in")
+    add.add_argument('--when', help="a pack from git's when, in place of its author's: a row, or always to inline it")
     remove = commands.add_parser('remove', help='uninstall a pack')
     remove.add_argument('name')
     update = commands.add_parser('update', help='move pinned packs on: one pinned to a commit to the tip of its '

@@ -167,7 +167,7 @@ Build UI from `@acme/ui` components; don't style raw HTML elements. Every user-f
 <!-- context-packs:end sha256:3d908050ef2a -->
 ```
 
-The nested `react` pack gets a row rather than having its rules pasted in. The row points at a generated index, `react.md`, which holds its rules and its own table:
+The nested `react` pack gets a row rather than having its rules inlined. The row points at a generated index, `react.md`, which holds its rules and its own table:
 
 ```markdown
 Fetch data with the React Query hooks in `src/api/`, never in `useEffect`.
@@ -187,7 +187,7 @@ Asked to add a sign-up form, the agent matches "Building or changing a form" and
 
 ## Choosing when a pack loads
 
-The web app keeps its sessions table in a small `db/` folder, so it wants the database team's rules, but only when it touches that folder. Added as it is, the `database` pack would paste its rules into every session, since its `pack.md` has no `when`: its team wrote it for API services, where nearly every task touches the database. So the web app adds it with a `when` of its own, and keeps its import pack in its own docs, so its row joins the `project` table. Without `--into`, it would get a block of its own holding the same row.
+The web app keeps its sessions table in a small `db/` folder, so it wants the database team's rules, but only when it touches that folder. Added as it is, the `database` pack would inline its rules into every session, since its `pack.md` has no `when`: its team wrote it for API services, where nearly every task touches the database. So the web app adds it with a `when` of its own, and keeps its import pack in its own docs, so its row joins the `project` table. Without `--into`, it would get a block of its own holding the same row.
 
 ```console
 $ npx context-packs add database https://github.com/acme/agent-context.git --path database --ref database-v2.0.0 --into docs/agents/project --when 'Editing `db/**`'

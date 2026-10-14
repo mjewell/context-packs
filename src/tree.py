@@ -30,7 +30,7 @@ class Node(NamedTuple):
 
     @property
     def row(self):
-        """Whether the pack gets a row pointing at its index, rather than having its rules and table pasted into its
+        """Whether the pack gets a row pointing at its index, rather than having its rules and table inlined into its
         block, or after the rules and table of the pack holding it: it does when it has a when other than always.
         A pack renders the same installed on its own as inside another."""
         return self.fields.get('when', 'always') != 'always'
@@ -83,8 +83,8 @@ def load(folder, pack, id='', imported=None):
     pack_md = folder / home / 'pack.md'
     fields, rules = front(pack_md.read_text(encoding='utf-8'), where(home / 'pack.md'),
                           ('when',)) if pack_md.is_file() else ({}, '')
-    # A nested pack's when is its row in its parent's table. The installed pack needs none: without one, it's pasted
-    # in.
+    # A nested pack's when is its row in its parent's table. The installed pack needs none: without one, it's
+    # inlined.
     if id and 'when' not in fields:
         sys.exit(f'context-packs: {where(home / "pack.md")} must start with front matter saying when to read it, '
                  'since it\'s nested in another pack:\n\n---\nwhen: Editing `web/**`\n---')
@@ -154,9 +154,9 @@ def render(node, pack):
                   + [(c.id, c.fields['when'], index(c, pack)) for c in node.children if c.row]
                   + [(i.id, i.root.fields['when'], index(i.root, i.pack)) for i in node.imports if i.root.row])
     title = f'{pack.name}/{node.id}' if node.id else pack.name
-    pasted = ([render(c, pack) for c in node.children if not c.row]
-              + [render(i.root, i.pack) for i in node.imports if not i.root.row])
-    return '\n'.join(part for part in (node.rules, table(title, [r[1:] for r in rows]), *pasted) if part)
+    inlined = ([render(c, pack) for c in node.children if not c.row]
+               + [render(i.root, i.pack) for i in node.imports if not i.root.row])
+    return '\n'.join(part for part in (node.rules, table(title, [r[1:] for r in rows]), *inlined) if part)
 
 
 def body(root, pack):
