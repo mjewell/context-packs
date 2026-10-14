@@ -120,6 +120,10 @@ def load(folder, pack, id='', imported=None):
                     if 'when' not in doc_fields:
                         sys.exit(f'context-packs: {where(path)} must start with front matter saying when to read '
                                  'it:\n\n---\nwhen: Editing `**/*.ts`\n---')
+                    if doc_fields['when'] == 'always':
+                        sys.exit(f'context-packs: {where(path)} has `when: always`, but only a pack.md is inlined. '
+                                 'Move its rules into the pack.md of the pack holding it, or give it a when saying '
+                                 'when to read it.')
                     docs.append(Doc(path.as_posix(), doc_fields['when']))
 
     walk(home)

@@ -121,6 +121,16 @@ class NestedPackTests(SyncCase):
         self.assertIn('context/frontend/css/grid.md', result.stderr)
         self.assertFalse(self.agents_md.exists())
 
+    def test_doc_whose_when_is_always_stops_the_sync(self):
+        self.publish({'testing.md': doc('always', 'Test behavior.\n')})
+
+        result = self.add()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('context/testing.md', result.stderr)
+        self.assertIn('pack.md', result.stderr)
+        self.assertFalse(self.agents_md.exists())
+
     def test_tier_on_a_doc_stops_the_sync(self):
         self.publish({'testing.md': doc('Writing tests', tier='required')})
 
