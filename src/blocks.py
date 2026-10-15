@@ -1,58 +1,48 @@
-"""The context-packs blocks in AGENTS.md or CLAUDE.md, and the files each pack wrote beside them."""
+"""The context-packs block in AGENTS.md or CLAUDE.md, which the sync owns along with context-packs/gen/."""
 import hashlib
 import os
 import re
 import sys
-from typing import Dict, List, NamedTuple
+from typing import NamedTuple
 
-from packs import PACKS, Pack
+from packs import GEN, ROOT
 
-HEADER = 'header'
-HEADER_START = '<!-- context-packs:start header -->\n'
-HEADER_RULES = (
+START = '<!-- context-packs:start -->\n'
+HEADER = (
     '## Context Packs\n\n'
-    'Context packs bring shared rules and docs in from elsewhere. Each pack has a block in this file holding its rules '
-    'and a table of its context docs, and a doc may hold a table of its own. Before starting work that a row in any '
-    f"of these tables matches, read its doc. A pack's block, and everything under `{PACKS.as_posix()}/`, are "
-    "generated from the folder its start marker names, and the import pack there if it has one: change them there, "
-    "never here.\n")
-BLOCK = re.compile(r'^<!-- context-packs:start (\S+)((?: \S+)*) -->\n(.*?)'
-                   r'^<!-- context-packs:end sha256:([0-9a-f]{12}) -->\n?', re.MULTILINE | re.DOTALL)
+    'Context packs bring shared rules and docs in from elsewhere. Each pack has its rules and a table of its context '
+    'docs here, and a doc may hold a table of its own. Before starting work that a row in any of these tables '
+    f'matches, read its doc. The packs here, and everything under `{GEN.as_posix()}/`, are generated from '
+    f'`{ROOT.as_posix()}/`: change them there, never here.\n')
+BLOCK = re.compile(r'^<!-- context-packs:start -->\n(.*?)^<!-- context-packs:end sha256:([0-9a-f]{12}) -->\n?',
+                   re.MULTILINE | re.DOTALL)
+MARKER = re.compile(r'^<!-- context-packs:start', re.MULTILINE)
+# A start marker holding a pack's name, as versions before one block per file wrote them.
+OLD_MARKER = re.compile(r'^<!-- context-packs:start (?!-->)', re.MULTILINE)
 
 
 class Region(NamedTuple):
-    """Where the instructions file's context-packs blocks sit, each block's text by name, and the packs they hold."""
+    """Where the instructions file's context-packs block sits, and its text."""
     text: str
     start: int
     end: int
-    blocks: Dict[str, str]
-    packs: List[Pack]
+    block: str
 
 
 def digest(body, docs=b''):
     return hashlib.sha256(body.encode() + docs).hexdigest()[:12]
 
 
-def block(start, body, docs=b''):
-    return f'{start}{body}<!-- context-packs:end sha256:{digest(body, docs)} -->\n'
+def block(body, docs=b''):
+    return f'{START}{body}<!-- context-packs:end sha256:{digest(body, docs)} -->\n'
 
 
 def snapshot(folder):
-    """The synced docs' paths and contents, which the block's hash covers so edits to them are caught too."""
+    """The generated files' paths and contents, which the block's hash covers so edits to them are caught too."""
     if not folder.is_dir():
         return b''
     return b''.join(f'{p.relative_to(folder).as_posix()}\0'.encode() + p.read_bytes() + b'\0'
                     for p in sorted(folder.rglob('*')) if p.is_file())
-
-
-def marked_pack(file, name, marker):
-    """The pack a block's start marker names, by the folder on disk holding it."""
-    pairs = [field.split('=', 1) for field in marker.split()]
-    fields = dict(p for p in pairs if len(p) == 2)
-    if len(fields) != len(pairs) or set(fields) != {'path'}:
-        sys.exit(f'context-packs: {file}: the {name} block\'s start marker needs path=<folder>, the folder on disk '
-                 'holding the pack, and nothing else. Fix the marker, then sync again.')
-    return Pack(name, '.', fields['path'], None)
 
 
 def read(file):
@@ -61,27 +51,27 @@ def read(file):
 
 
 def instructions(repo):
-    """The file the sync writes: whichever of AGENTS.md and CLAUDE.md holds the blocks, else a new AGENTS.md. Which
-    instruction file a repo uses is its call, so the sync stops for the blocks to be pasted into a file that exists,
+    """The file the sync writes: whichever of AGENTS.md and CLAUDE.md holds the block, else a new AGENTS.md. Which
+    instruction file a repo uses is its call, so the sync stops for the block to be pasted into a file that exists,
     and never writes through a symlink."""
     agents_md, claude_md = repo / 'AGENTS.md', repo / 'CLAUDE.md'
     files = [f for f in (agents_md, claude_md) if f.is_file() and not f.is_symlink()]
     for file in files:
-        # Checked first, since the blocks can't be found in a file with CRLF line endings.
+        # Checked first, since the block can't be found in a file with CRLF line endings.
         if '\r' in read(file):
             sys.exit(f'context-packs: {file} has CRLF line endings. Convert it to LF, then sync again.')
-    marked = [f for f in files if BLOCK.search(read(f))]
+    marked = [f for f in files if MARKER.search(read(f))]
     if len(marked) > 1:
-        sys.exit(f'context-packs: {agents_md} and {claude_md} both have context-packs blocks. '
-                 "Delete them from the one that shouldn't be synced, then sync again.")
+        sys.exit(f'context-packs: {agents_md} and {claude_md} both have a context-packs block. '
+                 "Delete it from the one that shouldn't be synced, then sync again.")
     if marked:
         return marked[0]
-    lines = block(HEADER_START, '')
+    lines = block('')
     if len(files) > 1:
-        sys.exit(f'context-packs: Neither {agents_md} nor {claude_md} has context-packs blocks. Add these two lines '
+        sys.exit(f'context-packs: Neither {agents_md} nor {claude_md} has a context-packs block. Add these two lines '
                  f'to the one that should hold the packs, where the shared rules should go, then sync again:\n\n{lines}')
     if files:
-        sys.exit(f'context-packs: {files[0]} has no context-packs blocks. '
+        sys.exit(f'context-packs: {files[0]} has no context-packs block. '
                  f'Add these two lines where the shared rules should go, then sync again:\n\n{lines}')
     if agents_md.is_symlink():
         sys.exit(f'context-packs: {agents_md} is a symlink, and the sync would write through it. '
@@ -93,29 +83,24 @@ def instructions(repo):
 
 
 def region(repo, file):
-    """file's context-packs blocks, or a new file's empty header block, after checking that nothing in them was edited since the last sync."""
-    text = read(file) if file.exists() else block(HEADER_START, '')
+    """file's context-packs block, or a new file's empty one, after checking that nothing in it or in context-packs/gen/
+    was edited since the last sync."""
+    text = read(file) if file.exists() else block('')
+    if OLD_MARKER.search(text):
+        sys.exit(f'context-packs: {file} has context-packs blocks from an older version, which kept packs in '
+                 'docs/agents/. Replace everything from their first start marker to their last end marker with these '
+                 f'two lines, delete docs/agents/generated/ and the import packs in docs/agents/, then add the packs '
+                 f'again:\n\n{block("")}')
     blocks = list(BLOCK.finditer(text))
-    names = [match.group(1) for match in blocks]
-    if names[0] != HEADER:
-        sys.exit(f'context-packs: {file}: the context-packs blocks must start with the header block. '
-                 f'Add these two lines before them, then sync again:\n\n{block(HEADER_START, "")}')
-    for name in sorted({n for n in names if names.count(n) > 1}):
-        sys.exit(f'context-packs: {file} has more than one {name} block. Delete all but one, then sync again.')
-    for before, after in zip(blocks, blocks[1:]):
-        if text[before.end():after.start()] != '\n':
-            sys.exit(f'context-packs: {file} has text between the context-packs blocks, which must sit together '
-                     'separated by blank lines. Move it outside them, then sync again.')
-    packs = [marked_pack(file, m.group(1), m.group(2)) for m in blocks[1:]]
-    if (repo / PACKS).is_dir():
-        for entry in sorted((repo / PACKS).iterdir()):
-            if entry.name not in names[1:]:
-                sys.exit(f'context-packs: {(PACKS / entry.name).as_posix()} has no block in {file}. '
-                         'Remove it, then sync again.')
-    for match in blocks:
-        name, _, synced, sha = match.groups()
-        if digest(synced, snapshot(repo / PACKS / name)) != sha:
-            sys.exit(f'context-packs: {file}: the {name} block or a doc in {PACKS / name} was edited since '
-                     'the last sync. Move the change into its context pack or outside them, revert it, '
-                     'then sync again.')
-    return Region(text, blocks[0].start(), blocks[-1].end(), {m.group(1): m.group(0) for m in blocks}, packs)
+    if len(blocks) > 1:
+        sys.exit(f'context-packs: {file} has more than one context-packs block. Delete all but one, then sync again.')
+    if not blocks:
+        sys.exit(f'context-packs: {file} has a context-packs start marker without its end marker. Replace it with '
+                 f'these two lines, then sync again:\n\n{block("")}')
+    match = blocks[0]
+    body, sha = match.groups()
+    if digest(body, snapshot(repo / GEN)) != sha:
+        sys.exit(f'context-packs: {file}: the context-packs block or a file in {GEN.as_posix()} was edited since the '
+                 f'last sync. Move the change into {ROOT.as_posix()}/ or outside the block, or revert it, then sync '
+                 'again.')
+    return Region(text, match.start(), match.end(), match.group(0))

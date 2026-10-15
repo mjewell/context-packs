@@ -1,12 +1,11 @@
 import shutil
 import unittest
 
-from test_cli import SyncCase, git
-from test_nested import doc
+from test_cli import HEADER, SyncCase, block, doc, git
 
 
 class ImportPackCase(SyncCase):
-    """The house-rules pack imported into the repo's own docs, the project pack, read from the working tree."""
+    """The house-rules pack imported into a folder of the repo's own docs, context-packs/project/."""
 
     def setUp(self):
         super().setUp()
@@ -14,55 +13,44 @@ class ImportPackCase(SyncCase):
             'pack.md': 'Prefer small PRs.\n',
             'testing.md': doc('Writing tests', 'Test behavior.\n'),
         })
-        self.docs = self.repo / 'docs' / 'agents' / 'project'
-        self.docs.mkdir(parents=True)
-        (self.docs / 'design.md').write_text(doc('Changing the design', 'Keep it small.\n'))
-        self.agents_md = self.repo / 'AGENTS.md'
-        self.import_md = self.docs / 'house-rules' / 'pack.md'
-        self.generated = self.repo / 'docs' / 'agents' / 'generated' / 'project' / 'house-rules'
-        self.add_project()
+        self.write('context-packs/project/design.md', doc('Changing the design', 'Keep it small.\n'))
+        self.id = 'project/house-rules'
+        self.generated = self.gen / 'project' / 'house-rules'
 
-    def add_project(self):
-        result = self.sync('add', 'project', '.', '--path', 'docs/agents/project')
-        self.assertEqual(result.returncode, 0, result.stderr)
-
-    def import_rules(self, *args, name='house-rules', into='docs/agents/project'):
-        return self.sync('add', name, str(self.origin), '--path', 'context', '--into', into, *args)
-
-    def front(self, ref=None, when=None):
-        return ('---\n' + f'when: {when}\n' * bool(when)
-                + f'from: {self.origin}\npath: context\nref: {ref or self.ref}\n---\n')
+    def import_rules(self, *args, id='project/house-rules'):
+        return self.add(*args, id=id)
 
 
 class ImportTests(ImportPackCase):
-    def test_add_into_writes_an_import_pack_pinned_to_the_latest_commit(self):
+    def test_add_at_a_nested_id_writes_an_import_pack_pinned_to_the_latest_commit(self):
         result = self.import_rules('--when', 'Reviewing a PR')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.import_md.read_text(), self.front(when='Reviewing a PR'))
-        self.assertIn(f'house-rules: added @ {self.ref[:7]}\n', result.stdout)
+        self.assertEqual(self.import_md(self.id).read_text(), self.front(self.ref, 'Reviewing a PR'))
+        self.assertIn(f'project/house-rules: added @ {self.ref[:7]}\n', result.stdout)
 
     def test_import_pack_with_a_when_gets_a_row_in_its_parents_table(self):
         result = self.import_rules('--when', 'Reviewing a PR')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('## project context\n\n| When | Read |\n|---|---|\n'
-                      '| Changing the design | `docs/agents/project/design.md` |\n'
-                      '| Reviewing a PR | `docs/agents/generated/project/house-rules/pack.md` |\n<!-- context-packs:end',
-                      self.agents_md.read_text())
+        self.assertEqual(self.agents(),
+                         block('## Context\n\n| When | Read |\n|---|---|\n'
+                               '| Changing the design | `context-packs/project/design.md` |\n'
+                               '| Reviewing a PR | `context-packs/gen/project/house-rules/pack.md` |\n'))
         self.assertEqual((self.generated / 'pack.md').read_text(),
-                         'Prefer small PRs.\n\n## house-rules context\n\n| When | Read |\n|---|---|\n'
-                         '| Writing tests | `docs/agents/generated/project/house-rules/testing.md` |\n')
+                         'Prefer small PRs.\n\n## project/house-rules context\n\n| When | Read |\n|---|---|\n'
+                         '| Writing tests | `context-packs/gen/project/house-rules/testing.md` |\n')
         self.assertEqual((self.generated / 'testing.md').read_text(), doc('Writing tests', 'Test behavior.\n'))
 
     def test_import_pack_without_a_when_is_inlined_after_its_parent(self):
         result = self.import_rules()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('| Changing the design | `docs/agents/project/design.md` |\n\n'
-                      'Prefer small PRs.\n\n## house-rules context\n\n| When | Read |\n|---|---|\n'
-                      '| Writing tests | `docs/agents/generated/project/house-rules/testing.md` |\n<!-- context-packs:end',
-                      self.agents_md.read_text())
+        self.assertEqual(self.agents(),
+                         block('## Context\n\n| When | Read |\n|---|---|\n'
+                               '| Changing the design | `context-packs/project/design.md` |\n\n'
+                               'Prefer small PRs.\n\n## project/house-rules context\n\n| When | Read |\n|---|---|\n'
+                               '| Writing tests | `context-packs/gen/project/house-rules/testing.md` |\n'))
         self.assertFalse((self.generated / 'pack.md').exists())
 
     def test_import_pack_without_a_when_follows_its_authors(self):
@@ -71,8 +59,7 @@ class ImportTests(ImportPackCase):
         result = self.import_rules()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('| Working on anything | `docs/agents/generated/project/house-rules/pack.md` |\n',
-                      self.agents_md.read_text())
+        self.assertIn('| Working on anything | `context-packs/gen/project/house-rules/pack.md` |\n', self.agents())
 
     def test_import_packs_when_replaces_its_authors(self):
         self.ref = self.share(doc('Working on anything', 'Prefer small PRs.\n'))
@@ -80,9 +67,8 @@ class ImportTests(ImportPackCase):
         result = self.import_rules('--when', 'Reviewing a PR')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('| Reviewing a PR | `docs/agents/generated/project/house-rules/pack.md` |\n',
-                      self.agents_md.read_text())
-        self.assertNotIn('Working on anything', self.agents_md.read_text())
+        self.assertIn('| Reviewing a PR | `context-packs/gen/project/house-rules/pack.md` |\n', self.agents())
+        self.assertNotIn('Working on anything', self.agents())
 
     def test_when_always_inlines_the_pack_even_with_its_authors_when(self):
         self.ref = self.share(doc('Working on anything', 'Prefer small PRs.\n'))
@@ -90,17 +76,17 @@ class ImportTests(ImportPackCase):
         result = self.import_rules('--when', 'always')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('\n\nPrefer small PRs.\n\n## house-rules context', self.agents_md.read_text())
-        self.assertNotIn('Working on anything', self.agents_md.read_text())
+        self.assertIn('\n\nPrefer small PRs.\n\n## project/house-rules context', self.agents())
+        self.assertNotIn('Working on anything', self.agents())
 
     def test_rules_written_in_the_import_pack_come_before_the_imported_ones(self):
         self.import_rules()
-        self.import_md.write_text(self.front() + 'Small means under 200 lines.\n')
+        self.import_md(self.id).write_text(self.front(self.ref) + 'Small means under 200 lines.\n')
 
         result = self.sync()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('\n\nSmall means under 200 lines.\n\nPrefer small PRs.\n', self.agents_md.read_text())
+        self.assertIn('\n\nSmall means under 200 lines.\n\nPrefer small PRs.\n', self.agents())
 
     def test_packs_nested_in_the_imported_pack_render_as_written(self):
         self.ref = self.publish({'frontend/pack.md': doc('Editing `web/**`', 'Keep components small.\n')})
@@ -108,58 +94,54 @@ class ImportTests(ImportPackCase):
         result = self.import_rules('--when', 'Reviewing a PR')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('| Editing `web/**` | `docs/agents/generated/project/house-rules/frontend.md` |\n',
+        self.assertIn('| Editing `web/**` | `context-packs/gen/project/house-rules/frontend.md` |\n',
                       (self.generated / 'pack.md').read_text())
-        self.assertEqual((self.generated / 'frontend.md').read_text(),
-                         'Keep components small.\n')
+        self.assertEqual((self.generated / 'frontend.md').read_text(), 'Keep components small.\n')
 
     def test_import_pack_in_a_nested_pack_renders_into_its_index(self):
-        (self.docs / 'review' / 'pack.md').parent.mkdir()
-        (self.docs / 'review' / 'pack.md').write_text(doc('Reviewing code', 'Read the tests first.\n'))
+        self.write('context-packs/project/review/pack.md', doc('Reviewing code', 'Read the tests first.\n'))
 
-        result = self.import_rules(into='docs/agents/project/review')
+        result = self.import_rules(id='project/review/house-rules')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual((self.repo / 'docs' / 'agents' / 'generated' / 'project' / 'review.md').read_text(),
-                         'Read the tests first.\n\nPrefer small PRs.\n\n## house-rules context\n\n'
+        self.assertEqual((self.gen / 'project' / 'review.md').read_text(),
+                         'Read the tests first.\n\nPrefer small PRs.\n\n## project/review/house-rules context\n\n'
                          '| When | Read |\n|---|---|\n'
-                         '| Writing tests | `docs/agents/generated/project/review/house-rules/testing.md` |\n')
+                         '| Writing tests | `context-packs/gen/project/review/house-rules/testing.md` |\n')
 
-    def test_import_pack_moved_into_a_nested_pack_renders_there(self):
+    def test_import_pack_moved_to_another_folder_renders_there_on_resync(self):
         self.import_rules()
-        (self.docs / 'review').mkdir()
-        (self.docs / 'review' / 'pack.md').write_text(doc('Reviewing code', 'Read the tests first.\n'))
-        shutil.move(str(self.import_md.parent), str(self.docs / 'review' / 'house-rules'))
+        self.write('context-packs/project/review/pack.md', doc('Reviewing code', 'Read the tests first.\n'))
+        shutil.move(str(self.import_md(self.id).parent), str(self.packs / 'project' / 'review' / 'house-rules'))
 
         result = self.sync()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn('Prefer small PRs.', self.agents_md.read_text())
-        self.assertIn('Read the tests first.\n\nPrefer small PRs.\n',
-                      (self.repo / 'docs' / 'agents' / 'generated' / 'project' / 'review.md').read_text())
+        self.assertNotIn('Prefer small PRs.', self.agents())
+        self.assertIn('Read the tests first.\n\nPrefer small PRs.\n', (self.gen / 'project' / 'review.md').read_text())
         self.assertFalse(self.generated.exists())
 
     def test_update_moves_the_import_packs_pin_and_keeps_the_rest_of_it(self):
         self.import_rules('--when', 'Reviewing a PR')
-        self.import_md.write_text(self.import_md.read_text() + 'Small means under 200 lines.\n')
+        self.import_md(self.id).write_text(self.import_md(self.id).read_text() + 'Small means under 200 lines.\n')
         latest = self.share('Prefer small PRs.\nWrite tests first.\n')
 
         result = self.sync('update')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.import_md.read_text(),
+        self.assertEqual(self.import_md(self.id).read_text(),
                          self.front(latest, 'Reviewing a PR') + 'Small means under 200 lines.\n')
         self.assertIn('Write tests first.', (self.generated / 'pack.md').read_text())
-        self.assertIn(f'house-rules: {self.ref[:7]} → {latest[:7]}\n', result.stdout)
+        self.assertEqual(result.stdout, f'project/house-rules: {self.ref[:7]} → {latest[:7]}\n')
 
-    def test_update_by_name_moves_only_that_import_pack(self):
+    def test_update_by_id_moves_only_that_import_pack(self):
         self.import_rules()
         latest = self.share('Prefer small PRs.\nWrite tests first.\n')
 
-        result = self.sync('update', 'house-rules')
+        result = self.sync('update', 'project/house-rules')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.import_md.read_text(), self.front(latest))
+        self.assertEqual(self.import_md(self.id).read_text(), self.front(latest))
 
     def test_resync_keeps_the_import_pack_at_its_pin(self):
         self.import_rules()
@@ -168,7 +150,7 @@ class ImportTests(ImportPackCase):
         result = self.sync()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn('Write tests first.', self.agents_md.read_text())
+        self.assertNotIn('Write tests first.', self.agents())
 
     def test_resync_with_nothing_to_change_names_the_import_packs_pin(self):
         self.import_rules()
@@ -176,36 +158,36 @@ class ImportTests(ImportPackCase):
         result = self.sync()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, f'Nothing changed: project, house-rules @ {self.ref[:7]}\n')
+        self.assertEqual(result.stdout, f'Nothing changed: project/house-rules @ {self.ref[:7]}\n')
 
     def test_remove_deletes_the_import_pack_and_its_generated_files(self):
         self.import_rules()
 
-        result = self.sync('remove', 'house-rules')
+        result = self.sync('remove', 'project/house-rules')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertFalse(self.import_md.parent.exists())
+        self.assertFalse(self.import_md(self.id).parent.exists())
         self.assertFalse(self.generated.exists())
-        self.assertNotIn('Prefer small PRs.', self.agents_md.read_text())
-        self.assertIn('house-rules: removed\n', result.stdout)
+        self.assertTrue((self.packs / 'project' / 'design.md').exists())
+        self.assertNotIn('Prefer small PRs.', self.agents())
+        self.assertEqual(result.stdout, 'project/house-rules: removed\n')
 
     def test_deleting_the_import_pack_by_hand_clears_its_files_on_resync(self):
         self.import_rules()
-        shutil.rmtree(self.import_md.parent)
+        shutil.rmtree(self.import_md(self.id).parent)
 
         result = self.sync()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertFalse(self.generated.exists())
+        self.assertFalse(self.gen.exists())
 
-    def test_list_shows_import_packs_under_the_pack_holding_them(self):
+    def test_list_shows_import_packs_by_id(self):
         self.import_rules()
 
         result = self.sync('list')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, f'project  docs/agents/project\n'
-                                        f'  house-rules  {self.origin}  context @ {self.ref}\n')
+        self.assertEqual(result.stdout, f'project/house-rules  {self.origin}  context @ {self.ref}\n')
 
     def test_editing_an_imported_doc_stops_the_next_sync(self):
         self.import_rules('--when', 'Reviewing a PR')
@@ -214,205 +196,131 @@ class ImportTests(ImportPackCase):
         result = self.sync()
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn('project', result.stderr)
+        self.assertIn('context-packs/gen', result.stderr)
         self.assertEqual((self.generated / 'testing.md').read_text(), 'Edited here.\n')
 
 
 class ImportRuleTests(ImportPackCase):
     """What stops a sync with import packs."""
 
-    def test_when_for_a_folder_on_disk_stops(self):
-        result = self.sync('add', 'shared', '../house-rules', '--path', 'context', '--when', 'Reviewing a PR')
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('--when', result.stderr)
-        self.assertIn('pack.md', result.stderr)
-
-    def test_into_a_folder_that_already_has_the_import_packs_folder_stops(self):
-        (self.docs / 'house-rules').mkdir()
-
-        result = self.import_rules()
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('docs/agents/project/house-rules', result.stderr)
-        self.assertFalse(self.import_md.exists())
-
-    def test_import_pack_named_like_a_pack_in_agents_md_stops(self):
-        self.add()
-        before = self.agents_md.read_text()
-
-        result = self.import_rules(name='house-rules')
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('house-rules', result.stderr)
-        self.assertFalse(self.import_md.exists())
-        self.assertEqual(self.agents_md.read_text(), before)
-
-    def test_two_import_packs_with_one_name_stop(self):
+    def test_two_import_packs_of_one_folder_stop(self):
         self.import_rules()
-        (self.docs / 'review' / 'house-rules').mkdir(parents=True)
-        shutil.copy(self.import_md, self.docs / 'review' / 'house-rules' / 'pack.md')
 
-        result = self.sync()
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('house-rules', result.stderr)
-
-    def test_import_pack_overlapping_a_pack_in_agents_md_stops(self):
-        self.sync('add', 'shared', str(self.origin), '--path', 'context')
-
-        result = self.import_rules()
+        result = self.import_rules(id='shared')
 
         self.assertEqual(result.returncode, 1)
         self.assertIn('overlap', result.stderr)
-        self.assertFalse(self.import_md.exists())
+        self.assertFalse(self.import_md('shared').exists())
 
     def test_import_pack_holding_another_file_stops(self):
         self.import_rules()
-        (self.import_md.parent / 'notes.md').write_text(doc('Taking notes'))
+        self.write(f'context-packs/{self.id}/notes.md', doc('Taking notes'))
 
         result = self.sync()
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn('docs/agents/project/house-rules', result.stderr)
+        self.assertIn('context-packs/project/house-rules', result.stderr)
+        self.assertIn('notes.md', result.stderr)
 
-    def test_import_pack_from_a_git_url_without_a_ref_stops(self):
-        self.import_md.parent.mkdir()
-        self.import_md.write_text(f'---\nfrom: {self.origin}\npath: context\n---\n')
+    def test_add_inside_an_import_packs_folder_stops_untouched(self):
+        self.import_rules()
+        before = self.agents_md.read_text()
+        other_origin, other = self.remote('other-rules')
+        self.publish({'pack.md': 'Use tabs.\n'}, checkout=other)
 
-        result = self.sync()
+        result = self.sync('add', f'{self.id}/other', str(other_origin), '--path', 'context')
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn('docs/agents/project/house-rules/pack.md', result.stderr)
-        self.assertIn('ref', result.stderr)
+        self.assertIn('context-packs/project/house-rules', result.stderr)
+        self.assertFalse(self.import_md(f'{self.id}/other').parent.exists())
+        self.assertEqual(self.agents_md.read_text(), before)
 
-    def test_fetched_pack_holding_an_import_pack_stops(self):
+    def test_fetched_pack_holding_an_import_pack_from_git_stops(self):
         other_origin, other = self.remote('other-rules')
         self.publish({'pack.md': 'Use tabs.\n'}, checkout=other)
         self.publish({'other/pack.md': f'---\nfrom: {other_origin}\npath: context\nref: '
                                        f'{git(other, "rev-parse", "HEAD")}\n---\n'})
 
-        result = self.add()
+        result = self.import_rules()
 
         self.assertEqual(result.returncode, 1)
         self.assertIn('context/other/pack.md', result.stderr)
-        self.assertIn('only a pack read from a folder on disk', result.stderr)
+        self.assertIn('from git', result.stderr)
+        self.assertFalse(self.import_md(self.id).parent.exists())
+
+    def test_import_pack_of_a_folder_holding_context_packs_stops_untouched(self):
+        result = self.sync('add', 'self', '.')
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('overlap', result.stderr)
+        self.assertFalse(self.import_md('self').parent.exists())
+
+    def test_import_pack_of_a_folder_inside_context_packs_stops_untouched(self):
+        result = self.sync('add', 'loop', 'context-packs/project')
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('overlap', result.stderr)
+        self.assertFalse(self.import_md('loop').parent.exists())
 
 
-class InstallTests(SyncCase):
-    """A pack from git installed as an import pack that a marker names, and a pack read from a folder on disk that
-    one names directly."""
+class LocalImportTests(SyncCase):
+    """An import pack whose from is a path, inside a pack from elsewhere: the path is in that pack's origin, so a
+    pack can point at another folder of its own repo, and works the same wherever it's installed."""
 
     def setUp(self):
         super().setUp()
-        self.ref = self.publish({'pack.md': 'Prefer small PRs.\n', 'testing.md': doc('Writing tests')})
-        self.agents_md = self.repo / 'AGENTS.md'
-        self.import_md = self.repo / 'docs' / 'agents' / 'house-rules' / 'pack.md'
+        self.ref = self.publish({'pack.md': 'Prefer small PRs.\n', 'common/pack.md': '---\nfrom: .\npath: common\n---\n'})
+        self.publish({'pack.md': 'Use tabs.\n', 'style.md': doc('Styling code', 'Indent once.\n')}, folder='common')
+        self.ref = git(self.source, 'rev-parse', 'HEAD')
 
-    def test_add_writes_an_import_pack_in_docs_agents_and_a_marker_naming_its_folder(self):
+    def test_local_import_in_a_pack_from_git_reads_its_origin_at_the_packs_ref(self):
         result = self.add()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.import_md.read_text(), f'---\nfrom: {self.origin}\npath: context\nref: {self.ref}\n---\n')
-        self.assertIn(self.start() + 'Prefer small PRs.\n\n## house-rules context\n', self.agents_md.read_text())
-        self.assertIn(f'house-rules: added @ {self.ref[:7]}\n', result.stdout)
+        self.assertEqual(self.agents(),
+                         block('Prefer small PRs.\n\nUse tabs.\n\n## house-rules/common context\n\n'
+                               '| When | Read |\n|---|---|\n'
+                               '| Styling code | `context-packs/gen/house-rules/common/style.md` |\n'))
+        self.assertEqual((self.gen / 'house-rules' / 'common' / 'style.md').read_text(),
+                         doc('Styling code', 'Indent once.\n'))
 
-    def test_add_into_a_folder_outside_any_pack_gives_the_import_pack_its_own_block(self):
-        result = self.add('--into', 'docs/shared')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue((self.repo / 'docs' / 'shared' / 'house-rules' / 'pack.md').exists())
-        self.assertIn('<!-- context-packs:start house-rules path=docs/shared/house-rules -->\n',
-                      self.agents_md.read_text())
-
-    def test_import_pack_named_by_a_marker_follows_its_authors_when(self):
-        self.share(doc('Working on anything', 'Prefer small PRs.\n'))
-
-        result = self.add()
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(self.start() + '## house-rules context\n\n| When | Read |\n|---|---|\n'
-                      '| Working on anything | `docs/agents/generated/house-rules/pack.md` |\n', self.agents_md.read_text())
-
-    def test_when_in_an_import_pack_named_by_a_marker_gives_it_a_row(self):
-        result = self.add('--when', 'Reviewing a PR')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('when: Reviewing a PR\n', self.import_md.read_text())
-        self.assertIn(self.start() + '## house-rules context\n\n| When | Read |\n|---|---|\n'
-                      '| Reviewing a PR | `docs/agents/generated/house-rules/pack.md` |\n', self.agents_md.read_text())
-
-    def test_remove_deletes_an_import_pack_a_marker_names(self):
+    def test_local_import_in_a_pack_from_git_moves_only_with_its_pin(self):
         self.add()
+        self.publish({'pack.md': 'Use spaces.\n'}, folder='common')
 
-        result = self.sync('remove', 'house-rules')
+        resynced = self.sync()
+        self.assertEqual(resynced.returncode, 0, resynced.stderr)
+        self.assertIn('Use tabs.\n', self.agents())
 
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertFalse(self.import_md.parent.exists())
-        self.assertNotIn('house-rules', self.agents_md.read_text())
+        updated = self.sync('update')
+        self.assertEqual(updated.returncode, 0, updated.stderr)
+        self.assertIn('Use spaces.\n', self.agents())
 
-    def moved_into_project(self):
-        docs = self.repo / 'docs' / 'agents' / 'project'
-        docs.mkdir(parents=True)
-        (docs / 'design.md').write_text(doc('Changing the design'))
-        self.sync('add', 'project', 'docs/agents/project')
-        self.add()
-        shutil.move(str(self.import_md.parent), str(docs / 'house-rules'))
-        return docs / 'house-rules'
-
-    def test_marker_whose_folder_moved_stops_and_says_to_remove_it(self):
-        self.moved_into_project()
-        before = self.agents_md.read_text()
-
-        result = self.sync()
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("house-rules pack's folder, docs/agents/house-rules, isn't there", result.stderr)
-        self.assertIn('remove house-rules', result.stderr)
-        self.assertEqual(self.agents_md.read_text(), before)
-
-    def test_remove_after_moving_a_pack_into_another_keeps_it_there(self):
-        moved = self.moved_into_project()
-
-        result = self.sync('remove', 'house-rules')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue((moved / 'pack.md').exists())
-        self.assertNotIn(self.start(), self.agents_md.read_text())
-        self.assertIn('| Changing the design | `docs/agents/project/design.md` |\n\nPrefer small PRs.\n',
-                      self.agents_md.read_text())
-
-    def test_remove_keeps_the_folder_of_a_pack_on_disk(self):
-        docs = self.repo / 'docs' / 'agents' / 'project'
-        docs.mkdir(parents=True)
-        (docs / 'design.md').write_text(doc('Changing the design'))
-        self.sync('add', 'project', 'docs/agents/project')
-
-        result = self.sync('remove', 'project')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue((docs / 'design.md').exists())
-
-    def test_add_into_a_folder_that_exists_stops(self):
-        self.import_md.parent.mkdir(parents=True)
+    def test_local_import_reaching_outside_its_origin_stops(self):
+        self.publish({'common/pack.md': '---\nfrom: ..\npath: elsewhere\n---\n'})
 
         result = self.add()
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn('docs/agents/house-rules', result.stderr)
-        self.assertFalse(self.agents_md.exists())
+        self.assertIn('context/common/pack.md', result.stderr)
+        self.assertIn('outside', result.stderr)
 
-    def test_list_shows_a_pack_on_disk_by_its_folder_and_one_from_git_by_its_origin(self):
-        docs = self.repo / 'docs' / 'agents' / 'project'
-        docs.mkdir(parents=True)
-        (docs / 'design.md').write_text(doc('Changing the design'))
-        self.sync('add', 'project', 'docs/agents/project')
-        self.add()
+    def test_local_import_of_a_folder_holding_its_pack_stops(self):
+        self.publish({'common/pack.md': '---\nfrom: .\n---\n'})
 
-        result = self.sync('list')
+        result = self.add()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('overlap', result.stderr)
+
+    def test_local_import_in_a_folder_on_disk_reads_that_folder_where_it_is(self):
+        result = self.sync('add', 'house-rules', '../house-rules', '--path', 'context')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, f'project  docs/agents/project\nhouse-rules  {self.origin}  context @ {self.ref}\n')
+        self.assertIn(HEADER + '\nPrefer small PRs.\n\nUse tabs.\n\n## house-rules/common context\n\n'
+                      '| When | Read |\n|---|---|\n| Styling code | `../house-rules/common/style.md` |\n',
+                      self.agents())
+        self.assertFalse(self.gen.exists())
 
 
 if __name__ == '__main__':
