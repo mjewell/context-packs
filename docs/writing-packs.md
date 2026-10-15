@@ -27,7 +27,20 @@ Each nested pack is a read an agent makes before reaching the docs inside it, so
 
 A nested pack is installed whenever its parent is. A part only some repos want, such as a language's rules, goes in a pack of its own, in a folder beside its parent's rather than inside it, and those repos install it with `add`.
 
-Any folder with a `pack.md` can also be installed on its own, as its own pack, and it renders the way it would inside its parent. If its `pack.md` has a `when`, its block in `AGENTS.md` is a one-row table pointing at a generated index of its rules, so installing just `typescript` still loads its rules only when a row matches. Without a `when`, or with `when: always`, its rules are inlined into the block.
+Any folder with a `pack.md` can also be installed on its own, as its own pack, and it renders the way it would inside its parent. If its `pack.md` has a `when`, it gets a row pointing at a generated index of its rules, so installing just `typescript` still loads its rules only when a row matches. Without a `when`, or with `when: always`, its rules are inlined.
+
+## Pointing at another folder
+
+A pack can import another folder of its own repo, with an import pack whose `from` is a path:
+
+```text
+context/
+├── pack.md
+└── shared/
+    └── pack.md      # from: .  path: common
+```
+
+The path is in the pack's own origin: for a pack installed from git, the same repo at the same ref, and for a folder on disk, that folder's `from`. So the pack renders the same in every repo that installs it, and `shared` moves with the pack's pin. A path can't reach outside the pack's repo, and a pack from git can't import a pack from git, since that would bring pins of its own to keep in step.
 
 ## One repo or many
 
@@ -46,7 +59,7 @@ In a shared repo, give each pack's tags its own prefix, such as `frontend-v1.4.0
 Pass the path of a folder beside the repo in place of the git URL:
 
 ```bash
-npx context-packs add <name> ../agent-rules --path <folder>
+npx context-packs add <id> ../agent-rules --path <folder>
 ```
 
-Its block reads that folder as it is on disk, like your own docs, so there's no import pack and no ref to pin, and the table points at the docs where they are. Edits to a doc show up without a resync. Changes to `pack.md` or a `when:` line need one, since those are copied into `AGENTS.md`. It syncs only where that folder exists, so it's for trying a pack out, not for a repo that clones, CI and cloud sessions sync.
+That writes an import pack with that path as its `from` and no ref. The folder is read as it is on disk, like your own docs, and the table points at the docs where they are. Edits to a doc show up without a resync. Changes to `pack.md` or a `when:` line need one, since those are copied into `AGENTS.md`. It syncs only where that folder exists, so it's for trying a pack out, not for a repo that clones, CI and cloud sessions sync.
