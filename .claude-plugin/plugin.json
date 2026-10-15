@@ -1,6 +1,6 @@
 {
   "name": "context-packs",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Sync shared agent rules and docs into each repo's AGENTS.md",
   "license": "MIT",
   "author": {
