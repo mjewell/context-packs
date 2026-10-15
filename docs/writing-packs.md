@@ -29,26 +29,22 @@ A nested pack is installed whenever its parent is. A part only some repos want, 
 
 Any folder with a `pack.md` can also be installed on its own, as its own pack, and it renders the way it would inside its parent. If its `pack.md` has a `when`, it gets a row pointing at a generated index of its rules, so installing just `typescript` still loads its rules only when a row matches. Without a `when`, or with `when: always`, its rules are inlined.
 
-## Pointing at another folder of the same repo
+## Sharing a folder between packs
 
-An import pack with a `path` and no `from` points at a folder of the repo it's in. In packs you publish, that lets several packs include one folder without copying it:
+When several packs build on the same rules, such as `web` and `api` both relying on TypeScript standards, make the shared part a pack of its own, beside them:
 
 ```text
 agent-rules/
-├── web/
-│   ├── pack.md
-│   └── typescript/
-│       └── pack.md
-├── api/
-│   ├── pack.md
-│   └── typescript/
-│       └── pack.md
+├── web/pack.md
+├── api/pack.md
 └── typescript/
     ├── pack.md
     └── types.md
 ```
 
-`web/typescript/pack.md`, and the same in `api/`:
+Each repo installs `typescript` alongside whichever of `web` and `api` it uses. It then has its own pin and `when`, which the repo can update and override on its own, and a repo with both `web` and `api` gets it once.
+
+A pack that should always bring another folder of its repo along can include it instead, with an import pack holding a `path` and no `from`. `web/typescript/pack.md`:
 
 ```markdown
 ---
@@ -56,9 +52,7 @@ path: typescript
 ---
 ```
 
-A repo that installs `web` gets `agent-rules/typescript/` rendered at `web/typescript`, fetched at the same commit as `web`, so it needs no pin of its own and renders the same wherever `web` is installed. The path is relative to the repo's root, not to the file, so moving the import pack doesn't break it, and it can't leave the repo.
-
-A repo that installs both `web` and `api` gets `typescript` in each, as each one's ref has it: if they're pinned to different commits or tags, each brings its own version. A pack from git can't import a pack from git, since that would bring pins of its own to keep in step.
+That renders `agent-rules/typescript/` inside `web`, at `web`'s commit. The path is relative to the repo's root, so moving the import pack doesn't break it, and it can't leave the repo. The cost is control: it moves only with `web`'s pin, a repo installing `web` can't override its `when`, and a repo that installs two packs including it gets it in each, at each one's version. A pack from git can't import a pack from git, since that would bring pins of its own to keep in step.
 
 ## One repo or many
 
