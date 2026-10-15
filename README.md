@@ -12,6 +12,7 @@ With context-packs, you write rules and docs once, as a folder in any git repo: 
 It also keeps that file short. Instead of loading every doc into every session, `AGENTS.md` holds only the rules every session needs, plus a table telling the agent which doc to read for which task. Two packs synced into a web app's `AGENTS.md`, after a short header:
 
 ```markdown
+<!-- context-packs:pack auth -->
 Never log tokens, session IDs or passwords, even at debug level.
 
 ## auth context
@@ -20,7 +21,9 @@ Never log tokens, session IDs or passwords, even at debug level.
 |---|---|
 | Adding an endpoint, or checking what a user may do | `context-packs/gen/auth/permissions.md` |
 | Reading the signed-in user, or changing sign-in or sign-out | `context-packs/gen/auth/sessions.md` |
+<!-- context-packs:pack-end auth -->
 
+<!-- context-packs:pack frontend -->
 Build UI from `@acme/ui` components; don't style raw HTML elements. Every user-facing string goes through `t()`.
 
 ## frontend context
@@ -30,6 +33,7 @@ Build UI from `@acme/ui` components; don't style raw HTML elements. Every user-f
 | Adding anything a user can click, type into or focus | `context-packs/gen/frontend/accessibility.md` |
 | Building or changing a form | `context-packs/gen/frontend/forms.md` |
 | Writing or changing React components | `context-packs/gen/frontend/react.md` |
+<!-- context-packs:pack-end frontend -->
 ```
 
 Every session reads both packs' rules. Asked to build a form, the agent matches "Building or changing a form" and reads `forms.md`, and it never opens the auth docs unless the task touches them. This is the idea behind OpenAI's [Harness engineering](https://openai.com/index/harness-engineering/): keep `AGENTS.md` a short map that points to deeper docs. context-packs builds that map for you, and shares it across repos.

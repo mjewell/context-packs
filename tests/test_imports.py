@@ -1,7 +1,7 @@
 import shutil
 import unittest
 
-from test_cli import HEADER, SyncCase, block, doc, git
+from test_cli import HEADER, SyncCase, block, doc, git, packed
 
 
 class ImportPackCase(SyncCase):
@@ -49,8 +49,10 @@ class ImportTests(ImportPackCase):
         self.assertEqual(self.agents(),
                          block('## Context\n\n| When | Read |\n|---|---|\n'
                                '| Changing the design | `context-packs/project/design.md` |\n\n'
-                               'Prefer small PRs.\n\n## project/house-rules context\n\n| When | Read |\n|---|---|\n'
-                               '| Writing tests | `context-packs/gen/project/house-rules/testing.md` |\n'))
+                               + packed('project/house-rules',
+                                        'Prefer small PRs.\n\n## project/house-rules context\n\n'
+                                        '| When | Read |\n|---|---|\n'
+                                        '| Writing tests | `context-packs/gen/project/house-rules/testing.md` |\n')))
         self.assertFalse((self.generated / 'pack.md').exists())
 
     def test_import_pack_without_a_when_follows_its_authors(self):
@@ -76,7 +78,8 @@ class ImportTests(ImportPackCase):
         result = self.import_rules('--when', 'always')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('\n\nPrefer small PRs.\n\n## project/house-rules context', self.agents())
+        self.assertIn('\n\n<!-- context-packs:pack project/house-rules -->\nPrefer small PRs.\n\n'
+                      '## project/house-rules context', self.agents())
         self.assertNotIn('Working on anything', self.agents())
 
     def test_rules_written_in_the_import_pack_come_before_the_imported_ones(self):
@@ -86,7 +89,8 @@ class ImportTests(ImportPackCase):
         result = self.sync()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('\n\nSmall means under 200 lines.\n\nPrefer small PRs.\n', self.agents())
+        self.assertIn('<!-- context-packs:pack project/house-rules -->\nSmall means under 200 lines.\n\n'
+                      'Prefer small PRs.\n', self.agents())
 
     def test_packs_nested_in_the_imported_pack_render_as_written(self):
         self.ref = self.publish({'frontend/pack.md': doc('Editing `web/**`', 'Keep components small.\n')})
@@ -105,9 +109,11 @@ class ImportTests(ImportPackCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.gen / 'project' / 'review.md').read_text(),
-                         'Read the tests first.\n\nPrefer small PRs.\n\n## project/review/house-rules context\n\n'
-                         '| When | Read |\n|---|---|\n'
-                         '| Writing tests | `context-packs/gen/project/review/house-rules/testing.md` |\n')
+                         'Read the tests first.\n\n'
+                         + packed('project/review/house-rules',
+                                  'Prefer small PRs.\n\n## project/review/house-rules context\n\n'
+                                  '| When | Read |\n|---|---|\n'
+                                  '| Writing tests | `context-packs/gen/project/review/house-rules/testing.md` |\n'))
 
     def test_import_pack_moved_to_another_folder_renders_there_on_resync(self):
         self.import_rules()
@@ -118,7 +124,8 @@ class ImportTests(ImportPackCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn('Prefer small PRs.', self.agents())
-        self.assertIn('Read the tests first.\n\nPrefer small PRs.\n', (self.gen / 'project' / 'review.md').read_text())
+        self.assertIn('Read the tests first.\n\n<!-- context-packs:pack project/review/house-rules -->\n'
+                      'Prefer small PRs.\n', (self.gen / 'project' / 'review.md').read_text())
         self.assertFalse(self.generated.exists())
 
     def test_update_moves_the_import_packs_pin_and_keeps_the_rest_of_it(self):
@@ -278,9 +285,11 @@ class LocalImportTests(SyncCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.agents(),
-                         block('Prefer small PRs.\n\nUse tabs.\n\n## house-rules/common context\n\n'
-                               '| When | Read |\n|---|---|\n'
-                               '| Styling code | `context-packs/gen/house-rules/common/style.md` |\n'))
+                         block(packed('house-rules', 'Prefer small PRs.\n\n'
+                                      + packed('house-rules/common',
+                                               'Use tabs.\n\n## house-rules/common context\n\n'
+                                               '| When | Read |\n|---|---|\n'
+                                               '| Styling code | `context-packs/gen/house-rules/common/style.md` |\n'))))
         self.assertEqual((self.gen / 'house-rules' / 'common' / 'style.md').read_text(),
                          doc('Styling code', 'Indent once.\n'))
 
@@ -317,7 +326,9 @@ class LocalImportTests(SyncCase):
         result = self.sync('add', 'house-rules', '../house-rules', '--path', 'context')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(HEADER + '\nPrefer small PRs.\n\nUse tabs.\n\n## house-rules/common context\n\n'
+        self.assertIn(HEADER + '\n<!-- context-packs:pack house-rules -->\nPrefer small PRs.\n\n'
+                      '<!-- context-packs:pack house-rules/common -->\nUse tabs.\n\n'
+                      '## house-rules/common context\n\n'
                       '| When | Read |\n|---|---|\n| Styling code | `../house-rules/common/style.md` |\n',
                       self.agents())
         self.assertFalse(self.gen.exists())

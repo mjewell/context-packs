@@ -18,7 +18,7 @@ A pack's id is its import pack's folder under `context-packs/`, such as `core` o
 
 ## The context-packs folder
 
-`context-packs/` holds every pack a repo has: its own, and an import pack for each pack from elsewhere. The sync renders it into one block of your instruction file, and writes into `context-packs/gen/`, which you never edit.
+`context-packs/` holds every pack a repo has: its own, and an import pack for each pack from elsewhere. The sync renders it into one block of your instruction file, and writes into `context-packs/gen/`, which you never edit. Each pack whose rules or table are inlined sits between `<!-- context-packs:pack <id> -->` and `<!-- context-packs:pack-end <id> -->`, so people reading the file can see where it starts and ends. The sync doesn't read those comments, so they hold nothing to change.
 
 ```text
 context-packs/

@@ -1,6 +1,6 @@
 import unittest
 
-from test_cli import SyncCase, block, doc
+from test_cli import SyncCase, block, doc, packed
 
 
 class FolderTests(SyncCase):
@@ -21,9 +21,10 @@ class FolderTests(SyncCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.agents(),
-                         block('Prefer small PRs.\n\n## house-rules context\n\n| When | Read |\n|---|---|\n'
-                               '| Writing React components | `context-packs/gen/house-rules/typescript/react.md` |\n'
-                               '| Declaring types | `context-packs/gen/house-rules/typescript/types.md` |\n'))
+                         block(packed('house-rules', 'Prefer small PRs.\n\n## house-rules context\n\n'
+                                      '| When | Read |\n|---|---|\n'
+                                      '| Writing React components | `context-packs/gen/house-rules/typescript/react.md` |\n'
+                                      '| Declaring types | `context-packs/gen/house-rules/typescript/types.md` |\n')))
 
     def test_every_file_in_the_folder_is_copied(self):
         result = self.add()
@@ -53,18 +54,24 @@ class NestedPackTests(SyncCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.agents(),
-                         block('Prefer small PRs.\n\n## house-rules context\n\n| When | Read |\n|---|---|\n'
-                               '| Editing `web/**` | `context-packs/gen/house-rules/frontend.md` |\n'
-                               '| Writing tests | `context-packs/gen/house-rules/testing.md` |\n'))
+                         block(packed('house-rules', 'Prefer small PRs.\n\n## house-rules context\n\n'
+                                                     '| When | Read |\n|---|---|\n'
+                                                     '| Editing `web/**` | `context-packs/gen/house-rules/frontend.md` |\n'
+                                                     '| Writing tests | `context-packs/gen/house-rules/testing.md` |\n')))
 
-    def test_nested_pack_whose_when_is_always_is_inlined_after_its_parent(self):
+    def test_nested_pack_whose_when_is_always_is_inlined_after_its_parent_between_markers(self):
         self.publish({'frontend/pack.md': doc('always', 'Keep components small.\n')})
 
         result = self.add()
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('| Writing tests | `context-packs/gen/house-rules/testing.md` |\n\n'
-                      'Keep components small.\n\n## house-rules/frontend context\n', self.agents())
+                      '<!-- context-packs:pack house-rules/frontend -->\nKeep components small.\n\n'
+                      '## house-rules/frontend context\n\n| When | Read |\n|---|---|\n'
+                      '| Laying out pages | `context-packs/gen/house-rules/frontend/css/layout.md` |\n'
+                      '| Writing React components | `context-packs/gen/house-rules/frontend/react.md` |\n'
+                      '<!-- context-packs:pack-end house-rules/frontend -->\n'
+                      '<!-- context-packs:pack-end house-rules -->\n', self.agents())
         self.assertFalse((self.synced / 'frontend.md').exists())
         self.assertTrue((self.synced / 'frontend' / 'react.md').exists())
 

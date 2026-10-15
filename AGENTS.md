@@ -14,6 +14,7 @@ Context packs bring shared rules and docs in from elsewhere. Each pack has its r
 | Changing how packs are written, pinned or updated | `context-packs/project/design.md` |
 | Releasing a new version to npm | `context-packs/project/releasing.md` |
 
+<!-- context-packs:pack core -->
 ## Collaboration
 
 I'm an experienced full-stack engineer, expert in TypeScript and React — skip basic explanations unless I ask.
@@ -87,7 +88,8 @@ Edit only files I own. Plugins, synced skills, and installed dependencies belong
 | Writing or editing a skill (`**/SKILL.md`) | `context-packs/gen/core/skill-authoring.md` |
 | Writing or changing tests, or fixing a bug | `context-packs/gen/core/testing.md` |
 | Writing commit messages, PR titles or descriptions, or anything else others will read without session context | `context-packs/gen/core/writing-for-humans.md` |
-<!-- context-packs:end sha256:fdd0fcc99e40 -->
+<!-- context-packs:pack-end core -->
+<!-- context-packs:end sha256:3eec1daf5ded -->
 
 ## Project
 

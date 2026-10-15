@@ -136,6 +136,7 @@ Context packs bring shared rules and docs in from elsewhere. Each pack has its r
 | Deploying, or changing the deploy pipeline | `context-packs/deploys.md` |
 | Adding a page or route | `context-packs/routes.md` |
 
+<!-- context-packs:pack auth -->
 Never log tokens, session IDs or passwords, even at debug level.
 
 ## auth context
@@ -144,7 +145,9 @@ Never log tokens, session IDs or passwords, even at debug level.
 |---|---|
 | Adding an endpoint, or checking what a user may do | `context-packs/gen/auth/permissions.md` |
 | Reading the signed-in user, or changing sign-in or sign-out | `context-packs/gen/auth/sessions.md` |
+<!-- context-packs:pack-end auth -->
 
+<!-- context-packs:pack frontend -->
 Build UI from `@acme/ui` components; don't style raw HTML elements. Every user-facing string goes through `t()`.
 
 ## frontend context
@@ -154,10 +157,11 @@ Build UI from `@acme/ui` components; don't style raw HTML elements. Every user-f
 | Adding anything a user can click, type into or focus | `context-packs/gen/frontend/accessibility.md` |
 | Building or changing a form | `context-packs/gen/frontend/forms.md` |
 | Writing or changing React components | `context-packs/gen/frontend/react.md` |
-<!-- context-packs:end sha256:99bfeded60ec -->
+<!-- context-packs:pack-end frontend -->
+<!-- context-packs:end sha256:513899ce75f9 -->
 ```
 
-The web app's own docs come first, in the `## Context` table, followed by each pack in the order of its folder.
+The web app's own docs come first, in the `## Context` table, followed by each pack in the order of its folder. Each pack sits between comments naming its folder in `context-packs/`, which show people reading the file where it starts and ends; the sync doesn't read them, and Claude Code strips them before an agent sees the file.
 
 The nested `react` pack gets a row rather than having its rules inlined. The row points at a generated index, `react.md`, which holds its rules and its own table:
 
@@ -173,7 +177,7 @@ Fetch data with the React Query hooks in `src/api/`, never in `useEffect`.
 
 ## What an agent does with it
 
-Every session loads `AGENTS.md`: the header, the auth and frontend rules, and the four tables. That's a few dozen lines, however many docs sit behind them.
+Every session loads `AGENTS.md`: the header, the auth and frontend rules, and the three tables. That's a few dozen lines, however many docs sit behind them.
 
 Asked to add a sign-up form, the agent matches "Building or changing a form" and reads `forms.md`. Adding a submit button also matches "Adding anything a user can click…", so it reads `accessibility.md`. Because the form is a React component, it reads `react.md`, which gives it the data-fetching rule and one more row to check. It never reads `deploys.md` or the auth docs, since nothing in the task matches them.
 

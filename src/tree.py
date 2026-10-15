@@ -201,9 +201,20 @@ def table(heading, rows):
             + ''.join(f'| {when} | `{path.as_posix()}` |\n' for when, path in rows)) if rows else ''
 
 
+def name(node, pack):
+    """The pack's folder under context-packs/, '' for context-packs/ itself."""
+    return '/'.join(part for part in (pack.id, node.id) if part)
+
+
 def heading(node, pack):
-    name = '/'.join(part for part in (pack.id, node.id) if part)
-    return f'## {name} context' if name else '## Context'
+    return f'## {name(node, pack)} context' if name(node, pack) else '## Context'
+
+
+def inline(node, pack):
+    """The pack rendered where its parent's rules and table end, between markers naming it, which only show people
+    reading the file where each pack starts and ends."""
+    return (f'<!-- context-packs:pack {name(node, pack)} -->\n{render(node, pack)}'
+            f'<!-- context-packs:pack-end {name(node, pack)} -->\n')
 
 
 def render(node, pack):
@@ -212,8 +223,8 @@ def render(node, pack):
     rows = sorted([(d.path[:-len('.md')], d.when, pack.synced / d.path) for d in node.docs]
                   + [(c.id, c.fields['when'], index(c, pack)) for c in node.children if c.row]
                   + [(i.id, i.root.fields['when'], index(i.root, i.pack)) for i in node.imports if i.root.row])
-    inlined = ([render(c, pack) for c in node.children if not c.row]
-               + [render(i.root, i.pack) for i in node.imports if not i.root.row])
+    inlined = ([inline(c, pack) for c in node.children if not c.row]
+               + [inline(i.root, i.pack) for i in node.imports if not i.root.row])
     return '\n'.join(part for part in (node.rules, table(heading(node, pack), [r[1:] for r in rows]), *inlined)
                      if part)
 
