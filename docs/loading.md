@@ -6,7 +6,7 @@ An agent reads `AGENTS.md` in every session. Three rules decide what else it rea
 - **`when: always`, or no `when` on a pack you import, inlines it.** Only a `pack.md` can be inlined: its rules sit wherever its parent's do, all the way up to `AGENTS.md` itself for a pack in `context-packs/`.
 - **A `pack.md` starts a new table** for the docs in its folder. A folder without one is just for organization: its docs join the nearest pack's table.
 
-`context-packs/` is a pack too, the one at the top: its `pack.md`, if it has one, is inlined into `AGENTS.md`, and its docs get the `## Context` table.
+`context-packs/` is a pack too, the one at the top: its `pack.md`, if it has one, is inlined into `AGENTS.md`, and its docs get the `## Context` table. A pack directly in it that gets a row gets it in that table too, pointing at its index, which starts with the pack's own heading.
 
 ## Choosing when a pack loads
 
