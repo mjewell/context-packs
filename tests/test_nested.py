@@ -1,11 +1,6 @@
 import unittest
 
-from test_cli import SyncCase, git
-
-
-def doc(when, text='', **fields):
-    front = ''.join(f'{key}: {value}\n' for key, value in fields.items())
-    return f'---\nwhen: {when}\n{front}---\n{text}'
+from test_cli import SyncCase, block, doc, packed
 
 
 class FolderTests(SyncCase):
@@ -19,17 +14,17 @@ class FolderTests(SyncCase):
             'typescript/types.md': doc('Declaring types', 'Prefer unions.\n'),
             'typescript/example.tsx': 'export const x = 1;\n',
         })
-        self.synced = self.repo / 'docs' / 'agents' / 'generated' / 'house-rules'
+        self.synced = self.gen / 'house-rules'
 
     def test_folder_docs_join_the_packs_table(self):
         result = self.add()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(self.start() + 'Prefer small PRs.\n\n## house-rules context\n\n| When | Read |\n|---|---|\n'
-                      '| Writing React components | `docs/agents/generated/house-rules/typescript/react.md` |\n'
-                      '| Declaring types | `docs/agents/generated/house-rules/typescript/types.md` |\n'
-                      '<!-- context-packs:end',
-                      (self.repo / 'AGENTS.md').read_text())
+        self.assertEqual(self.agents(),
+                         block(packed('house-rules', 'Prefer small PRs.\n\n## house-rules context\n\n'
+                                      '| When | Read |\n|---|---|\n'
+                                      '| Writing React components | `context-packs/gen/house-rules/typescript/react.md` |\n'
+                                      '| Declaring types | `context-packs/gen/house-rules/typescript/types.md` |\n')))
 
     def test_every_file_in_the_folder_is_copied(self):
         result = self.add()
@@ -52,27 +47,31 @@ class NestedPackTests(SyncCase):
             'frontend/react.md': doc('Writing React components', 'Use function components.\n'),
             'frontend/css/layout.md': doc('Laying out pages', 'Use grid.\n'),
         })
-        self.synced = self.repo / 'docs' / 'agents' / 'generated' / 'house-rules'
-        self.agents_md = self.repo / 'AGENTS.md'
+        self.synced = self.gen / 'house-rules'
 
     def test_nested_pack_gets_a_row_in_its_parents_table(self):
         result = self.add()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('Prefer small PRs.\n\n## house-rules context\n\n| When | Read |\n|---|---|\n'
-                      '| Editing `web/**` | `docs/agents/generated/house-rules/frontend.md` |\n'
-                      '| Writing tests | `docs/agents/generated/house-rules/testing.md` |\n'
-                      '<!-- context-packs:end',
-                      self.agents_md.read_text())
+        self.assertEqual(self.agents(),
+                         block(packed('house-rules', 'Prefer small PRs.\n\n## house-rules context\n\n'
+                                                     '| When | Read |\n|---|---|\n'
+                                                     '| Editing `web/**` | `context-packs/gen/house-rules/frontend.md` |\n'
+                                                     '| Writing tests | `context-packs/gen/house-rules/testing.md` |\n')))
 
-    def test_nested_pack_whose_when_is_always_is_inlined_after_its_parent(self):
+    def test_nested_pack_whose_when_is_always_is_inlined_after_its_parent_between_markers(self):
         self.publish({'frontend/pack.md': doc('always', 'Keep components small.\n')})
 
         result = self.add()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('| Writing tests | `docs/agents/generated/house-rules/testing.md` |\n\n'
-                      'Keep components small.\n\n## house-rules/frontend context\n', self.agents_md.read_text())
+        self.assertIn('| Writing tests | `context-packs/gen/house-rules/testing.md` |\n\n'
+                      '<!-- context-packs:pack house-rules/frontend -->\nKeep components small.\n\n'
+                      '## house-rules/frontend context\n\n| When | Read |\n|---|---|\n'
+                      '| Laying out pages | `context-packs/gen/house-rules/frontend/css/layout.md` |\n'
+                      '| Writing React components | `context-packs/gen/house-rules/frontend/react.md` |\n'
+                      '<!-- context-packs:pack-end house-rules/frontend -->\n'
+                      '<!-- context-packs:pack-end house-rules -->\n', self.agents())
         self.assertFalse((self.synced / 'frontend.md').exists())
         self.assertTrue((self.synced / 'frontend' / 'react.md').exists())
 
@@ -82,8 +81,8 @@ class NestedPackTests(SyncCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.synced / 'frontend.md').read_text(),
                          'Keep components small.\n\n## house-rules/frontend context\n\n| When | Read |\n|---|---|\n'
-                         '| Laying out pages | `docs/agents/generated/house-rules/frontend/css/layout.md` |\n'
-                         '| Writing React components | `docs/agents/generated/house-rules/frontend/react.md` |\n')
+                         '| Laying out pages | `context-packs/gen/house-rules/frontend/css/layout.md` |\n'
+                         '| Writing React components | `context-packs/gen/house-rules/frontend/react.md` |\n')
 
     def test_nested_packs_files_are_copied_without_its_pack_md(self):
         result = self.add()
@@ -100,7 +99,7 @@ class NestedPackTests(SyncCase):
         result = self.sync()
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn('docs/agents/generated/house-rules', result.stderr)
+        self.assertIn('context-packs/gen', result.stderr)
         self.assertEqual(index.read_text(), 'Edited here.\n')
 
     def test_nested_pack_without_a_when_line_stops_the_sync(self):
@@ -147,7 +146,7 @@ class NestedPackTests(SyncCase):
         result = self.sync()
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn('a doc in docs/agents/generated/house-rules was edited', result.stderr)
+        self.assertIn('a file in context-packs/gen was edited', result.stderr)
         self.assertTrue((self.synced / '.DS_Store').exists())
 
     def test_nested_pack_beside_a_doc_of_the_same_name_stops_the_sync(self):
@@ -169,7 +168,6 @@ class OverlapTests(SyncCase):
             'pack.md': 'Prefer small PRs.\n',
             'typescript/pack.md': doc('Editing `**/*.ts`', 'Prefer unions.\n'),
         })
-        self.agents_md = self.repo / 'AGENTS.md'
 
     def add_typescript(self, origin=None):
         return self.sync('add', 'typescript', str(origin or self.origin), '--path', 'context/typescript')
@@ -181,9 +179,11 @@ class OverlapTests(SyncCase):
         result = self.add_typescript()
 
         self.assertEqual(result.returncode, 1)
+        self.assertIn('overlap', result.stderr)
         self.assertIn('house-rules', result.stderr)
         self.assertIn('typescript', result.stderr)
         self.assertEqual(self.agents_md.read_text(), before)
+        self.assertFalse(self.import_md('typescript').parent.exists())
 
     def test_adding_a_pack_around_an_installed_one_stops_untouched(self):
         self.add_typescript()
@@ -192,7 +192,7 @@ class OverlapTests(SyncCase):
         result = self.add()
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn('house-rules', result.stderr)
+        self.assertIn('overlap', result.stderr)
         self.assertEqual(self.agents_md.read_text(), before)
 
     def test_same_folder_from_another_origin_doesnt_overlap(self):
@@ -215,19 +215,18 @@ class InstallPointTests(SyncCase):
             'typescript/pack.md': doc('Editing `**/*.ts`', 'Prefer unions.\n'),
             'typescript/types.md': doc('Declaring types'),
         })
-        self.agents_md = self.repo / 'AGENTS.md'
-        self.synced = self.repo / 'docs' / 'agents' / 'generated' / 'typescript'
+        self.synced = self.gen / 'typescript'
 
     def add_folder(self, name):
         return self.sync('add', name, str(self.origin), '--path', f'context/{name}')
 
-    def test_pack_with_a_when_line_gets_a_row_in_its_block(self):
+    def test_pack_with_a_when_line_gets_a_row_in_the_context_table(self):
         result = self.add_folder('typescript')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(' -->\n## typescript context\n\n| When | Read |\n|---|---|\n'
-                      '| Editing `**/*.ts` | `docs/agents/generated/typescript/pack.md` |\n<!-- context-packs:end',
-                      self.agents_md.read_text())
+        self.assertEqual(self.agents(),
+                         block('## Context\n\n| When | Read |\n|---|---|\n'
+                               '| Editing `**/*.ts` | `context-packs/gen/typescript/pack.md` |\n'))
 
     def test_pack_with_a_when_line_gets_an_index_of_its_rules_and_table(self):
         result = self.add_folder('typescript')
@@ -235,7 +234,7 @@ class InstallPointTests(SyncCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.synced / 'pack.md').read_text(),
                          'Prefer unions.\n\n## typescript context\n\n| When | Read |\n|---|---|\n'
-                         '| Declaring types | `docs/agents/generated/typescript/types.md` |\n')
+                         '| Declaring types | `context-packs/gen/typescript/types.md` |\n')
 
     def test_nested_pack_named_pack_beside_a_root_index_stops_the_sync(self):
         self.publish({'typescript/pack/pack.md': doc('Packaging')})
@@ -248,49 +247,42 @@ class InstallPointTests(SyncCase):
 
 
 class LocalNestedPackTests(SyncCase):
-    """A nested pack in a pack in the synced repo: its docs stay where they are, and only its index is generated."""
+    """A nested pack in the repo's own context-packs/: its docs stay where they are, and only its index is
+    generated."""
 
     def setUp(self):
         super().setUp()
-        self.docs = self.repo / 'docs' / 'agents' / 'project'
-        files = {
-            'design.md': doc('Changing the design', 'Keep it small.\n'),
-            'deploy/pack.md': doc('Deploying', 'Ship on green.\n'),
-            'deploy/rollback.md': doc('Rolling back', 'Revert first.\n'),
-        }
-        for path, text in files.items():
-            (self.docs / path).parent.mkdir(parents=True, exist_ok=True)
-            (self.docs / path).write_text(text)
-        self.index = self.repo / 'docs' / 'agents' / 'generated' / 'project' / 'deploy.md'
+        self.write('context-packs/project/design.md', doc('Changing the design', 'Keep it small.\n'))
+        self.write('context-packs/project/deploy/pack.md', doc('Deploying', 'Ship on green.\n'))
+        self.write('context-packs/project/deploy/rollback.md', doc('Rolling back', 'Revert first.\n'))
+        self.index = self.gen / 'project' / 'deploy.md'
 
-    def add_project(self):
-        return self.sync('add', 'project', '.', '--path', 'docs/agents/project')
-
-    def test_nested_packs_index_is_generated_beside_the_copied_packs(self):
-        result = self.add_project()
+    def test_nested_packs_index_is_generated_and_its_docs_stay_where_they_are(self):
+        result = self.sync()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('| Deploying | `docs/agents/generated/project/deploy.md` |\n'
-                      '| Changing the design | `docs/agents/project/design.md` |\n',
-                      (self.repo / 'AGENTS.md').read_text())
+        self.assertEqual(self.agents(),
+                         block('## Context\n\n| When | Read |\n|---|---|\n'
+                               '| Deploying | `context-packs/gen/project/deploy.md` |\n'
+                               '| Changing the design | `context-packs/project/design.md` |\n'))
         self.assertEqual(self.index.read_text(),
                          'Ship on green.\n\n## project/deploy context\n\n| When | Read |\n|---|---|\n'
-                         '| Rolling back | `docs/agents/project/deploy/rollback.md` |\n')
+                         '| Rolling back | `context-packs/project/deploy/rollback.md` |\n')
         self.assertEqual(sorted(p.name for p in self.index.parent.iterdir()), ['deploy.md'])
 
-    def test_local_packs_generated_index_edited_in_the_repo_stops_the_sync(self):
-        self.add_project()
+    def test_generated_index_edited_in_the_repo_stops_the_sync(self):
+        self.sync()
         self.index.write_text('Edited here.\n')
 
         result = self.sync()
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn('docs/agents/generated/project', result.stderr)
+        self.assertIn('context-packs/gen', result.stderr)
         self.assertEqual(self.index.read_text(), 'Edited here.\n')
 
-    def test_editing_a_local_nested_packs_rules_regenerates_its_index_on_resync(self):
-        self.add_project()
-        (self.docs / 'deploy' / 'pack.md').write_text(doc('Deploying', 'Ship on green, never on Friday.\n'))
+    def test_editing_a_nested_packs_rules_regenerates_its_index_on_resync(self):
+        self.sync()
+        self.write('context-packs/project/deploy/pack.md', doc('Deploying', 'Ship on green, never on Friday.\n'))
 
         result = self.sync()
 

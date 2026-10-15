@@ -1,6 +1,6 @@
 import unittest
 
-from test_cli import EMPTY_HEADER, SyncCase
+from test_cli import EMPTY, SyncCase, doc
 
 
 class ReportTests(SyncCase):
@@ -54,45 +54,38 @@ class ReportTests(SyncCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, f'Nothing changed: house-rules @ {self.first[:7]}\n')
 
-    def test_resync_without_packs_says_nothing_changed(self):
+    def test_resync_without_import_packs_says_nothing_changed(self):
         result = self.sync()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, 'Nothing changed: no packs installed\n')
+        self.assertEqual(result.stdout, 'Nothing changed\n')
 
-    def project_doc(self, name, when):
-        docs = self.repo / 'docs' / 'agents' / 'project'
-        docs.mkdir(parents=True, exist_ok=True)
-        (docs / f'{name}.md').write_text(f'---\nwhen: {when}\n---\nKeep it small.\n')
+    def test_add_of_a_folder_on_disk_names_no_ref(self):
+        self.write('team-rules/pack.md', 'Use pnpm.\n')
 
-    def test_add_of_a_pack_in_the_repo_names_no_ref(self):
-        self.project_doc('design', 'Changing the design')
-
-        result = self.sync('add', 'project', '.', '--path', 'docs/agents/project')
+        result = self.sync('add', 'team', 'team-rules')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, 'project: added\n')
+        self.assertEqual(result.stdout, 'team: added\n')
 
-    def test_resync_after_a_pack_in_the_repo_changes_says_it_changed(self):
-        self.project_doc('design', 'Changing the design')
-        self.sync('add', 'project', '.', '--path', 'docs/agents/project')
-        self.project_doc('billing', 'Editing billing')
+    def test_resync_after_the_repos_own_docs_change_says_the_block_changed(self):
+        self.write('context-packs/design.md', doc('Changing the design'))
 
         result = self.sync()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, 'project: changed\n')
+        self.assertEqual(result.stdout, 'Updated the context-packs block\n')
 
-    def test_filling_a_pasted_header_block_says_so(self):
-        (self.repo / 'AGENTS.md').write_text('# Repo\n\n' + EMPTY_HEADER)
+    def test_filling_a_pasted_block_says_so(self):
+        self.agents_md.write_text('# Repo\n\n' + EMPTY)
 
         result = self.sync()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, 'Updated the header block\n')
+        self.assertEqual(result.stdout, 'Updated the context-packs block\n')
 
     def test_first_sync_says_it_created_agents_md_and_linked_claude_md(self):
-        (self.repo / 'AGENTS.md').unlink()
+        self.agents_md.unlink()
         (self.repo / 'CLAUDE.md').unlink()
 
         result = self.sync()
@@ -106,7 +99,7 @@ class ReportTests(SyncCase):
         result = self.sync()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, 'Nothing changed: no packs installed\n')
+        self.assertEqual(result.stdout, 'Nothing changed\n')
         self.assertFalse((self.repo / 'CLAUDE.md').is_symlink())
 
 
