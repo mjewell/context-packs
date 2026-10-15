@@ -54,9 +54,9 @@ class Imported(NamedTuple):
 
 
 def imports_a_pack(text):
-    """Whether a pack.md's front matter names a pack to import."""
+    """Whether a pack.md's front matter names a pack to import: another repo's, or a folder of its own repo's."""
     match = FRONT.match(text)
-    return bool(match) and any(line.startswith('from: ') for line in match.group(1).split('\n'))
+    return bool(match) and any(line.startswith(('from: ', 'path: ')) for line in match.group(1).split('\n'))
 
 
 def front(text, where, keys):
@@ -83,13 +83,16 @@ def read(file):
 
 def load(repo, stack):
     """The tree of context-packs/ in repo, with each pack it imports fetched into a folder stack cleans up. Stops
-    when two packs overlap, which also catches a pack importing a folder that holds it."""
-    claimed = []
+    when two packs overlap, which also catches a pack importing a folder that holds it. A folder imported in two
+    places, such as one two packs from the same repo both include, renders in each, at each one's ref."""
+    # Every pack loaded so far, and the ones being loaded: the pack claiming a folder and those holding it.
+    claimed, loading = [], []
 
     def claim(pack):
         here = place(repo, pack)
         for other, there in claimed:
-            if overlap(here, there):
+            shared = here == there and other not in loading
+            if overlap(here, there) and not shared:
                 sys.exit(f'context-packs: the {other.id or "context-packs"} and {pack.id} packs overlap: one\'s '
                          'folder holds the other\'s, so its rules would sync twice. Keep only one of them.')
         claimed.append((pack, here))
@@ -103,30 +106,35 @@ def load(repo, stack):
                      f'{", ".join(others)} beside it.')
         fields, rules = front(read(source / rel / 'pack.md'), where, IMPORT_KEYS)
         id = '/'.join(part for part in (holder.id, rel.as_posix()) if part)
-        origin, path = fields['from'], fields.get('path', '')
-        if local(origin) and 'ref' in fields:
-            sys.exit(f'context-packs: {where} pins {origin} to a ref, but a path is a folder on disk, read from its '
-                     'working tree. Remove the ref line, or import the pack by its git URL to pin it.')
-        if not local(origin) and not holder.local:
-            sys.exit(f'context-packs: {where} imports a pack from git, but it sits in a pack from git, which can '
-                     'import only folders of its own origin, by path.')
-        if not local(origin):
+        # from names another repo, and without it the path is a folder of the repo the import pack is in: the
+        # synced repo for context-packs/, or the repo of the pack from elsewhere holding it.
+        origin, path = fields.get('from'), folder('.', fields.get('path', ''))
+        if path == '..' or path.startswith(('../', '/')):
+            sys.exit(f'context-packs: {where} imports {path}, which is outside the repo '
+                     f'{"its from names" if origin else "it is in"}. Name the other repo in `from`, and the folder in '
+                     'it in `path`.')
+        path = '' if path == '.' else path
+        if origin and not holder.local:
+            sys.exit(f'context-packs: {where} imports {origin}, but it sits in a pack from git, which can import only '
+                     'folders of its own repo, with `path` alone.')
+        if (not origin or local(origin)) and 'ref' in fields:
+            sys.exit(f'context-packs: {where} pins a folder on disk to a ref, but a folder on disk is read from its '
+                     'working tree, and a folder of the pack\'s own repo moves with that pack. Remove the ref line, '
+                     'or import the pack by its git URL to pin it.')
+        if not origin:
+            pack = Pack(id, holder.origin, path, holder.ref)
+        elif local(origin):
+            pack = Pack(id, folder(holder.origin, origin), path, None)
+        else:
             if 'ref' not in fields:
                 sys.exit(f'context-packs: {where} imports {origin} without a ref to pin it to. Add `ref: <tag or '
                          'commit>`, or delete the folder and add the pack again.')
             pack = Pack(id, origin, path, fields['ref'])
-        elif holder.local:
-            # A path is in the origin of the pack holding it, which for context-packs/ is the synced repo.
-            pack = Pack(id, folder(holder.origin, origin), path, None)
-        else:
-            inside = folder(origin, path)
-            if inside == '..' or inside.startswith(('../', '/')):
-                sys.exit(f'context-packs: {where} imports {inside}, which is outside {holder.origin}. A pack from '
-                         'git can import only folders of its own origin.')
-            pack = Pack(id, holder.origin, '' if inside == '.' else inside, holder.ref)
         claim(pack)
         content = fetch(repo, pack, stack)
+        loading.append(pack)
         root = tree(pack, content, '', ('when',))
+        loading.pop()
         if rules and not rules.endswith('\n'):
             rules += '\n'
         root = root._replace(fields={**root.fields, **{k: v for k, v in fields.items() if k == 'when'}},
@@ -175,6 +183,7 @@ def load(repo, stack):
         return Node(id, fields, rules, tuple(docs), tuple(files), tuple(children), tuple(imports))
 
     claim(REPO)
+    loading.append(REPO)
     return tree(REPO, repo / REPO.synced, '', ())
 
 

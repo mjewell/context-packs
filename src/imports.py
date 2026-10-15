@@ -1,6 +1,8 @@
 """The import packs in context-packs/: folders whose pack.md names a pack from elsewhere, which syncs in their place.
 The commands add, remove and move the pins of these; the ones that packs from elsewhere hold are theirs to change."""
 import contextlib
+import os
+from pathlib import Path
 import re
 import shutil
 import sys
@@ -40,7 +42,7 @@ def scan(repo):
         text = tree.read(pack_md)
         if tree.imports_a_pack(text):
             fields, _ = tree.front(text, (ROOT / rel).as_posix(), tree.IMPORT_KEYS)
-            found.append(Import(rel.parent.as_posix(), (ROOT / rel).as_posix(), text, fields['from'],
+            found.append(Import(rel.parent.as_posix(), (ROOT / rel).as_posix(), text, fields.get('from', '.'),
                                 fields.get('path', ''), fields.get('ref')))
     return found
 
@@ -59,9 +61,16 @@ def command(args, repo, imports):
         if local(args.origin) and args.ref:
             sys.exit(f'context-packs: {args.origin} is a folder on disk, which syncs from its working tree, so '
                      'it takes no --ref.')
-        ref = None if local(args.origin) else origins.pin(args.origin, args.ref) if args.ref else origins.tip(args.origin)
-        text = ('---\n' + f'when: {args.when}\n' * bool(args.when) + f'from: {args.origin}\n'
-                + f'path: {args.path}\n' * bool(args.path) + f'ref: {ref}\n' * bool(ref) + '---\n')
+        origin, path, ref = args.origin, args.path, None
+        if local(origin):
+            inside = os.path.relpath(os.path.join(os.path.abspath(repo), origin, path), os.path.abspath(repo))
+            # A folder of the synced repo is named by its path alone, so it reads the same however add was given it.
+            if inside != '..' and not inside.startswith('..' + os.sep):
+                origin, path = None, Path(inside).as_posix()
+        else:
+            ref = origins.pin(origin, args.ref) if args.ref else origins.tip(origin)
+        text = ('---\n' + f'when: {args.when}\n' * bool(args.when) + f'from: {origin}\n' * bool(origin)
+                + f'path: {path}\n' * bool(path) + f'ref: {ref}\n' * bool(ref) + '---\n')
         return [((target / 'pack.md').as_posix(), text)]
     named = [args.id] if args.command == 'remove' else getattr(args, 'ids', [])
     unknown = [n for n in named if n not in ids]

@@ -29,18 +29,36 @@ A nested pack is installed whenever its parent is. A part only some repos want, 
 
 Any folder with a `pack.md` can also be installed on its own, as its own pack, and it renders the way it would inside its parent. If its `pack.md` has a `when`, it gets a row pointing at a generated index of its rules, so installing just `typescript` still loads its rules only when a row matches. Without a `when`, or with `when: always`, its rules are inlined.
 
-## Pointing at another folder
+## Pointing at another folder of the same repo
 
-A pack can import another folder of its own repo, with an import pack whose `from` is a path:
+An import pack with a `path` and no `from` points at a folder of the repo it's in. In packs you publish, that lets several packs include one folder without copying it:
 
 ```text
-context/
-├── pack.md
-└── shared/
-    └── pack.md      # from: .  path: common
+agent-rules/
+├── web/
+│   ├── pack.md
+│   └── typescript/
+│       └── pack.md
+├── api/
+│   ├── pack.md
+│   └── typescript/
+│       └── pack.md
+└── typescript/
+    ├── pack.md
+    └── types.md
 ```
 
-The path is in the pack's own origin: for a pack installed from git, the same repo at the same ref, and for a folder on disk, that folder's `from`. So the pack renders the same in every repo that installs it, and `shared` moves with the pack's pin. A path can't reach outside the pack's repo, and a pack from git can't import a pack from git, since that would bring pins of its own to keep in step.
+`web/typescript/pack.md`, and the same in `api/`:
+
+```markdown
+---
+path: typescript
+---
+```
+
+A repo that installs `web` gets `agent-rules/typescript/` rendered at `web/typescript`, fetched at the same commit as `web`, so it needs no pin of its own and renders the same wherever `web` is installed. The path is relative to the repo's root, not to the file, so moving the import pack doesn't break it, and it can't leave the repo.
+
+A repo that installs both `web` and `api` gets `typescript` in each, as each one's ref has it: if they're pinned to different commits or tags, each brings its own version. A pack from git can't import a pack from git, since that would bring pins of its own to keep in step.
 
 ## One repo or many
 
@@ -62,4 +80,4 @@ Pass the path of a folder beside the repo in place of the git URL:
 npx context-packs add <id> ../agent-rules --path <folder>
 ```
 
-That writes an import pack with that path as its `from` and no ref. The folder is read as it is on disk, like your own docs, and the table points at the docs where they are. Edits to a doc show up without a resync. Changes to `pack.md` or a `when:` line need one, since those are copied into `AGENTS.md`. It syncs only where that folder exists, so it's for trying a pack out, not for a repo that clones, CI and cloud sessions sync.
+That writes an import pack whose `from` names that folder, with no ref. The folder is read as it is on disk, like your own docs, and the table points at the docs where they are. Edits to a doc show up without a resync. Changes to `pack.md` or a `when:` line need one, since those are copied into `AGENTS.md`. It syncs only where that folder exists, so it's for trying a pack out, not for a repo that clones, CI and cloud sessions sync.

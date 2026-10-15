@@ -210,14 +210,24 @@ class ImportTests(ImportPackCase):
 class ImportRuleTests(ImportPackCase):
     """What stops a sync with import packs."""
 
-    def test_two_import_packs_of_one_folder_stop(self):
+    def test_two_import_packs_of_one_folder_both_render(self):
         self.import_rules()
 
         result = self.import_rules(id='shared')
 
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('## project/house-rules context', self.agents())
+        self.assertIn('## shared context', self.agents())
+
+    def test_import_pack_of_a_folder_inside_another_import_packs_stops(self):
+        self.ref = self.publish({'review/pack.md': doc('Reviewing code', 'Read the tests first.\n')})
+        self.assertEqual(self.import_rules().returncode, 0)
+
+        result = self.sync('add', 'review', str(self.origin), '--path', 'context/review')
+
         self.assertEqual(result.returncode, 1)
         self.assertIn('overlap', result.stderr)
-        self.assertFalse(self.import_md('shared').exists())
+        self.assertFalse(self.import_md('review').exists())
 
     def test_import_pack_holding_another_file_stops(self):
         self.import_rules()
@@ -270,17 +280,17 @@ class ImportRuleTests(ImportPackCase):
         self.assertFalse(self.import_md('loop').parent.exists())
 
 
-class LocalImportTests(SyncCase):
-    """An import pack whose from is a path, inside a pack from elsewhere: the path is in that pack's origin, so a
-    pack can point at another folder of its own repo, and works the same wherever it's installed."""
+class PathImportTests(SyncCase):
+    """An import pack with a path and no from, inside a pack from elsewhere: the path is a folder of that pack's repo,
+    so a pack can point at another folder of its own repo, and works the same wherever it's installed."""
 
     def setUp(self):
         super().setUp()
-        self.ref = self.publish({'pack.md': 'Prefer small PRs.\n', 'common/pack.md': '---\nfrom: .\npath: common\n---\n'})
+        self.publish({'pack.md': 'Prefer small PRs.\n', 'common/pack.md': '---\npath: common\n---\n'})
         self.publish({'pack.md': 'Use tabs.\n', 'style.md': doc('Styling code', 'Indent once.\n')}, folder='common')
         self.ref = git(self.source, 'rev-parse', 'HEAD')
 
-    def test_local_import_in_a_pack_from_git_reads_its_origin_at_the_packs_ref(self):
+    def test_path_import_in_a_pack_from_git_reads_its_repo_at_the_packs_ref(self):
         result = self.add()
 
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -293,7 +303,7 @@ class LocalImportTests(SyncCase):
         self.assertEqual((self.gen / 'house-rules' / 'common' / 'style.md').read_text(),
                          doc('Styling code', 'Indent once.\n'))
 
-    def test_local_import_in_a_pack_from_git_moves_only_with_its_pin(self):
+    def test_path_import_in_a_pack_from_git_moves_only_with_its_pin(self):
         self.add()
         self.publish({'pack.md': 'Use spaces.\n'}, folder='common')
 
@@ -305,8 +315,8 @@ class LocalImportTests(SyncCase):
         self.assertEqual(updated.returncode, 0, updated.stderr)
         self.assertIn('Use spaces.\n', self.agents())
 
-    def test_local_import_reaching_outside_its_origin_stops(self):
-        self.publish({'common/pack.md': '---\nfrom: ..\npath: elsewhere\n---\n'})
+    def test_path_import_reaching_outside_its_repo_stops(self):
+        self.publish({'common/pack.md': '---\npath: ../elsewhere\n---\n'})
 
         result = self.add()
 
@@ -314,15 +324,24 @@ class LocalImportTests(SyncCase):
         self.assertIn('context/common/pack.md', result.stderr)
         self.assertIn('outside', result.stderr)
 
-    def test_local_import_of_a_folder_holding_its_pack_stops(self):
-        self.publish({'common/pack.md': '---\nfrom: .\n---\n'})
+    def test_import_pack_from_a_folder_on_disk_in_a_pack_from_git_stops(self):
+        self.publish({'common/pack.md': '---\nfrom: ../other-rules\npath: common\n---\n'})
+
+        result = self.add()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('context/common/pack.md', result.stderr)
+        self.assertIn('`path` alone', result.stderr)
+
+    def test_path_import_of_a_folder_holding_its_pack_stops(self):
+        self.publish({'common/pack.md': '---\npath: .\n---\n'})
 
         result = self.add()
 
         self.assertEqual(result.returncode, 1)
         self.assertIn('overlap', result.stderr)
 
-    def test_local_import_in_a_folder_on_disk_reads_that_folder_where_it_is(self):
+    def test_path_import_in_a_folder_on_disk_reads_its_repo_where_it_is(self):
         result = self.sync('add', 'house-rules', '../house-rules', '--path', 'context')
 
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -333,6 +352,54 @@ class LocalImportTests(SyncCase):
                       self.agents())
         self.assertFalse(self.gen.exists())
 
+
+
+class SharedFolderTests(SyncCase):
+    """Two packs from one repo pointing at the same folder of it, such as web and api both including typescript."""
+
+    def setUp(self):
+        super().setUp()
+        self.publish({
+            'web/pack.md': 'Build UI from components.\n',
+            'web/typescript/pack.md': '---\npath: context/typescript\n---\n',
+            'api/pack.md': 'Return problem+json errors.\n',
+            'api/typescript/pack.md': '---\npath: context/typescript\n---\n',
+            'typescript/pack.md': doc('Editing `**/*.ts`', 'Prefer unions.\n'),
+        })
+
+    def add_pack(self, name):
+        return self.sync('add', name, str(self.origin), '--path', f'context/{name}')
+
+    def test_folder_both_point_at_renders_in_each(self):
+        self.add_pack('web')
+
+        result = self.add_pack('api')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('| Editing `**/*.ts` | `context-packs/gen/api/typescript/pack.md` |\n', self.agents())
+        self.assertIn('| Editing `**/*.ts` | `context-packs/gen/web/typescript/pack.md` |\n', self.agents())
+        self.assertTrue((self.gen / 'api' / 'typescript' / 'pack.md').exists())
+        self.assertTrue((self.gen / 'web' / 'typescript' / 'pack.md').exists())
+
+    def test_folder_both_point_at_renders_in_each_at_its_holders_ref(self):
+        self.add_pack('web')
+        self.publish({'typescript/pack.md': doc('Editing `**/*.ts`', 'Prefer unions, never enums.\n')})
+
+        result = self.add_pack('api')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.gen / 'web' / 'typescript' / 'pack.md').read_text(),
+                         'Prefer unions.\n')
+        self.assertEqual((self.gen / 'api' / 'typescript' / 'pack.md').read_text(),
+                         'Prefer unions, never enums.\n')
+
+    def test_pack_pointing_at_its_own_folder_stops(self):
+        self.publish({'web/self/pack.md': '---\npath: context/web\n---\n'})
+
+        result = self.add_pack('web')
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('overlap', result.stderr)
 
 if __name__ == '__main__':
     unittest.main()

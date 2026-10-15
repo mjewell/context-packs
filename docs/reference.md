@@ -62,15 +62,24 @@ Then it renders the pack into the block, and copies its docs into `context-packs
 npx context-packs add <id> <folder>
 ```
 
-That writes an import pack whose `from` is a path, relative to the repo, with no `ref`:
+For a folder in the repo, such as docs you'd rather keep where they are, that writes an import pack holding just the folder's path, relative to the repo:
 
 ```markdown
 ---
-from: docs/agents/project
+path: docs/agents/project
 ---
 ```
 
-The folder is read from your working tree, so it has no pin and `update` leaves it alone. Its table points at the docs where they are, and only the indexes of packs nested in it are generated, into `context-packs/gen/<id>/`. Use it for docs you keep somewhere else in the repo, or [a pack beside the repo](writing-packs.md#trying-a-pack-before-pushing-it). A folder that holds `context-packs/`, or sits inside it, stops the sync, since its packs would render twice.
+For a folder outside the repo, such as a checkout beside it, `from` names that folder and `path` the folder in it, the same shape as a pack from git without its `ref`:
+
+```markdown
+---
+from: ../agent-rules
+path: context
+---
+```
+
+Either way the folder is read from your working tree, so it has no pin and `update` leaves it alone. A `path` can't leave the repo it's in: name the other repo in `from` instead. Its table points at the docs where they are, and only the indexes of packs nested in it are generated, into `context-packs/gen/<id>/`. Use it for docs you keep somewhere else in the repo, or [a pack beside the repo](writing-packs.md#trying-a-pack-before-pushing-it). A folder that holds `context-packs/`, or sits inside it, stops the sync, since its packs would render twice.
 
 ## Already have an `AGENTS.md` or `CLAUDE.md`?
 

@@ -330,14 +330,37 @@ class AddRemoveTests(SyncCase):
                 self.assertIn(f"{id} can't name a pack", result.stderr)
                 self.assertFalse(self.agents_md.exists())
 
-    def test_add_of_a_folder_in_the_repo_imports_it_where_it_is(self):
+    def test_add_of_a_folder_in_the_repo_imports_it_by_its_path_alone(self):
         self.write('team-rules/pack.md', 'Use pnpm.\n')
 
-        result = self.sync('add', 'team', 'team-rules')
+        for args in (('team-rules',), ('.', '--path', 'team-rules'), ('./docs/../team-rules',)):
+            with self.subTest(args=args):
+                result = self.sync('add', 'team', *args)
 
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.import_md('team').read_text(), '---\nfrom: team-rules\n---\n')
-        self.assertEqual(self.agents(), block(packed('team', 'Use pnpm.\n')))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(self.import_md('team').read_text(), '---\npath: team-rules\n---\n')
+                self.assertEqual(self.agents(), block(packed('team', 'Use pnpm.\n')))
+                self.sync('remove', 'team')
+
+    def test_import_pack_whose_path_leaves_the_repo_stops(self):
+        self.write('context-packs/team/pack.md', '---\npath: ../team-rules\n---\n')
+
+        result = self.sync()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('context-packs/team/pack.md', result.stderr)
+        self.assertIn('outside', result.stderr)
+        self.assertIn('from', result.stderr)
+
+    def test_import_pack_with_a_path_alone_and_a_ref_stops(self):
+        self.write('team-rules/pack.md', 'Use pnpm.\n')
+        self.write('context-packs/team/pack.md', '---\npath: team-rules\nref: v1.0.0\n---\n')
+
+        result = self.sync()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('context-packs/team/pack.md', result.stderr)
+        self.assertIn('ref', result.stderr)
 
     def test_remove_drops_the_import_pack_and_its_generated_files(self):
         self.publish({'testing.md': doc('Writing tests', 'Test behavior.\n')})
