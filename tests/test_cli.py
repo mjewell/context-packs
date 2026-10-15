@@ -235,6 +235,8 @@ class SyncTests(SyncCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn('older version', result.stderr)
         self.assertIn(EMPTY, result.stderr)
+        self.assertIn('Move each import pack in docs/agents/', result.stderr)
+        self.assertNotIn('add the packs again', result.stderr)
         self.assertEqual(self.agents_md.read_text(), old)
 
     def test_shared_rules_without_a_final_newline_still_resync(self):

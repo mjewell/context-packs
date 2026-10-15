@@ -88,9 +88,10 @@ def region(repo, file):
     text = read(file) if file.exists() else block('')
     if OLD_MARKER.search(text):
         sys.exit(f'context-packs: {file} has context-packs blocks from an older version, which kept packs in '
-                 'docs/agents/. Replace everything from their first start marker to their last end marker with these '
-                 f'two lines, delete docs/agents/generated/ and the import packs in docs/agents/, then add the packs '
-                 f'again:\n\n{block("")}')
+                 'docs/agents/. Replace everything from their first start marker to their last end marker with the two '
+                 f'lines below. Move each import pack in docs/agents/, such as docs/agents/core/, to {ROOT.as_posix()}/, '
+                 f'delete docs/agents/generated/, and move your own docs into {ROOT.as_posix()}/ or `add` their folder. '
+                 f'Then sync again:\n\n{block("")}')
     blocks = list(BLOCK.finditer(text))
     if len(blocks) > 1:
         sys.exit(f'context-packs: {file} has more than one context-packs block. Delete all but one, then sync again.')
