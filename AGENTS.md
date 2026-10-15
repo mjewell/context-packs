@@ -2,13 +2,18 @@
 
 Syncs context packs, which are shared agent rules and docs kept in git repos, into each repo's `AGENTS.md`. See README.md for how it's used.
 
-<!-- context-packs:start header -->
+<!-- context-packs:start -->
 ## Context Packs
 
-Context packs bring shared rules and docs in from elsewhere. Each pack has a block in this file holding its rules and a table of its context docs, and a doc may hold a table of its own. Before starting work that a row in any of these tables matches, read its doc. A pack's block, and everything under `docs/agents/generated/`, are generated from the folder its start marker names, and the import pack there if it has one: change them there, never here.
-<!-- context-packs:end sha256:7b25770825f6 -->
+Context packs bring shared rules and docs in from elsewhere. Each pack has its rules and a table of its context docs here, and a doc may hold a table of its own. Before starting work that a row in any of these tables matches, read its doc. The packs here, and everything under `context-packs/gen/`, are generated from `context-packs/`: change them there, never here.
 
-<!-- context-packs:start core path=docs/agents/core -->
+## Context
+
+| When | Read |
+|---|---|
+| Changing how packs are written, pinned or updated | `context-packs/project/design.md` |
+| Releasing a new version to npm | `context-packs/project/releasing.md` |
+
 ## Collaboration
 
 I'm an experienced full-stack engineer, expert in TypeScript and React — skip basic explanations unless I ask.
@@ -77,26 +82,17 @@ Edit only files I own. Plugins, synced skills, and installed dependencies belong
 
 | When | Read |
 |---|---|
-| Committing, pushing, creating a git worktree, or opening or updating a PR | `docs/agents/generated/core/git-and-prs.md` |
-| Adding or changing a rule, an instruction file (AGENTS.md, CLAUDE.md) or a context doc | `docs/agents/generated/core/instruction-files.md` |
-| Writing or editing a skill (`**/SKILL.md`) | `docs/agents/generated/core/skill-authoring.md` |
-| Writing or changing tests, or fixing a bug | `docs/agents/generated/core/testing.md` |
-| Writing commit messages, PR titles or descriptions, or anything else others will read without session context | `docs/agents/generated/core/writing-for-humans.md` |
-<!-- context-packs:end sha256:c6ea8c26323d -->
-
-<!-- context-packs:start project path=docs/agents/project -->
-## project context
-
-| When | Read |
-|---|---|
-| Changing how packs are written, pinned or updated | `docs/agents/project/design.md` |
-| Releasing a new version to npm | `docs/agents/project/releasing.md` |
-<!-- context-packs:end sha256:7038f0690ddc -->
+| Committing, pushing, creating a git worktree, or opening or updating a PR | `context-packs/gen/core/git-and-prs.md` |
+| Adding or changing a rule, an instruction file (AGENTS.md, CLAUDE.md) or a context doc | `context-packs/gen/core/instruction-files.md` |
+| Writing or editing a skill (`**/SKILL.md`) | `context-packs/gen/core/skill-authoring.md` |
+| Writing or changing tests, or fixing a bug | `context-packs/gen/core/testing.md` |
+| Writing commit messages, PR titles or descriptions, or anything else others will read without session context | `context-packs/gen/core/writing-for-humans.md` |
+<!-- context-packs:end sha256:fdd0fcc99e40 -->
 
 ## Project
 
-- The CLI is `src/cli.py`, with `src/blocks.py` for the blocks in `AGENTS.md`, `src/packs.py` for where packs come from, `src/tree.py` for a pack's content as a tree of nested packs, and `src/origins.py` for fetching packs from git. It uses only the Python standard library and `git`, and runs on macOS's system `python3` (3.9).
+- The CLI is `src/cli.py`, with `src/blocks.py` for the block in `AGENTS.md`, `src/packs.py` for where packs come from, `src/tree.py` for `context-packs/` as a tree of packs, `src/imports.py` for the import packs the commands change, and `src/origins.py` for fetching packs from git. It uses only the Python standard library and `git`, and runs on macOS's system `python3` (3.9).
 - `bin/context-packs.js` is the npm package's bin, which npx runs. It only hands its arguments to the Python CLI.
 - `skills/context-packs/` is the skill this repo ships as a Claude Code plugin, alongside `.claude-plugin/plugin.json`.
 - Run the tests with `python3 -m unittest discover tests`.
-- This repo's own context docs are in `docs/agents/project/`, which the `project` pack lists. After adding a doc or changing its `when:` line, run `node bin/context-packs.js` and commit the result.
+- This repo's own context docs are in `context-packs/project/`, and its shared rules come from agent-config through the import pack `context-packs/core/`. After adding a doc or changing its `when:` line, run `node bin/context-packs.js` and commit the result.

@@ -3,7 +3,7 @@ when: Changing how packs are written, pinned or updated
 ---
 # Why context-packs works the way it does
 
-The [README](../../../README.md) covers how to use it. This covers the choices that look like mistakes until you know the reason.
+The [README](../../README.md) covers how to use it. This covers the choices that look like mistakes until you know the reason.
 
 - **Packs are copied into each repo, not linked or loaded by a hook.** Cloud sessions and fresh clones see only what's committed, and Codex can't include another file from `AGENTS.md`. A link into a plugin's install folder would differ by machine and break wherever the plugin isn't installed. A hook would have to be set up for each agent, and would load every doc up front instead of only when a row matches.
 - **The sync writes whichever instruction file a repo already uses.** Teams differ on `AGENTS.md` versus `CLAUDE.md`, and on how one reaches the other, and that isn't this tool's call. So it syncs the file holding the blocks, and a repo with files but no blocks picks one by pasting the two marker lines into it. Only a repo with neither file gets the recommendation: a new `AGENTS.md` with `CLAUDE.md` linked to it. Blocks in both files stop the sync rather than syncing both, since two copies of the installed packs could drift apart, and a repo that wants both files can have one import the other. It never writes through a symlink, since its target could be anywhere.
