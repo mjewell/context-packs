@@ -90,7 +90,7 @@ The sync leaves your other instruction file alone. If you keep a separate `CLAUD
 
 ## Pinning
 
-`--ref` takes a tag or a commit, never a branch, since a branch moves. `update` moves a pack pinned to a commit to the tip of the default branch, and one pinned to a release tag (a prefix and dot-separated numbers, such as `v1.2.0` or `acme-v3`) to the newest release with the same prefix, skipping pre-releases. Other tags stay put. A pack in a folder on disk, such as `.` or `../agent-rules`, isn't pinned.
+`--ref` takes a tag or a commit, never a branch, since a branch moves. `update` moves a pack pinned to a commit to the tip of the default branch, and leaves one pinned to a tag where it is: move it with `update <id> --ref <tag>`. It prints a line for each pack it covers, such as `core: 9faa48e → 1a2b3c4`, `typescript: 9faa48e (up to date)` or `frontend: v1.4.0 (tag)`. A pack in a folder on disk, such as `.` or `../agent-rules`, isn't pinned.
 
 The commands manage the import packs in `context-packs/`. An import pack inside a pack from elsewhere is that pack's to change: one in a pack from git moves with its holder's pin, and one in a folder on disk is edited there.
 

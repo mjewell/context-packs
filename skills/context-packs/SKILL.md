@@ -22,7 +22,7 @@ Done when the target repo's packs are what the user asked for and synced, any wo
    - **Decide when a pack loads, instead of leaving it to its author:** set `when:` in its import pack's front matter and resync, or pass `--when` to `add`. `when: always` inlines its rules into every session; any other `when` gives it a row. The user owns an import pack's `when` and any rules below its front matter.
    - **Group packs, or move one:** move its folder within `context-packs/` and resync; it renders where it now sits, and its id becomes its new folder. To put several packs behind one row of the user's, move their folders into a folder whose `pack.md` has a `when`.
    - **Remove a pack:** `remove <id>`.
-   - **Take the latest:** `update`, or `update <id>…` for some packs. A pack pinned to a commit moves to the default branch's tip, and one pinned to a release tag to the newest release with the same prefix. `update <id> --ref <tag or commit>` pins one pack somewhere specific.
+   - **Take the latest:** `update`, or `update <id>…` for some packs. A pack pinned to a commit moves to the default branch's tip, and one pinned to a tag stays where it is. `update <id> --ref <tag or commit>` pins one pack somewhere specific.
    - **Add or drop one of the repo's own context docs:** add or delete the doc in `context-packs/`, give a new one a `when:` line in its front matter, and resync with no command.
    - **Resync without changing anything:** no command.
    - **Check whether a resync is needed, writing nothing:** `check`. It exits 1 and names what's stale.

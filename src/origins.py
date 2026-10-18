@@ -8,8 +8,6 @@ import sys
 import tarfile
 
 COMMIT = re.compile(r'[0-9a-f]{40}')
-# A release tag: a series prefix, then only dot-separated numbers, such as v1.2.0 or acme-v3.
-RELEASE = re.compile(r'(\D*)(\d+(?:\.\d+)*)')
 
 
 def git(*args):
@@ -73,17 +71,8 @@ def pin(url, ref):
 
 
 def latest(url, ref):
-    """Where an update moves a pack pinned to ref: a commit to the tip of the default branch, a release tag to the
-    newest release in its series, and any other tag nowhere."""
-    if COMMIT.fullmatch(ref):
-        return tip(url)
-    current = RELEASE.fullmatch(ref)
-    if not current:
-        return ref
-    releases = [(tuple(map(int, match.group(2).split('.'))), name)
-                for name in [ref, *remote(url, 'tags')]
-                for match in [RELEASE.fullmatch(name)] if match and match.group(1) == current.group(1)]
-    return max(releases)[1]
+    """Where an update moves a pack pinned to ref: a commit to the tip of the default branch, and a tag nowhere."""
+    return tip(url) if COMMIT.fullmatch(ref) else ref
 
 
 def extract(url, ref, path, into):
