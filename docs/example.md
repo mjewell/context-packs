@@ -50,7 +50,7 @@ acme/agent-context
         └── testing.md
 ```
 
-Each team tags its own releases with a prefix, such as `frontend-v1.4.0` and `database-v2.0.0`, so `update` moves each pack along its own series.
+Each team tags its own releases with a prefix, such as `frontend-v1.4.0` and `database-v2.0.0`, so a repo can pin each pack to a version.
 
 `react/pack.md` starts with front matter saying when to read it, like a doc:
 
@@ -231,6 +231,6 @@ If the web app later wants its server rules behind one row, it can write `contex
 
 ## Later
 
-When the auth team changes its pack, they commit to `acme/auth-service` as usual. The web app picks up the change with `npx context-packs update auth`, which moves the pin to the latest commit. `update frontend` moves to the newest `frontend-v*` release and ignores `database-v*` tags. Each update is a normal diff to review and commit.
+When the auth team changes its pack, they commit to `acme/auth-service` as usual. The web app picks up the change with `npx context-packs update auth`, which moves the pin to the latest commit. `frontend` is pinned to a tag, so `update` leaves it there, and `update frontend --ref frontend-v1.5.0` moves it to the next release. Each update is a normal diff to review and commit.
 
 If someone edits a generated file in the web app, the next sync stops and says so, so the fix goes back to that pack's repo.

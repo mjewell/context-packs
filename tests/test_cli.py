@@ -651,7 +651,7 @@ class PinningTests(SyncCase):
 
 
 class VersionTests(SyncCase):
-    """A pack pinned to a tag follows the newest release in its tag's series."""
+    """A pack pinned to a tag stays there until a ref names somewhere else."""
 
     def setUp(self):
         super().setUp()
@@ -663,22 +663,9 @@ class VersionTests(SyncCase):
         self.assertEqual(self.agents(), self.rules())
         self.assertEqual(self.pin(), 'v1.2.0')
 
-    def test_update_moves_to_the_newest_release_in_the_series(self):
+    def test_update_leaves_the_tag_even_when_a_newer_release_exists(self):
         self.share('Prefer small PRs.\nWrite tests first.\n')
-        self.tag('v1.9.0')
-        self.tag('v1.10.0')
-        self.share('Prefer tiny PRs.\n')
-        self.tag('v2.0.0-rc1')
-        self.tag('acme-v9.0.0')
-
-        result = self.sync('update')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.agents(), block(packed('house-rules', 'Prefer small PRs.\nWrite tests first.\n')))
-        self.assertEqual(self.pin(), 'v1.10.0')
-
-    def test_update_keeps_the_tag_when_no_release_is_newer(self):
-        self.share('Prefer tiny PRs.\n')
+        self.tag('v1.3.0')
 
         result = self.sync('update')
 

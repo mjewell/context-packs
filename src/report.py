@@ -12,19 +12,25 @@ def at(imported):
     return f' @ {short(imported.ref)}' if imported.ref else ''
 
 
-def changes(found, written, created, linked, before, after):
+def changes(found, written, created, linked, before, after, updating=()):
     """Lines describing what the sync did: whether it created AGENTS.md and linked CLAUDE.md to it, how the import
-    packs before it became the ones after, and otherwise whether the block it found differs from the one it wrote."""
+    packs before it became the ones after, where each pinned pack in updating stayed, and otherwise whether the block
+    it found differs from the one it wrote."""
     was = {i.id: i for i in before}
     now = {i.id: i for i in after}
     lines = ['Created AGENTS.md'] * created + ['Linked CLAUDE.md to AGENTS.md'] * linked
+    kept = 0
     for id, imported in now.items():
         if id not in was:
             lines.append(f'{id}: added{at(imported)}')
         elif was[id].ref != imported.ref:
             lines.append(f'{id}: {short(was[id].ref)} → {short(imported.ref)}')
+        elif id in updating and imported.ref:
+            kept += 1
+            lines.append(f'{id}: {short(imported.ref)} (' + ('up to date' if COMMIT.fullmatch(imported.ref) else 'tag')
+                         + ')')
     lines += [f'{id}: removed' for id in was if id not in now]
-    if not lines and found.block != written:
+    if len(lines) == kept and found.block != written:
         lines.append('Updated the context-packs block')
     if lines:
         return lines

@@ -62,9 +62,7 @@ A pack can sit beside the code it describes, such as an `agent-pack/` folder in 
 
 ## Versions
 
-Tags are optional. A repo pins to a commit by default, and `update` moves it to the tip of your default branch. Tag releases like `v1.2.0` once you want repos to pin to versions and `update` from one release to the next.
-
-In a shared repo, give each pack's tags its own prefix, such as `frontend-v1.4.0` and `database-v2.0.0`, and `update` moves each pack along its own series. [Pinning](reference.md#pinning) has the details.
+A repo pins each pack to a commit by default, and `update` moves it to the tip of your default branch, as a diff to review. To hold a pack at a version instead, tag it, such as `v1.2.0`, and pin to the tag with `--ref`. `update` leaves a tag where it is, so moving to another is `update <id> --ref <tag>`. [Pinning](reference.md#pinning) has the details.
 
 ## Trying a pack before pushing it
 

@@ -70,9 +70,8 @@ def main():
     add.add_argument('--when', help="the pack's when, in place of its author's: a row, or always to inline it")
     remove = commands.add_parser('remove', help='uninstall a pack, deleting its import pack')
     remove.add_argument('id')
-    update = commands.add_parser('update', help='move pinned packs on: one pinned to a commit to the tip of its '
-                                                "origin's default branch, one pinned to a release tag to the newest "
-                                                'release in its series')
+    update = commands.add_parser('update', help='move packs pinned to a commit to the tip of their origin\'s '
+                                                'default branch, leaving those pinned to a tag')
     update.add_argument('ids', nargs='*', help='the packs to update; all of them if left out')
     update.add_argument('--ref', help='a tag or commit to pin the one named pack to instead')
     commands.add_parser('list', help='list the import packs, where each comes from, and its pin')
@@ -107,7 +106,8 @@ def main():
     linked = created and not os.path.lexists(repo / 'CLAUDE.md')
     if linked:
         (repo / 'CLAUDE.md').symlink_to('AGENTS.md')
-    for line in report.changes(found, written, created, linked, before, imports.scan(repo)):
+    updating = [i.id for i in before if not args.ids or i.id in args.ids] if args.command == 'update' else []
+    for line in report.changes(found, written, created, linked, before, imports.scan(repo), updating):
         print(line)
 
 

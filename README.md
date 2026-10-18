@@ -93,7 +93,7 @@ Where the import pack sits decides where the pack renders, so you arrange packs 
 
 To change the pack, edit it at its source, push, and run `npx context-packs update` in each repo. If someone edits the generated copy instead, the next sync stops and says what to fix.
 
-[Writing packs](docs/writing-packs.md) covers nesting packs for big topics, splitting packs as different people own different parts, tagging releases, and trying a pack from a local folder before you push it.
+[Writing packs](docs/writing-packs.md) covers nesting packs for big topics, splitting packs as different people own different parts, pinning to tags, and trying a pack from a local folder before you push it.
 
 Rather not type commands? [Let your agent run them](#let-your-agent-run-it).
 
@@ -105,7 +105,7 @@ Rather not type commands? [Let your agent run them](#let-your-agent-run-it).
 | Docs read only when relevant, for this repo only | [Write them in `context-packs/`](#1-write-your-repos-docs), and [sync](#2-sync-it) |
 | Docs kept somewhere else in the repo | `add <id> <folder>`, which lists them where they are |
 | Rules and docs shared across repos | [Push the pack to a git repo](#3-share-packs-across-repos), and `add` it in each repo |
-| A pack pinned to a release | `add … --ref <tag or commit>` |
+| A pack held at a tag or commit | `add … --ref <tag or commit>` |
 | CI to fail when the packs need a resync | Run `npx context-packs check`, as in [Checking in CI](docs/reference.md#checking-in-ci) |
 | A shared pack loaded differently than its author set up | See [How packs load](docs/loading.md#choosing-when-a-pack-loads) |
 
@@ -139,7 +139,7 @@ A doc with a `when` looks like a skill with a description. Skills suit procedure
 ## Learn more
 
 - [The full example](docs/example.md): two packs and a repo's own docs, from the files you write to the `AGENTS.md` you get.
-- [Writing packs](docs/writing-packs.md): nested packs, one repo or many, release tags, and trying a pack before pushing it.
+- [Writing packs](docs/writing-packs.md): nested packs, one repo or many, pinning to tags, and trying a pack before pushing it.
 - [How packs load](docs/loading.md): what goes into every session and what waits behind a row, and how to change that for a pack you install.
 - [Reference](docs/reference.md): every command, pinning, and what the sync writes.
 - [Design](context-packs/project/design.md): the choices behind the format. To contribute, run the tests with `python3 -m unittest discover tests`.

@@ -34,16 +34,42 @@ class ReportTests(SyncCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, f'house-rules: {self.first[:7]} → {latest[:7]}\n')
 
-    def test_update_to_a_release_tag_shows_the_tags_in_full(self):
+    def test_update_lists_every_pack_it_covers(self):
+        self.add()
+        steady_origin, steady = self.remote('steady')
+        steady_ref = self.publish({'pack.md': 'Use steady.\n'}, checkout=steady)
+        self.sync('add', 'steady', str(steady_origin), '--path', 'context')
+        tagged_origin, tagged = self.remote('tagged')
+        self.publish({'pack.md': 'Use tagged.\n'}, checkout=tagged)
+        self.tag('v1.0.0', checkout=tagged)
+        self.sync('add', 'tagged', str(tagged_origin), '--path', 'context', '--ref', 'v1.0.0')
+        latest = self.share('Prefer small PRs.\nWrite tests first.\n')
+
+        result = self.sync('update')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, f'house-rules: {self.first[:7]} → {latest[:7]}\n'
+                                        f'steady: {steady_ref[:7]} (up to date)\n'
+                                        'tagged: v1.0.0 (tag)\n')
+
+    def test_update_to_another_tag_shows_the_tags_in_full(self):
         self.tag('v1.0.0')
         self.add('--ref', 'v1.0.0')
         self.share('Prefer small PRs.\nWrite tests first.\n')
         self.tag('v1.1.0')
 
-        result = self.sync('update')
+        result = self.sync('update', 'house-rules', '--ref', 'v1.1.0')
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, 'house-rules: v1.0.0 → v1.1.0\n')
+
+    def test_update_lists_no_folder_on_disk(self):
+        self.sync('add', 'house-rules', '../house-rules', '--path', 'context')
+
+        result = self.sync('update')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, 'Nothing changed: house-rules\n')
 
     def test_resync_with_nothing_to_change_says_so_and_names_the_pins(self):
         self.add()
