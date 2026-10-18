@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import shutil
 import sys
+import tempfile
 
 import imports
 import report
@@ -20,6 +21,35 @@ def show(found):
     """Each import pack: its id, where its pack comes from, and its pin."""
     for i in found:
         print(f'{i.id}  {i.origin}' + f'  {i.path}' * bool(i.path) + f' @ {i.ref}' * bool(i.ref))
+
+
+def generate(root, out, repo):
+    """Write the generated files into out's context-packs/gen/, and return the block, whose hash covers them."""
+    tree.write(root, REPO, repo / REPO.synced, out)
+    rendered = tree.render(root, REPO)
+    return block(HEADER + '\n' * bool(rendered) + rendered, snapshot(out / GEN))
+
+
+def generated(out):
+    """The files in out's context-packs/gen/, by their path in the synced repo."""
+    folder = out / GEN
+    return {(GEN / p.relative_to(folder)).as_posix(): p.read_bytes()
+            for p in folder.rglob('*') if p.is_file()} if folder.is_dir() else {}
+
+
+def check(file, found, written, out, repo):
+    """Stop, naming what a sync would change, if the block or a generated file differs from what it would write into
+    out. The block's hash covers the generated files, so any change to them changes the block too."""
+    if not file.exists():
+        sys.exit(f"context-packs: {file} doesn't exist, so the repo was never synced. Run `npx context-packs` and "
+                 'commit the result.')
+    if written == found.block:
+        return
+    fresh, current = generated(out), generated(repo)
+    stale = sorted(path for path in {*fresh, *current} if fresh.get(path) != current.get(path))
+    sys.exit(f'context-packs: {file}: the context-packs block is stale'
+             + ', as are these generated files:\n\n' * bool(stale) + ''.join(f'  {path}\n' for path in stale)
+             + '.\n' * (not stale) + '\nRun `npx context-packs` and commit the result.')
 
 
 def main():
@@ -46,6 +76,7 @@ def main():
     update.add_argument('ids', nargs='*', help='the packs to update; all of them if left out')
     update.add_argument('--ref', help='a tag or commit to pin the one named pack to instead')
     commands.add_parser('list', help='list the import packs, where each comes from, and its pin')
+    commands.add_parser('check', help='exit 1 if a sync would change anything, writing nothing')
     args = parser.parse_args()
     repo = args.dir
     if not repo.is_dir():
@@ -61,11 +92,13 @@ def main():
 
     with imports.applied(repo, edits), contextlib.ExitStack() as stack:
         root = tree.load(repo, stack)
+        if args.command == 'check':
+            out = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix='context-packs-check-')))
+            check(file, found, generate(root, out, repo), out, repo)
+            return
         if (repo / GEN).exists():
             shutil.rmtree(repo / GEN)
-        tree.write(root, REPO, repo / REPO.synced, repo)
-        rendered = tree.render(root, REPO)
-        written = block(HEADER + '\n' * bool(rendered) + rendered, snapshot(repo / GEN))
+        written = generate(root, repo, repo)
         text = found.text[:found.start] + written + found.text[found.end:]
         created = not file.exists()
         file.write_bytes(text.encode('utf-8'))

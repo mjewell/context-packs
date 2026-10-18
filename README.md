@@ -106,6 +106,7 @@ Rather not type commands? [Let your agent run them](#let-your-agent-run-it).
 | Docs kept somewhere else in the repo | `add <id> <folder>`, which lists them where they are |
 | Rules and docs shared across repos | [Push the pack to a git repo](#3-share-packs-across-repos), and `add` it in each repo |
 | A pack pinned to a release | `add … --ref <tag or commit>` |
+| CI to fail when the packs need a resync | Run `npx context-packs check`, as in [Checking in CI](docs/reference.md#checking-in-ci) |
 | A shared pack loaded differently than its author set up | See [How packs load](docs/loading.md#choosing-when-a-pack-loads) |
 
 ## Let your agent run it

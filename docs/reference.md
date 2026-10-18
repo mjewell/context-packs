@@ -13,6 +13,7 @@ Each command syncs the current folder, or `--dir <folder>`, and prints what chan
 | `update [id…]` | Moves packs to their latest version |
 | `update <id> --ref R` | Pins one pack to a tag or commit |
 | `list` | Lists each import pack, where its pack comes from, and its pin |
+| `check` | Exits 1, naming what's stale, if a sync would change anything, and writes nothing |
 
 A pack's id is its import pack's folder under `context-packs/`, such as `core` or `server/database`. Moving the folder changes the id.
 
@@ -96,6 +97,17 @@ The commands manage the import packs in `context-packs/`. An import pack inside 
 ## Edits stay upstream
 
 The block ends with a hash of its text and the files under `context-packs/gen/`. If either was edited in the repo, the sync stops and says what to fix: change the pack in its origin, then `update`.
+
+## Checking in CI
+
+`check` renders every pack the way a sync would, and fails if `AGENTS.md` or a file in `context-packs/gen/` differs, such as after a `when:` line or a pinned `ref` changed without a resync, or after synced content was edited in place:
+
+```yaml
+- uses: actions/checkout@v4
+- run: npx --yes context-packs check
+```
+
+It fetches packs from git at their pins, as a sync does, so a repo installing packs from a private repo needs git credentials that can read it.
 
 ## Upgrading from 0.6
 
