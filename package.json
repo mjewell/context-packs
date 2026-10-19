@@ -8,6 +8,7 @@
   },
   "files": [
     "bin",
+    "evals/reads.js",
     "src/*.py"
   ],
   "engines": {

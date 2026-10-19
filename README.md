@@ -142,4 +142,5 @@ A doc with a `when` looks like a skill with a description. Skills suit procedure
 - [Writing packs](docs/writing-packs.md): nested packs, one repo or many, pinning to tags, and trying a pack before pushing it.
 - [How packs load](docs/loading.md): what goes into every session and what waits behind a row, and how to change that for a pack you install.
 - [Reference](docs/reference.md): every command, pinning, and what the sync writes.
+- [Testing your `when`s](docs/evals.md): checking with promptfoo that an agent reads each doc when it should, and only then.
 - [Design](context-packs/project/design.md): the choices behind the format. To contribute, run the tests with `python3 -m unittest discover tests`.

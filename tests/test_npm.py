@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -31,3 +32,17 @@ class NpmBinTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn('context-packs: ', result.stderr)
         self.assertIn('acme', result.stderr)
+
+
+@unittest.skipUnless(shutil.which('npm'), 'npm packs the package')
+class NpmPackageTests(unittest.TestCase):
+    def test_package_ships_the_reads_assertion(self):
+        result = subprocess.run(['npm', 'pack', '--dry-run', '--json'], cwd=ROOT, text=True, capture_output=True,
+                                timeout=60)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('evals/reads.js', [f['path'] for f in json.loads(result.stdout)[0]['files']])
+
+
+if __name__ == '__main__':
+    unittest.main()
