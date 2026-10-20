@@ -10,6 +10,7 @@ import shutil
 import sys
 import tempfile
 
+import evals
 import imports
 import report
 from blocks import HEADER, block, instructions, region, snapshot
@@ -76,6 +77,12 @@ def main():
     update.add_argument('--ref', help='a tag or commit to pin the one named pack to instead')
     commands.add_parser('list', help='list the import packs, where each comes from, and its pin')
     commands.add_parser('check', help='exit 1 if a sync would change anything, writing nothing')
+    evaluate = commands.add_parser('eval', help="run each doc's cases: prompts that should, or shouldn't, make an "
+                                                'agent read it, each as a claude -p session in a copy of the repo')
+    evaluate.add_argument('docs', nargs='*', help='the docs whose cases to run, as eval names them, such as '
+                                                  'testing.md or core/testing.md; all of them if left out')
+    evaluate.add_argument('--runs', type=int, default=1, help='how many times to run each prompt, 1 by default')
+    evaluate.add_argument('--model', help='the model the sessions use, if not claude\'s default')
     args = parser.parse_args()
     repo = args.dir
     if not repo.is_dir():
@@ -91,9 +98,12 @@ def main():
 
     with imports.applied(repo, edits), contextlib.ExitStack() as stack:
         root = tree.load(repo, stack)
-        if args.command == 'check':
+        if args.command in ('check', 'eval'):
             out = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix='context-packs-check-')))
             check(file, found, generate(root, out, repo), out, repo)
+            # Cases run against the block as it is, so a stale one would test rows that are about to change.
+            if args.command == 'eval':
+                evals.run(root, repo, args)
             return
         if (repo / GEN).exists():
             shutil.rmtree(repo / GEN)

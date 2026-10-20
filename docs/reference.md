@@ -14,6 +14,7 @@ Each command syncs the current folder, or `--dir <folder>`, and prints what chan
 | `update <id> --ref R` | Pins one pack to a tag or commit |
 | `list` | Lists each import pack, where its pack comes from, and its pin |
 | `check` | Exits 1, naming what's stale, if a sync would change anything, and writes nothing |
+| `eval [doc…] [--runs N] [--model M]` | Runs each doc's cases, checking that an agent reads it when it should, and only then |
 
 A pack's id is its import pack's folder under `context-packs/`, such as `core` or `server/database`. Moving the folder changes the id.
 
@@ -108,6 +109,31 @@ The block ends with a hash of its text and the files under `context-packs/gen/`.
 ```
 
 It fetches packs from git at their pins, as a sync does, so a repo installing packs from a private repo needs git credentials that can read it.
+
+## Testing when each doc gets read
+
+A row only helps if an agent reads its doc when the work matches, and leaves it alone otherwise. To check, write prompts for a doc in `.evals/<doc>.md` beside it:
+
+````markdown
+## Reads
+
+- The date parser returns the wrong month for ISO strings. Fix it.
+- CI failed with this:
+
+  ```
+  FAIL src/parse.test.ts > parses ISO dates
+  ```
+
+## Skips
+
+- Explain how parseIsoDate works.
+````
+
+Each `- ` item is a prompt, and lines indented under it continue it. `npx context-packs eval` runs each prompt as a Claude Code session (`claude -p`), and checks whether the session read the doc: it should for a prompt under `## Reads`, and shouldn't under `## Skips`. Name docs as it prints them, such as `testing.md`, to run only theirs, and pass `--runs 3` to see whether a result holds up: a prompt passes only if every run does.
+
+The sessions run in a copy of the repo outside your folders, without `.git`, `node_modules` or the cases, loading only its own `CLAUDE.md`, with tools that look but change nothing, for up to 8 turns. They use your Claude Code login and cost tokens, about 20–30k each. The sync skips `.evals`, so cases never reach the repos that install a pack, and only packs read in place, the repo's own and folders on disk, have theirs run. `eval` stops if the block is stale, since it would test rows about to change.
+
+Prompts close to a row's `when` that shouldn't match it, or that match only through a clause that's easy to miss, are the ones worth writing.
 
 ## Upgrading from 0.6
 
