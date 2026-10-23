@@ -105,7 +105,8 @@ class EvalTests(EvalCase):
         result = self.sync('eval', 'releasing.md')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, '✓ releasing.md  reads  Help me with releasing a version\n')
+        self.assertIn('✓ releasing.md  reads  Help me with releasing a version\n', result.stdout)
+        self.assertNotIn('testing.md', result.stdout)
 
     def test_repo_without_cases_says_so(self):
         result = self.sync('eval')
@@ -124,7 +125,7 @@ class EvalTests(EvalCase):
         result = self.sync('eval', 'core/deploying.md')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, '✓ core/deploying.md  reads  Help me with deploying to production\n')
+        self.assertIn('✓ core/deploying.md  reads  Help me with deploying to production\n', result.stdout)
 
     def test_stale_block_stops_before_any_session(self):
         self.cases('## Reads\n\n- Help me with writing tests\n')
@@ -136,6 +137,35 @@ class EvalTests(EvalCase):
         self.assertIn('stale', result.stderr)
         self.assertFalse(self.log.exists())
 
+
+    def test_sessions_use_sonnet_unless_told_otherwise(self):
+        self.cases('## Reads\n\n- Help me with writing tests\n')
+
+        self.sync('eval')
+        self.sync('eval', '--model', 'haiku')
+
+        models = [run['args'][run['args'].index('--model') + 1] for run in map(json.loads, self.log.read_text().splitlines())]
+        self.assertEqual(models, ['sonnet', 'haiku'])
+
+    def test_session_ends_once_it_reads_the_doc(self):
+        self.cases('## Reads\n\n- Help me with writing tests\n\n## Skips\n\n- Writing tests again, please\n')
+        self.env['FAKE_CLAUDE_SLEEP'] = '60'
+
+        result = self.sync('eval')
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('✓ testing.md  reads  Help me with writing tests', result.stdout)
+        self.assertIn('✗ testing.md  skips  Writing tests again, please', result.stdout)
+
+    def test_output_says_what_runs_then_how_it_went(self):
+        self.cases('## Reads\n\n- Help me with writing tests\n- Writing tests again, please\n')
+
+        result = self.sync('eval', '--runs', '2')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        lines = result.stdout.splitlines()
+        self.assertEqual(lines[0], 'Running 2 prompts for 1 doc, 2 times each, in a copy of the repo, on sonnet…')
+        self.assertEqual(lines[-1], '2 passed')
 
 class FixtureTests(EvalCase):
     """A fixture/ folder beside a doc's cases: they run in a copy of it, with this repo's packs synced into it."""
@@ -184,9 +214,39 @@ class FixtureTests(EvalCase):
         result = self.sync('eval', 'core/deploying.md')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, '✓ core/deploying.md  reads  Help me with deploying to production\n')
+        self.assertIn('✓ core/deploying.md  reads  Help me with deploying to production\n', result.stdout)
         files = self.runs()[0]['files']
         self.assertIn('src/app.ts', files)
+        self.assertNotIn('rules/deploying.md', files)
+
+    def test_fixture_beside_a_packs_cases_gets_only_that_pack(self):
+        self.write('rules/pack.md', 'Prefer small PRs.\n')
+        self.write('rules/deploying.md', doc('Deploying to production'))
+        self.write('rules/.evals/deploying.md', '## Reads\n\n- Help me with deploying to production\n')
+        self.write('rules/.evals/fixture/src/app.ts', 'export {};\n')
+        self.write('context-packs/core/pack.md', '---\npath: rules\n---\n')
+        self.sync()
+
+        result = self.sync('eval', 'core/deploying.md')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        files = self.runs()[0]['files']
+        self.assertIn('context-packs/core/pack.md', files)
+        self.assertNotIn('context-packs/testing.md', files)
+
+    def test_fixture_beside_the_repos_own_cases_gets_everything_the_repo_installs(self):
+        self.cases('## Reads\n\n- Help me with writing tests\n')
+        self.write('rules/pack.md', 'Prefer small PRs.\n')
+        self.write('rules/deploying.md', doc('Deploying to production'))
+        self.write('context-packs/core/pack.md', '---\npath: rules\n---\n')
+        self.sync()
+
+        result = self.sync('eval')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        files = self.runs()[0]['files']
+        self.assertIn('context-packs/testing.md', files)
+        self.assertIn('context-packs/core/pack.md', files)
         self.assertNotIn('rules/deploying.md', files)
 
     def test_linked_fixture_is_copied_like_a_folder(self):

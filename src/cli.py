@@ -82,7 +82,7 @@ def main():
     evaluate.add_argument('docs', nargs='*', help='the docs whose cases to run, as eval names them, such as '
                                                   'testing.md or core/testing.md; all of them if left out')
     evaluate.add_argument('--runs', type=int, default=1, help='how many times to run each prompt, 1 by default')
-    evaluate.add_argument('--model', help='the model the sessions use, if not claude\'s default')
+    evaluate.add_argument('--model', default='sonnet', help='the model the sessions use, sonnet by default')
     args = parser.parse_args()
     repo = args.dir
     if not repo.is_dir():
