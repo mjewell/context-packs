@@ -13,8 +13,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from typing import NamedTuple
 
+import eval_output
 import imports
 from packs import GEN, REPO, ROOT, local
 import tree
@@ -160,70 +162,58 @@ def docs(copy, pack):
     return {doc[len(prefix):]: path for doc, path in found.items() if doc.startswith(prefix)}
 
 
-def session(prompt, cwd, model, doc):
-    """The files a claude -p session given prompt in cwd read, resolved, ending it as soon as it reads doc, since
-    that settles the case either way. --tools leaves it only tools that look, and --allowedTools lets it use them
-    without asking; no MCP server loads, nor any settings but the copy's own."""
+class Run(NamedTuple):
+    """How one session went: the files it read, resolved, its error if it failed, so its reads settle nothing, what
+    claude says it cost, unless it ended without saying, and how long it took."""
+    read: set
+    error: str
+    cost_usd: float
+    duration_ms: int
+
+
+def session(prompt, cwd, model):
+    """How a claude -p session given prompt in cwd went, run to its end, though reading its doc settles its case,
+    so it shows every doc it reads and what it cost. --tools leaves it only tools that look, and --allowedTools lets
+    it use them without asking; no MCP server loads, nor any settings but the copy's own."""
     command = ['claude', '-p', prompt, '--output-format', 'stream-json', '--verbose', '--setting-sources', 'project',
                '--tools', 'Read,Glob,Grep', '--allowedTools', 'Read,Glob,Grep', '--strict-mcp-config',
                '--max-turns', '8', '--model', model]
-    read = set()
-    with subprocess.Popen(command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True) as process:
+    read, start = set(), time.monotonic()
+
+    def ended(error=None, cost_usd=None):
+        return Run(read, error, cost_usd, round((time.monotonic() - start) * 1000))
+
+    with tempfile.TemporaryFile('w+') as stderr, \
+            subprocess.Popen(command, cwd=cwd, stdout=subprocess.PIPE, stderr=stderr, text=True) as process:
         for line in process.stdout:
             message = json.loads(line)
+            if message.get('type') == 'result':
+                # claude flags running out of turns as an error too, but the session just ends there, having read
+                # what it read.
+                failed = message.get('is_error') and message['subtype'] != 'error_max_turns'
+                return ended(message['result'] if failed else None, message.get('total_cost_usd'))
             if message.get('type') != 'assistant':
                 continue
             for part in message['message']['content']:
                 if part.get('type') == 'tool_use' and part['name'] == 'Read':
                     read.add(Path(part['input']['file_path']).resolve())
-            if doc in read:
-                process.kill()
-                break
-    return read
+        process.wait()
+        stderr.seek(0)
+        return ended(stderr.read().strip() or f'claude exited with code {process.returncode} without a result')
 
 
-def shown(path, copy, repo):
-    """A file a session read, relative to the copy or else the repo when it's in one, as a failure lists it."""
-    for folder in (copy.resolve(), repo.resolve()):
-        if folder in path.parents:
-            return path.relative_to(folder).as_posix()
-    return str(path)
+class Verdict(NamedTuple):
+    """How a case's runs went: 'passed' if every run did, so a when that matches only some of the time shows up,
+    'errored' if a session failed, or else 'failed', and how many runs passed."""
+    outcome: str
+    passes: int
 
 
-def plural(count, noun):
-    return f'{count} {noun}' + 's' * (count != 1)
-
-
-def status(done, total):
-    """On a terminal, how many runs have finished, on a line the next one overwrites; None clears it."""
-    if sys.stdout.isatty():
-        sys.stdout.write('\r\033[K' + (f'[{done}/{total}]' if done is not None else ''))
-        sys.stdout.flush()
-
-
-def report(case, reads, doc, copy, repo, runs):
-    """Print how the case's runs went, as each read doc or didn't, and return whether every run passed, so a when
-    that matches only some of the time shows up."""
+def judge(case, results, doc, runs):
+    reads = [result.read for result in results if not result.error]
     passes = sum((doc in read) == (case.expect == 'reads') for read in reads)
-    passed = passes == runs
-    status(None, None)
-    count = f'{passes}/{runs}  ' if runs > 1 else ''
-    first = case.prompt.split('\n')[0]
-    print(f'{"✓" if passed else "✗"} {case.name}  {case.expect}  {count}{first}')
-    if not passed:
-        docs = sorted({shown(path, copy, repo) for read in reads for path in read if path.suffix == '.md'})
-        print(f'    read: {", ".join(docs)}' if docs else '    read no docs')
-    sys.stdout.flush()
-    return passed
-
-
-def where(packs, repo):
-    """What the packs' sessions run in, as the first line says it."""
-    fixtures = sum((repo / pack.evals / 'fixture').is_dir() for pack in packs)
-    repos = sum(pack.top and not (repo / pack.evals / 'fixture').is_dir() for pack in packs)
-    empty = len(packs) - fixtures - repos
-    return ', '.join([*['a copy of the repo'] * repos, *[plural(fixtures, 'fixture')] * bool(fixtures),
-                      *[plural(empty, 'empty folder')] * bool(empty)])
+    errored = any(result.error for result in results)
+    return Verdict('errored' if errored else 'passed' if passes == runs else 'failed', passes)
 
 
 def run(root, repo, args):
@@ -254,23 +244,33 @@ def run(root, repo, args):
             if case.doc not in paths[case.pack]:
                 sys.exit(f'context-packs: {case.pack.evals / case.doc} names no doc in {case.pack.folder}. Name its '
                          'file by the doc\'s path in the pack.')
-        times = f', {args.runs} times each' if args.runs > 1 else ''
-        print(f'Running {plural(len(found), "prompt")} for {plural(len({c.name for c in found}), "doc")}{times}, in '
-              f'{where(packs, repo)}, on {args.model}…', flush=True)
-        reads = {index: [] for index in range(len(found))}
-        failed = 0
+        if not args.json:
+            eval_output.heading(len(found), len({case.name for case in found}), args.runs, packs, repo, args.model)
+        results = {index: [] for index in range(len(found))}
+        verdicts = {}
         with ThreadPoolExecutor(4) as pool:
-            runs = {pool.submit(session, case.prompt, copies[case.pack], args.model, paths[case.pack][case.doc]):
-                    index for index, case in enumerate(found) for _ in range(args.runs)}
+            runs = {pool.submit(session, case.prompt, copies[case.pack], args.model): index
+                    for index, case in enumerate(found) for _ in range(args.runs)}
             for done, future in enumerate(as_completed(runs), 1):
                 index = runs[future]
                 case = found[index]
-                reads[index].append(future.result())
-                if len(reads[index]) == args.runs:
-                    failed += not report(case, reads[index], paths[case.pack][case.doc], copies[case.pack], repo,
-                                         args.runs)
-                status(done, len(runs))
-        status(None, None)
-        print(f'{len(found) - failed} passed' if not failed else f'{failed} of {len(found)} failed')
-    if failed:
+                results[index].append(future.result())
+                if len(results[index]) == args.runs:
+                    doc = paths[case.pack][case.doc]
+                    verdicts[index] = judge(case, results[index], doc, args.runs)
+                    if not args.json:
+                        eval_output.report(case, results[index], verdicts[index], doc, copies[case.pack], repo,
+                                           args.runs)
+                if not args.json:
+                    eval_output.status(done, len(runs))
+        outcomes = [verdict.outcome for verdict in verdicts.values()]
+        failed, errored = outcomes.count('failed'), outcomes.count('errored')
+        if args.json:
+            print(eval_output.document([(case, results[index], verdicts[index], copies[case.pack], repo)
+                                        for index, case in enumerate(found)], args.model, args.runs))
+        else:
+            eval_output.status(None, None)
+            print(eval_output.summary(len(found), failed, errored))
+    if failed or errored:
         sys.exit(1)
+

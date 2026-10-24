@@ -34,6 +34,7 @@ class EvalTests(EvalCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('✓ testing.md  reads  Help me with writing tests for the parser', result.stdout)
+        self.assertNotIn('also read', result.stdout)
 
     def test_reads_prompt_whose_doc_isnt_read_fails(self):
         self.cases('## Reads\n\n- Rename a variable in the parser\n')
@@ -52,6 +53,20 @@ class EvalTests(EvalCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn('✗ testing.md  skips  Help me with writing tests for the parser', result.stdout)
         self.assertIn('read: context-packs/testing.md', result.stdout)
+
+    def test_prompt_that_passes_lists_the_other_docs_its_session_read(self):
+        self.write('context-packs/releasing.md', doc('Releasing a version'))
+        self.sync()
+        self.cases('## Reads\n\n- Help me with writing tests before releasing a version\n')
+        self.cases('## Skips\n\n- Help me with writing tests\n', name='releasing')
+
+        result = self.sync('eval')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('✓ testing.md  reads  Help me with writing tests before releasing a version\n'
+                      '    also read: context-packs/releasing.md\n', result.stdout)
+        self.assertIn('✓ releasing.md  skips  Help me with writing tests\n'
+                      '    also read: context-packs/testing.md\n', result.stdout)
 
     def test_lines_indented_under_an_item_continue_its_prompt(self):
         self.cases('## Reads\n\n- CI failed while writing tests\n  for the parser:\n\n  ```\n  FAIL parse\n  ```\n'
@@ -136,15 +151,97 @@ class EvalTests(EvalCase):
         models = [run['args'][run['args'].index('--model') + 1] for run in runs]
         self.assertEqual(models, ['sonnet', 'haiku'])
 
-    def test_session_ends_once_it_reads_the_doc(self):
-        self.cases('## Reads\n\n- Help me with writing tests\n\n## Skips\n\n- Writing tests again, please\n')
-        self.env['FAKE_CLAUDE_SLEEP'] = '60'
+    def test_session_goes_on_after_reading_its_doc(self):
+        self.write('context-packs/upgrading.md', doc('Upgrading dependencies'))
+        self.sync()
+        self.cases('## Reads\n\n- Help me with writing tests, then upgrading dependencies\n')
+
+        result = self.sync('eval')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('✓ testing.md  reads  Help me with writing tests, then upgrading dependencies\n'
+                      '    also read: context-packs/upgrading.md\n', result.stdout)
+
+    def test_session_that_errors_shows_its_error_instead_of_passing(self):
+        self.cases('## Skips\n\n- Rename a variable in the parser\n')
+        self.env['FAKE_CLAUDE_ERROR'] = 'There\'s an issue with the selected model (sonnet).'
 
         result = self.sync('eval')
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn('✓ testing.md  reads  Help me with writing tests', result.stdout)
-        self.assertIn('✗ testing.md  skips  Writing tests again, please', result.stdout)
+        self.assertIn('! testing.md  skips  Rename a variable in the parser\n'
+                      '    error: There\'s an issue with the selected model (sonnet).\n', result.stdout)
+        self.assertEqual(result.stdout.splitlines()[-1], '1 of 1 errored')
+
+    def test_runs_that_error_alike_show_their_error_once_and_count_no_passes(self):
+        self.cases('## Skips\n\n- Rename a variable in the parser\n')
+        self.env['FAKE_CLAUDE_ERROR'] = 'Not logged in.'
+
+        result = self.sync('eval', '--runs', '2')
+
+        self.assertIn('! testing.md  skips  0/2  Rename a variable in the parser\n'
+                      '    error: Not logged in.\n1 of 1 errored\n', result.stdout)
+
+    def test_session_that_ends_without_a_result_shows_what_claude_printed(self):
+        self.cases('## Skips\n\n- Rename a variable in the parser\n')
+        self.env['FAKE_CLAUDE_CRASH'] = 'TypeError: undefined is not a function'
+
+        result = self.sync('eval')
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('! testing.md  skips  Rename a variable in the parser\n'
+                      '    error: TypeError: undefined is not a function\n', result.stdout)
+
+    def test_session_that_runs_out_of_turns_just_ends(self):
+        self.cases('## Skips\n\n- Rename a variable in the parser\n')
+        self.env['FAKE_CLAUDE_MAX_TURNS'] = '1'
+
+        result = self.sync('eval')
+
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn('✓ testing.md  skips  Rename a variable in the parser', result.stdout)
+
+    def test_json_prints_only_one_document_of_each_prompt_and_its_runs(self):
+        self.write('context-packs/releasing.md', doc('Releasing a version'))
+        self.sync()
+        self.cases('## Reads\n\n- Help me with writing tests before releasing a version\n\n'
+                   '## Skips\n\n- Rename a variable\n')
+
+        result = self.sync('eval', '--json', '--runs', '2')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = json.loads(result.stdout)
+        self.assertEqual(output['model'], 'sonnet')
+        self.assertEqual(output['runs'], 2)
+        reads, skips = output['cases']
+        self.assertEqual({key: reads[key] for key in ('doc', 'expect', 'prompt', 'outcome', 'passes')},
+                         {'doc': 'testing.md', 'expect': 'reads',
+                          'prompt': 'Help me with writing tests before releasing a version',
+                          'outcome': 'passed', 'passes': 2})
+        self.assertEqual([run['read'] for run in reads['runs']],
+                         [['context-packs/releasing.md', 'context-packs/testing.md']] * 2)
+        self.assertEqual([run['error'] for run in reads['runs']], [None, None])
+        self.assertEqual((skips['prompt'], skips['outcome']), ('Rename a variable', 'passed'))
+
+    def test_json_gives_each_runs_time_and_cost(self):
+        self.cases('## Reads\n\n- Help me with writing tests\n\n## Skips\n\n- Rename a variable\n')
+
+        result = self.sync('eval', '--json')
+
+        (reads,), (skips,) = (case['runs'] for case in json.loads(result.stdout)['cases'])
+        self.assertEqual((reads['cost_usd'], skips['cost_usd']), (0.0123, 0.0123))
+        self.assertIsInstance(reads['duration_ms'], int)
+        self.assertIsInstance(skips['duration_ms'], int)
+
+    def test_json_gives_a_sessions_error_and_still_exits_1(self):
+        self.cases('## Skips\n\n- Rename a variable\n')
+        self.env['FAKE_CLAUDE_ERROR'] = 'Not logged in.'
+
+        result = self.sync('eval', '--json')
+
+        self.assertEqual(result.returncode, 1)
+        (case,) = json.loads(result.stdout)['cases']
+        self.assertEqual((case['outcome'], case['runs'][0]['error']), ('errored', 'Not logged in.'))
 
     def test_output_says_what_runs_then_how_it_went(self):
         self.cases('## Reads\n\n- Help me with writing tests\n- Writing tests again, please\n')
