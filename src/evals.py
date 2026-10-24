@@ -229,9 +229,13 @@ def report(case, results, doc, copy, repo, runs):
     print(f'{MARKS[outcome]} {case.name}  {case.expect}  {count}{first}')
     for error in errors:
         print(f'    error: {error}')
+    docs = sorted({shown(path, copy, repo) for read in reads for path in read if path.suffix == '.md'})
+    others = [path for path in docs if path != shown(doc, copy, repo)]
     if outcome == 'failed':
-        docs = sorted({shown(path, copy, repo) for read in reads for path in read if path.suffix == '.md'})
         print(f'    read: {", ".join(docs)}' if docs else '    read no docs')
+    elif outcome == 'passed' and others:
+        # Other docs a passing session read, since a row firing where it shouldn't shows up here first.
+        print(f'    also read: {", ".join(others)}')
     sys.stdout.flush()
     return outcome
 

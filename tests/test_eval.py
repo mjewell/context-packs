@@ -34,6 +34,7 @@ class EvalTests(EvalCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('✓ testing.md  reads  Help me with writing tests for the parser', result.stdout)
+        self.assertNotIn('also read', result.stdout)
 
     def test_reads_prompt_whose_doc_isnt_read_fails(self):
         self.cases('## Reads\n\n- Rename a variable in the parser\n')
@@ -52,6 +53,20 @@ class EvalTests(EvalCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn('✗ testing.md  skips  Help me with writing tests for the parser', result.stdout)
         self.assertIn('read: context-packs/testing.md', result.stdout)
+
+    def test_prompt_that_passes_lists_the_other_docs_its_session_read(self):
+        self.write('context-packs/releasing.md', doc('Releasing a version'))
+        self.sync()
+        self.cases('## Reads\n\n- Help me with writing tests before releasing a version\n')
+        self.cases('## Skips\n\n- Help me with writing tests\n', name='releasing')
+
+        result = self.sync('eval')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('✓ testing.md  reads  Help me with writing tests before releasing a version\n'
+                      '    also read: context-packs/releasing.md\n', result.stdout)
+        self.assertIn('✓ releasing.md  skips  Help me with writing tests\n'
+                      '    also read: context-packs/testing.md\n', result.stdout)
 
     def test_lines_indented_under_an_item_continue_its_prompt(self):
         self.cases('## Reads\n\n- CI failed while writing tests\n  for the parser:\n\n  ```\n  FAIL parse\n  ```\n'
