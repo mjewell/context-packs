@@ -151,15 +151,16 @@ class EvalTests(EvalCase):
         models = [run['args'][run['args'].index('--model') + 1] for run in runs]
         self.assertEqual(models, ['sonnet', 'haiku'])
 
-    def test_session_ends_once_it_reads_the_doc(self):
-        self.cases('## Reads\n\n- Help me with writing tests\n\n## Skips\n\n- Writing tests again, please\n')
-        self.env['FAKE_CLAUDE_SLEEP'] = '60'
+    def test_session_goes_on_after_reading_its_doc(self):
+        self.write('context-packs/upgrading.md', doc('Upgrading dependencies'))
+        self.sync()
+        self.cases('## Reads\n\n- Help me with writing tests, then upgrading dependencies\n')
 
         result = self.sync('eval')
 
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('✓ testing.md  reads  Help me with writing tests', result.stdout)
-        self.assertIn('✗ testing.md  skips  Writing tests again, please', result.stdout)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('✓ testing.md  reads  Help me with writing tests, then upgrading dependencies\n'
+                      '    also read: context-packs/upgrading.md\n', result.stdout)
 
     def test_session_that_errors_shows_its_error_instead_of_passing(self):
         self.cases('## Skips\n\n- Rename a variable in the parser\n')
@@ -222,15 +223,15 @@ class EvalTests(EvalCase):
         self.assertEqual([run['error'] for run in reads['runs']], [None, None])
         self.assertEqual((skips['prompt'], skips['outcome']), ('Rename a variable', 'passed'))
 
-    def test_json_gives_each_runs_time_and_its_cost_when_it_ran_to_the_end(self):
+    def test_json_gives_each_runs_time_and_cost(self):
         self.cases('## Reads\n\n- Help me with writing tests\n\n## Skips\n\n- Rename a variable\n')
 
         result = self.sync('eval', '--json')
 
-        (stopped,), (finished,) = (case['runs'] for case in json.loads(result.stdout)['cases'])
-        self.assertEqual((stopped['cost_usd'], finished['cost_usd']), (None, 0.0123))
-        self.assertIsInstance(stopped['duration_ms'], int)
-        self.assertIsInstance(finished['duration_ms'], int)
+        (reads,), (skips,) = (case['runs'] for case in json.loads(result.stdout)['cases'])
+        self.assertEqual((reads['cost_usd'], skips['cost_usd']), (0.0123, 0.0123))
+        self.assertIsInstance(reads['duration_ms'], int)
+        self.assertIsInstance(skips['duration_ms'], int)
 
     def test_json_gives_a_sessions_error_and_still_exits_1(self):
         self.cases('## Skips\n\n- Rename a variable\n')

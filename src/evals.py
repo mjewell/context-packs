@@ -164,17 +164,17 @@ def docs(copy, pack):
 
 class Run(NamedTuple):
     """How one session went: the files it read, resolved, its error if it failed, so its reads settle nothing, what
-    claude says it cost if it ran to the end, and how long it took."""
+    claude says it cost, unless it ended without saying, and how long it took."""
     read: set
     error: str
     cost_usd: float
     duration_ms: int
 
 
-def session(prompt, cwd, model, doc):
-    """How a claude -p session given prompt in cwd went, ending it as soon as it reads doc, since that settles the
-    case either way. --tools leaves it only tools that look, and --allowedTools lets it use them without asking; no
-    MCP server loads, nor any settings but the copy's own."""
+def session(prompt, cwd, model):
+    """How a claude -p session given prompt in cwd went, run to its end, though reading its doc settles its case,
+    so it shows every doc it reads and what it cost. --tools leaves it only tools that look, and --allowedTools lets
+    it use them without asking; no MCP server loads, nor any settings but the copy's own."""
     command = ['claude', '-p', prompt, '--output-format', 'stream-json', '--verbose', '--setting-sources', 'project',
                '--tools', 'Read,Glob,Grep', '--allowedTools', 'Read,Glob,Grep', '--strict-mcp-config',
                '--max-turns', '8', '--model', model]
@@ -197,9 +197,6 @@ def session(prompt, cwd, model, doc):
             for part in message['message']['content']:
                 if part.get('type') == 'tool_use' and part['name'] == 'Read':
                     read.add(Path(part['input']['file_path']).resolve())
-            if doc in read:
-                process.kill()
-                return ended()
         process.wait()
         stderr.seek(0)
         return ended(stderr.read().strip() or f'claude exited with code {process.returncode} without a result')
@@ -252,8 +249,8 @@ def run(root, repo, args):
         results = {index: [] for index in range(len(found))}
         verdicts = {}
         with ThreadPoolExecutor(4) as pool:
-            runs = {pool.submit(session, case.prompt, copies[case.pack], args.model, paths[case.pack][case.doc]):
-                    index for index, case in enumerate(found) for _ in range(args.runs)}
+            runs = {pool.submit(session, case.prompt, copies[case.pack], args.model): index
+                    for index, case in enumerate(found) for _ in range(args.runs)}
             for done, future in enumerate(as_completed(runs), 1):
                 index = runs[future]
                 case = found[index]
