@@ -15,13 +15,13 @@ import sys
 import tempfile
 from typing import NamedTuple
 
+import eval_output
 import imports
 from packs import GEN, REPO, ROOT, local
 import tree
 
 HEADING = re.compile(r'^## (Reads|Skips)$')
 CLI = Path(__file__).resolve().parent / 'cli.py'
-MARKS = {'passed': '✓', 'failed': '✗', 'errored': '!'}
 # What a session's copy leaves out: history, installed dependencies, and the prompts it's being tested on.
 LEFT_OUT = shutil.ignore_patterns('.git', 'node_modules', '.evals')
 
@@ -197,56 +197,18 @@ def session(prompt, cwd, model, doc):
         return Run(read, stderr.read().strip() or f'claude exited with code {process.returncode} without a result')
 
 
-def shown(path, copy, repo):
-    """A file a session read, relative to the copy or else the repo when it's in one, as a failure lists it."""
-    for folder in (copy.resolve(), repo.resolve()):
-        if folder in path.parents:
-            return path.relative_to(folder).as_posix()
-    return str(path)
+class Verdict(NamedTuple):
+    """How a case's runs went: 'passed' if every run did, so a when that matches only some of the time shows up,
+    'errored' if a session failed, or else 'failed', and how many runs passed."""
+    outcome: str
+    passes: int
 
 
-def plural(count, noun):
-    return f'{count} {noun}' + 's' * (count != 1)
-
-
-def status(done, total):
-    """On a terminal, how many runs have finished, on a line the next one overwrites; None clears it."""
-    if sys.stdout.isatty():
-        sys.stdout.write('\r\033[K' + (f'[{done}/{total}]' if done is not None else ''))
-        sys.stdout.flush()
-
-
-def report(case, results, doc, copy, repo, runs):
-    """Print how the case's runs went, as each read doc or didn't, and return 'passed' if every run did, so a when
-    that matches only some of the time shows up, 'errored' if a session failed, or else 'failed'."""
-    errors = list(dict.fromkeys(result.error for result in results if result.error))
+def judge(case, results, doc, runs):
     reads = [result.read for result in results if not result.error]
     passes = sum((doc in read) == (case.expect == 'reads') for read in reads)
-    outcome = 'errored' if errors else 'passed' if passes == runs else 'failed'
-    status(None, None)
-    count = f'{passes}/{runs}  ' if runs > 1 else ''
-    first = case.prompt.split('\n')[0]
-    print(f'{MARKS[outcome]} {case.name}  {case.expect}  {count}{first}')
-    for error in errors:
-        print(f'    error: {error}')
-    docs = sorted({shown(path, copy, repo) for read in reads for path in read if path.suffix == '.md'})
-    others = [path for path in docs if path != shown(doc, copy, repo)]
-    if outcome == 'failed':
-        print(f'    read: {", ".join(docs)}' if docs else '    read no docs')
-    elif outcome == 'passed' and others:
-        # Other docs a passing session read, since a row firing where it shouldn't shows up here first.
-        print(f'    also read: {", ".join(others)}')
-    sys.stdout.flush()
-    return outcome
-
-
-def where(packs, repo):
-    """What the packs' sessions run in, as the first line says it."""
-    fixtures = sum((repo / pack.evals / 'fixture').is_dir() for pack in packs)
-    repos = sum(pack.top and not (repo / pack.evals / 'fixture').is_dir() for pack in packs)
-    empty = len(packs) - fixtures - repos
-    return ', '.join([*['a copy of the repo'] * repos, *[plural(fixtures, 'fixture')] * bool(fixtures),
-                      *[plural(empty, 'empty folder')] * bool(empty)])
+    errored = any(result.error for result in results)
+    return Verdict('errored' if errored else 'passed' if passes == runs else 'failed', passes)
 
 
 def run(root, repo, args):
@@ -277,9 +239,7 @@ def run(root, repo, args):
             if case.doc not in paths[case.pack]:
                 sys.exit(f'context-packs: {case.pack.evals / case.doc} names no doc in {case.pack.folder}. Name its '
                          'file by the doc\'s path in the pack.')
-        times = f', {args.runs} times each' if args.runs > 1 else ''
-        print(f'Running {plural(len(found), "prompt")} for {plural(len({c.name for c in found}), "doc")}{times}, in '
-              f'{where(packs, repo)}, on {args.model}…', flush=True)
+        eval_output.heading(len(found), len({case.name for case in found}), args.runs, packs, repo, args.model)
         results = {index: [] for index in range(len(found))}
         outcomes = []
         with ThreadPoolExecutor(4) as pool:
@@ -290,22 +250,14 @@ def run(root, repo, args):
                 case = found[index]
                 results[index].append(future.result())
                 if len(results[index]) == args.runs:
-                    outcomes.append(report(case, results[index], paths[case.pack][case.doc], copies[case.pack],
-                                           repo, args.runs))
-                status(done, len(runs))
-        status(None, None)
+                    doc = paths[case.pack][case.doc]
+                    verdict = judge(case, results[index], doc, args.runs)
+                    eval_output.report(case, results[index], verdict, doc, copies[case.pack], repo, args.runs)
+                    outcomes.append(verdict.outcome)
+                eval_output.status(done, len(runs))
+        eval_output.status(None, None)
         failed, errored = outcomes.count('failed'), outcomes.count('errored')
-        print(summary(len(found), failed, errored))
+        print(eval_output.summary(len(found), failed, errored))
     if failed or errored:
         sys.exit(1)
 
-
-def summary(total, failed, errored):
-    """The last line: how many passed, or how many failed and errored."""
-    if not failed and not errored:
-        return f'{total} passed'
-    if not errored:
-        return f'{failed} of {total} failed'
-    if not failed:
-        return f'{errored} of {total} errored'
-    return f'{failed} of {total} failed, {errored} errored'
