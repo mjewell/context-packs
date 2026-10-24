@@ -77,10 +77,12 @@ def main():
     update.add_argument('--ref', help='a tag or commit to pin the one named pack to instead')
     commands.add_parser('list', help='list the import packs, where each comes from, and its pin')
     commands.add_parser('check', help='exit 1 if a sync would change anything, writing nothing')
-    evaluate = commands.add_parser('eval', help="run each doc's cases: prompts that should, or shouldn't, make an "
-                                                'agent read it, each as a claude -p session in a copy of the repo')
+    evaluate = commands.add_parser('eval', help="run each pack's eval prompts: ones that should, or shouldn't, make an "
+                                                'agent read a doc, each as a claude -p session with the pack alone')
     evaluate.add_argument('docs', nargs='*', help='the docs whose cases to run, as eval names them, such as '
                                                   'testing.md or core/testing.md; all of them if left out')
+    evaluate.add_argument('--pack', help="a pack's folder, relative to the repo, to run only its prompts, whether the "
+                                         'repo installs it or not')
     evaluate.add_argument('--runs', type=int, default=1, help='how many times to run each prompt, 1 by default')
     evaluate.add_argument('--model', default='sonnet', help='the model the sessions use, sonnet by default')
     args = parser.parse_args()

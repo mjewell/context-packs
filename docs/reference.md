@@ -14,7 +14,7 @@ Each command syncs the current folder, or `--dir <folder>`, and prints what chan
 | `update <id> --ref R` | Pins one pack to a tag or commit |
 | `list` | Lists each import pack, where its pack comes from, and its pin |
 | `check` | Exits 1, naming what's stale, if a sync would change anything, and writes nothing |
-| `eval [doc…] [--runs N] [--model M]` | Runs each doc's cases, checking that an agent reads it when it should, and only then |
+| `eval [doc…] [--pack F] [--runs N] [--model M]` | Runs each pack's eval prompts, checking that an agent reads each doc when it should, and only then |
 
 A pack's id is its import pack's folder under `context-packs/`, such as `core` or `server/database`. Moving the folder changes the id.
 
@@ -112,7 +112,7 @@ It fetches packs from git at their pins, as a sync does, so a repo installing pa
 
 ## Testing when each doc gets read
 
-A row only helps if an agent reads its doc when the work matches, and leaves it alone otherwise. To check, write prompts for a doc in `.evals/<doc>.md` beside it:
+A row only helps if an agent reads its doc when the work matches, and leaves it alone otherwise. To check, write prompts for a doc in its pack's `.evals/` folder, at the pack's root, in a file named by the doc's path in the pack, such as `.evals/testing.md`:
 
 ````markdown
 ## Reads
@@ -129,11 +129,15 @@ A row only helps if an agent reads its doc when the work matches, and leaves it 
 - Explain how parseIsoDate works.
 ````
 
-Each `- ` item is a prompt, and lines indented under it continue it. `npx context-packs eval` runs each prompt as a Claude Code session (`claude -p`), and checks whether the session read the doc: it should for a prompt under `## Reads`, and shouldn't under `## Skips`. Name docs as it prints them, such as `testing.md`, to run only theirs, and pass `--runs 3` to see whether a result holds up: a prompt passes only if every run does.
+Each `- ` item is a prompt, and lines indented under it continue it. `npx context-packs eval` runs each prompt as a Claude Code session (`claude -p`), and checks whether the session read the doc: it should for a prompt under `## Reads`, and shouldn't under `## Skips`.
 
-The sessions run in a copy of the repo outside your folders, without `.git`, `node_modules` or the cases, loading only its own `CLAUDE.md`, with only the tools that look (`Read`, `Glob` and `Grep`), no MCP servers, and up to 8 turns. A prompt that fails lists the docs its session read. They use your Claude Code login and cost tokens, about 20–30k each, and they run on Sonnet unless you pass `--model`. Results depend on the model, and a prompt that passes only on a larger one points at a `when` worth making plainer. Each session ends as soon as it reads the doc, since that settles its prompt either way.
+A pack's prompts run with that pack installed alone, plus everything inside it, since a pack meant to be installed can't know what it will sit beside. `context-packs/` is the pack at the top, and everything the repo installs sits inside it, so prompts in `context-packs/.evals/` run with the whole repo. That's where to test your own docs, and to check how a pack you install behaves among your rules: `context-packs/.evals/core/testing.md` tests the `core` pack's `testing.md` in your repo. To test some of your own docs alone, move them into a folder with its own `.evals/`, and add it back with an import pack holding its `path`.
 
-If the prompts are about code the repo doesn't have, such as a pack written for other repos, put a folder to run them in beside them, as `.evals/fixture/`: a small fake project, say. The prompts in that `.evals/` run in a copy of it instead of the repo, with this repo's packs installed and synced. For a pack this repo imports, that's only its import pack, since a pack meant to be installed elsewhere can't know what it will sit beside. For this repo's own docs, it's all of `context-packs/`, since they always sit beside what this repo installs. A folder read in place is named by its absolute path, so its rows still point here. To share a fixture between folders, link each `.evals/fixture` to it: `eval` follows the link and copies what it points at. A fixture can't have a `context-packs/` of its own.
+`eval` runs the prompts of `context-packs/` and of every pack inside it read in place, and `eval --pack <folder>` runs one pack's, whether the repo installs it or not, as for a repo of packs written for others. Name docs as it prints them to run only theirs, and pass `--runs 3` to see whether a result holds up: a prompt passes only if every run does.
+
+The sessions for `context-packs/` run in a copy of the repo, and for any other pack in an empty folder with just that pack installed. If the prompts are about code that isn't there, put a folder for them to run in at `.evals/fixture/`, such as a small fake project: its copy gets the pack installed and synced instead, with a folder read in place named by its absolute path so its rows still point here. To share a fixture between packs, link each `.evals/fixture` to it. A fixture can't have a `context-packs/` of its own.
+
+Every copy sits outside your folders, without `.git`, `node_modules` or `.evals`, and loads only its own `CLAUDE.md`. Sessions get only the tools that look (`Read`, `Glob` and `Grep`), no MCP servers, and up to 8 turns, and each ends as soon as it reads its doc, since that settles its prompt either way. A prompt that fails lists the docs its session read. Sessions use your Claude Code login and cost tokens, about 20–30k each, and run on Sonnet unless you pass `--model`. Results depend on the model, and a prompt that passes only on a larger one points at a `when` worth making plainer.
 
 Prompts close to a row's `when` that shouldn't match it, or that match only through a clause that's easy to miss, are the ones worth writing.
 

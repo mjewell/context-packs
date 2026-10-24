@@ -83,8 +83,8 @@ class EvalTests(EvalCase):
         self.assertFalse(run['cwd'].startswith(str(self.root)))
         self.assertIn('context-packs/testing.md', run['files'])
         self.assertFalse([f for f in run['files'] if f.startswith('.git') or '.evals' in f])
-        for flags in (['--output-format', 'stream-json'], ['--setting-sources', 'project'], ['--tools', 'Read,Glob,Grep'],
-                      ['--allowedTools', 'Read,Glob,Grep'], ['--strict-mcp-config']):
+        for flags in (['--output-format', 'stream-json'], ['--setting-sources', 'project'],
+                      ['--tools', 'Read,Glob,Grep'], ['--allowedTools', 'Read,Glob,Grep'], ['--strict-mcp-config']):
             self.assertIn(' '.join(flags), ' '.join(run['args']))
 
     def test_runs_repeats_each_prompt_and_counts_the_passes(self):
@@ -112,20 +112,8 @@ class EvalTests(EvalCase):
         result = self.sync('eval')
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn('no doc has cases', result.stderr)
+        self.assertIn('no pack has eval prompts', result.stderr)
         self.assertFalse(self.log.exists())
-
-    def test_pack_read_in_place_runs_its_docs_cases(self):
-        self.write('rules/pack.md', 'Prefer small PRs.\n')
-        self.write('rules/deploying.md', doc('Deploying to production'))
-        self.write('rules/.evals/deploying.md', '## Reads\n\n- Help me with deploying to production\n')
-        self.write('context-packs/core/pack.md', '---\npath: rules\n---\n')
-        self.sync()
-
-        result = self.sync('eval', 'core/deploying.md')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('✓ core/deploying.md  reads  Help me with deploying to production\n', result.stdout)
 
     def test_stale_block_stops_before_any_session(self):
         self.cases('## Reads\n\n- Help me with writing tests\n')
@@ -144,7 +132,8 @@ class EvalTests(EvalCase):
         self.sync('eval')
         self.sync('eval', '--model', 'haiku')
 
-        models = [run['args'][run['args'].index('--model') + 1] for run in map(json.loads, self.log.read_text().splitlines())]
+        runs = map(json.loads, self.log.read_text().splitlines())
+        models = [run['args'][run['args'].index('--model') + 1] for run in runs]
         self.assertEqual(models, ['sonnet', 'haiku'])
 
     def test_session_ends_once_it_reads_the_doc(self):
@@ -167,104 +156,121 @@ class EvalTests(EvalCase):
         self.assertEqual(lines[0], 'Running 2 prompts for 1 doc, 2 times each, in a copy of the repo, on sonnet…')
         self.assertEqual(lines[-1], '2 passed')
 
-class FixtureTests(EvalCase):
-    """A fixture/ folder beside a doc's cases: they run in a copy of it, with this repo's packs synced into it."""
+class PackTests(EvalCase):
+    """A pack's .evals/ at its root: its prompts run with that pack installed alone, plus everything inside it. For
+    context-packs/, the pack at the top, that's the whole repo."""
 
     def setUp(self):
         super().setUp()
-        self.write('context-packs/.evals/fixture/src/parse.ts', 'export const parse = () => 1;\n')
+        self.write('rules/pack.md', 'Prefer small PRs.\n')
+        self.write('rules/deploying.md', doc('Deploying to production'))
+        self.write('rules/.evals/deploying.md', '## Reads\n\n- Help me with deploying to production\n')
+
+    def install(self):
+        self.write('context-packs/core/pack.md', '---\npath: rules\n---\n')
+        self.sync()
 
     def runs(self):
         return [json.loads(line) for line in self.log.read_text().splitlines()]
 
-    def test_cases_beside_a_fixture_run_in_it_with_the_repos_packs(self):
-        self.cases('## Reads\n\n- Help me with writing tests\n')
+    def test_installed_packs_prompts_run_with_only_that_pack(self):
+        self.install()
 
-        result = self.sync('eval')
+        result = self.sync('eval', 'deploying.md')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('✓ testing.md  reads  Help me with writing tests', result.stdout)
+        self.assertIn('✓ rules/deploying.md  reads  Help me with deploying to production\n', result.stdout)
         files = self.runs()[0]['files']
-        self.assertIn('src/parse.ts', files)
-        self.assertIn('context-packs/testing.md', files)
-        self.assertFalse([f for f in files if '.evals' in f])
-        self.assertFalse((self.packs / '.evals' / 'fixture' / 'AGENTS.md').exists())
+        self.assertIn('context-packs/rules/pack.md', files)
+        self.assertNotIn('context-packs/testing.md', files)
 
-    def test_cases_without_a_fixture_still_run_in_the_repo(self):
-        self.cases('## Reads\n\n- Help me with writing tests\n')
-        self.write('context-packs/ops/releasing.md', doc('Releasing a version'))
-        self.write('context-packs/ops/.evals/releasing.md', '## Reads\n\n- Help me with releasing a version\n')
-        self.sync()
+    def test_pack_without_a_fixture_runs_in_an_empty_folder(self):
+        self.install()
 
-        result = self.sync('eval')
+        self.sync('eval', 'deploying.md')
+
+        self.assertEqual(sorted(self.runs()[0]['files']), ['AGENTS.md', 'CLAUDE.md', 'context-packs',
+                                                           'context-packs/rules', 'context-packs/rules/pack.md'])
+
+    def test_pack_with_a_fixture_runs_in_it_with_only_that_pack(self):
+        self.write('rules/.evals/fixture/src/app.ts', 'export {};\n')
+        self.install()
+
+        result = self.sync('eval', 'deploying.md')
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        by_prompt = {run['args'][1]: run['files'] for run in self.runs()}
-        self.assertIn('src/parse.ts', by_prompt['Help me with writing tests'])
-        self.assertNotIn('src/parse.ts', by_prompt['Help me with releasing a version'])
+        files = self.runs()[0]['files']
+        self.assertIn('src/app.ts', files)
+        self.assertNotIn('context-packs/testing.md', files)
+        self.assertFalse([f for f in files if '.evals' in f])
 
-    def test_pack_read_in_place_points_at_this_repo_from_its_fixture(self):
-        self.write('rules/pack.md', 'Prefer small PRs.\n')
-        self.write('rules/deploying.md', doc('Deploying to production'))
-        self.write('rules/.evals/deploying.md', '## Reads\n\n- Help me with deploying to production\n')
-        self.write('rules/.evals/fixture/src/app.ts', 'export {};\n')
-        self.write('context-packs/core/pack.md', '---\npath: rules\n---\n')
-        self.sync()
+    def test_pack_not_installed_runs_the_same_with_pack(self):
+        result = self.sync('eval', '--pack', 'rules')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('✓ rules/deploying.md  reads  Help me with deploying to production\n', result.stdout)
+
+    def test_top_packs_prompts_test_an_installed_packs_doc_within_the_whole_repo(self):
+        self.install()
+        self.cases('## Reads\n\n- Help me with deploying to production\n', name='core/deploying')
 
         result = self.sync('eval', 'core/deploying.md')
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('✓ core/deploying.md  reads  Help me with deploying to production\n', result.stdout)
         files = self.runs()[0]['files']
-        self.assertIn('src/app.ts', files)
-        self.assertNotIn('rules/deploying.md', files)
+        self.assertIn('context-packs/testing.md', files)
+        self.assertIn('context-packs/core/pack.md', files)
 
-    def test_fixture_beside_a_packs_cases_gets_only_that_pack(self):
-        self.write('rules/pack.md', 'Prefer small PRs.\n')
-        self.write('rules/deploying.md', doc('Deploying to production'))
-        self.write('rules/.evals/deploying.md', '## Reads\n\n- Help me with deploying to production\n')
-        self.write('rules/.evals/fixture/src/app.ts', 'export {};\n')
-        self.write('context-packs/core/pack.md', '---\npath: rules\n---\n')
-        self.sync()
+    def test_top_packs_fixture_gets_all_of_context_packs(self):
+        self.install()
+        self.cases('## Reads\n\n- Help me with writing tests\n')
+        self.write('context-packs/.evals/fixture/src/parse.ts', 'export const parse = () => 1;\n')
 
-        result = self.sync('eval', 'core/deploying.md')
+        result = self.sync('eval', 'testing.md')
 
         self.assertEqual(result.returncode, 0, result.stderr)
         files = self.runs()[0]['files']
+        self.assertIn('src/parse.ts', files)
+        self.assertIn('context-packs/testing.md', files)
         self.assertIn('context-packs/core/pack.md', files)
-        self.assertNotIn('context-packs/testing.md', files)
 
-    def test_fixture_beside_the_repos_own_cases_gets_everything_the_repo_installs(self):
-        self.cases('## Reads\n\n- Help me with writing tests\n')
-        self.write('rules/pack.md', 'Prefer small PRs.\n')
-        self.write('rules/deploying.md', doc('Deploying to production'))
-        self.write('context-packs/core/pack.md', '---\npath: rules\n---\n')
+    def test_nested_packs_prompts_run_with_only_that_nested_pack(self):
+        self.write('context-packs/server/pack.md', doc('Editing the server'))
+        self.write('context-packs/server/database.md', doc('Changing the database'))
+        self.write('context-packs/server/.evals/database.md',
+                   '## Reads\n\n- Editing the server: help me with changing the database\n')
         self.sync()
+
+        result = self.sync('eval', 'database.md')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('context-packs/server/database.md  reads', result.stdout)
+        self.assertNotIn('context-packs/testing.md', self.runs()[0]['files'])
+
+    def test_case_file_naming_no_doc_in_its_pack_stops(self):
+        self.write('rules/.evals/releasing.md', '## Reads\n\n- Help me with releasing\n')
+        self.install()
 
         result = self.sync('eval')
 
-        self.assertEqual(result.returncode, 0, result.stderr)
-        files = self.runs()[0]['files']
-        self.assertIn('context-packs/testing.md', files)
-        self.assertIn('context-packs/core/pack.md', files)
-        self.assertNotIn('rules/deploying.md', files)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('rules/.evals/releasing.md names no doc in rules', result.stderr)
+        self.assertFalse(self.log.exists())
 
     def test_linked_fixture_is_copied_like_a_folder(self):
-        self.write('rules/pack.md', 'Prefer small PRs.\n')
-        self.write('rules/deploying.md', doc('Deploying to production'))
-        self.write('rules/.evals/deploying.md', '## Reads\n\n- Help me with deploying to production\n')
-        (self.repo / 'rules' / '.evals' / 'fixture').symlink_to('../../context-packs/.evals/fixture')
-        self.write('context-packs/core/pack.md', '---\npath: rules\n---\n')
-        self.sync()
+        self.write('shared/src/parse.ts', 'export const parse = () => 1;\n')
+        (self.repo / 'rules' / '.evals' / 'fixture').symlink_to('../../shared')
+        self.install()
 
-        result = self.sync('eval', 'core/deploying.md')
+        result = self.sync('eval', 'deploying.md')
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('src/parse.ts', self.runs()[0]['files'])
 
     def test_fixture_with_its_own_context_packs_stops(self):
-        self.cases('## Reads\n\n- Help me with writing tests\n')
-        self.write('context-packs/.evals/fixture/context-packs/pack.md', 'Its own rules.\n')
+        self.write('rules/.evals/fixture/context-packs/pack.md', 'Its own rules.\n')
+        self.install()
 
         result = self.sync('eval')
 
