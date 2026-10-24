@@ -1,6 +1,10 @@
-"""Run each doc's cases: prompts under `## Reads` that should make an agent read the doc, and under `## Skips` that
-shouldn't. Each runs as a `claude -p` session in a copy of the repo, and passes on whether the session read the doc."""
+"""Run each pack's eval prompts: under `## Reads`, prompts that should make an agent read a doc, and under `## Skips`,
+ones that shouldn't. A pack's prompts sit in .evals/ at its root, in a file named by the doc's path in the pack, and
+run with that pack installed alone, plus everything inside it: for context-packs/, the pack at the top, that's the
+whole repo. Each runs as a `claude -p` session in a copy of the pack's .evals/fixture/, or, without one, of the repo
+for context-packs/ and of an empty folder for any other pack, and passes on whether the session read the doc."""
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import contextlib
 import json
 import os
 from pathlib import Path
@@ -9,7 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 import imports
 from packs import GEN, REPO, ROOT, local
@@ -17,36 +21,45 @@ import tree
 
 HEADING = re.compile(r'^## (Reads|Skips)$')
 CLI = Path(__file__).resolve().parent / 'cli.py'
-# What a session's copy leaves out: history, installed dependencies, and the cases it's being tested on.
+# What a session's copy leaves out: history, installed dependencies, and the prompts it's being tested on.
 LEFT_OUT = shutil.ignore_patterns('.git', 'node_modules', '.evals')
 
 
+class Pack(NamedTuple):
+    """A pack whose prompts eval runs: its folder, relative to the repo, and whether it's context-packs/, which runs
+    with the whole repo."""
+    folder: Path
+    top: bool
+
+    @property
+    def evals(self):
+        return self.folder / '.evals'
+
+
 class Case(NamedTuple):
-    """A prompt, and whether a session given it should read the doc at path, relative to the repo. pack is the id of
-    the pack holding the doc, '' for the repo's own docs, and fixture the folder its session runs in a copy of, from a
-    fixture/ beside its case file, or None for the repo."""
-    name: str
-    path: Path
-    pack: str
-    fixture: Optional[Path]
+    """A prompt, and whether a session given it should read doc, the doc at that path in the pack."""
+    pack: Pack
+    doc: str
     expect: str
     prompt: str
 
     @property
-    def copy(self):
-        """Which copy the case's session runs in: the repo's, shared by every case without a fixture, or its
-        fixture's with its pack installed, since a fixture stands in for another repo installing just that pack."""
-        return (self.fixture, self.pack) if self.fixture else (None, None)
+    def name(self):
+        """The doc as eval prints it: by its name in the block for context-packs/, and by its path in the repo for any
+        other pack, which runs on its own."""
+        return self.doc if self.pack.top else (self.pack.folder / self.doc).as_posix()
 
 
-def packs(root, repo):
-    """Each pack read in place, as the pack, a node of it, and the folder holding its content."""
-    stack = [(REPO, root, repo / REPO.synced)]
+def installed(root, repo):
+    """context-packs/, then each pack inside it read in place: a nested pack, or a folder an import pack names."""
+    yield Pack(ROOT, True)
+    stack = [(REPO, child, repo / REPO.synced) for child in root.children]
+    stack += [(i.pack, i.root, i.source) for i in root.imports]
     while stack:
         pack, node, source = stack.pop(0)
         if not pack.local:
             continue
-        yield pack, node, source
+        yield Pack(Path(os.path.relpath(source / node.id, repo)), False)
         stack += [(pack, child, source) for child in node.children]
         stack += [(i.pack, i.root, i.source) for i in node.imports]
 
@@ -65,22 +78,86 @@ def parse(text, where):
         elif found and (line.startswith('  ') or not line.strip()):
             found[-1][1].append(line[2:])
         elif line.strip():
-            sys.exit(f'context-packs: {where}:{number} is neither a `## Reads` or `## Skips` heading, a `- ` item under '
-                     'one, nor a line indented under an item. Indent it under its item, or start an item with `- `.')
+            sys.exit(f'context-packs: {where}:{number} is neither a `## Reads` or `## Skips` heading, a `- ` item '
+                     'under one, nor a line indented under an item. Indent it under its item, or start an item '
+                     'with `- `.')
     return [(expect, '\n'.join(lines).rstrip('\n')) for expect, lines in found]
 
 
-def cases(root, repo):
-    """Every case of every doc in a pack read in place."""
-    for pack, node, source in packs(root, repo):
-        for doc in node.docs:
-            file = source / Path(doc.path).parent / '.evals' / f'{Path(doc.path).stem}.md'
-            if file.is_file():
+def cases(pack, repo):
+    """The prompts in the pack's .evals/, but not in its fixture."""
+    evals = repo / pack.evals
+    for file in sorted(evals.rglob('*.md')) if evals.is_dir() else []:
+        doc = file.relative_to(evals)
+        if doc.parts[0] != 'fixture':
+            for expect, prompt in parse(file.read_text(encoding='utf-8'), (pack.evals / doc).as_posix()):
+                yield Case(pack, doc.as_posix(), expect, prompt)
+
+
+def pointed(imported, repo):
+    """The import pack's text, naming a folder on disk it reads by its absolute path, so its rows point at the folder
+    itself from a copy of a fixture."""
+    if not local(imported.origin):
+        return imported.text
+    front = tree.FRONT.match(imported.text)
+    fields = [line for line in front.group(1).split('\n') if not line.startswith('from: ')]
+    origin = os.path.normpath(repo / imported.origin)
+    return '---\n' + '\n'.join([f'from: {origin}', *fields]) + '\n---\n' + imported.text[front.end():]
+
+
+def stage(repo, pack, into):
+    """Write the folder the pack's sessions run in a copy of: its fixture, or else the repo for context-packs/ or an
+    empty folder, with the pack synced into it alone, or with all of context-packs/ for the pack at the top. A folder
+    read in place is named by its absolute path, so its rows point at the folder itself from the copy."""
+    fixture = repo / pack.evals / 'fixture'
+    if not fixture.is_dir() and pack.top:
+        shutil.copytree(repo, into, symlinks=True, ignore=LEFT_OUT)
+        return
+    if fixture.is_dir():
+        # Resolved, so a fixture linked from elsewhere is copied like a folder.
+        shutil.copytree(fixture.resolve(), into, symlinks=True, ignore=LEFT_OUT)
+        if (into / ROOT).exists():
+            sys.exit(f'context-packs: {pack.evals / "fixture"} has a {ROOT.as_posix()}/ folder of its own, and eval '
+                     'puts the pack it tests there. Remove it from the fixture.')
+    else:
+        into.mkdir()
+    if pack.top:
+        def left_out(folder, names):
+            return [*LEFT_OUT(folder, names), *[GEN.name] * (Path(folder) == repo / ROOT)]
+
+        shutil.copytree(repo / ROOT, into / ROOT, symlinks=True, ignore=left_out)
+        for imported in imports.scan(repo):
+            (into / imported.file).write_text(pointed(imported, repo), encoding='utf-8')
+    else:
+        (into / ROOT / name(pack)).mkdir(parents=True)
+        origin = (repo / pack.folder).resolve()
+        (into / ROOT / name(pack) / 'pack.md').write_text(f'---\nfrom: {origin}\n---\n', encoding='utf-8')
+    synced = subprocess.run([sys.executable, str(CLI), '--dir', str(into)], capture_output=True, text=True)
+    if synced.returncode != 0:
+        sys.exit(f'context-packs: syncing {pack.folder} into a copy of its fixture failed:\n{synced.stderr.strip()}')
+
+
+def name(pack):
+    """The id a pack other than the top one gets in its copy."""
+    return pack.folder.resolve().name
+
+
+def docs(copy, pack):
+    """Each doc the pack brings to the copy's block, by its path in the pack, with where its row points."""
+    found = {}
+    with contextlib.ExitStack() as stack:
+        def walk(node, pack):
+            for doc in node.docs:
                 name = '/'.join(part for part in (pack.id, doc.path) if part)
-                # Resolved, so a fixture linked from another folder's .evals/ is copied like a folder.
-                fixture = (file.parent / 'fixture').resolve() if (file.parent / 'fixture').is_dir() else None
-                for expect, prompt in parse(file.read_text(encoding='utf-8'), os.path.relpath(file, repo)):
-                    yield Case(name, pack.synced / doc.path, pack.id, fixture, expect, prompt)
+                found[name] = (copy / pack.synced / doc.path).resolve()
+            for child in node.children:
+                walk(child, pack)
+            for imported in node.imports:
+                walk(imported.root, imported.pack)
+
+        walk(tree.load(copy, stack), REPO)
+    prefix = '' if pack.top else f'{name(pack)}/'
+    return {doc[len(prefix):]: path for doc, path in found.items() if doc.startswith(prefix)}
 
 
 def session(prompt, cwd, model, doc):
@@ -88,8 +165,8 @@ def session(prompt, cwd, model, doc):
     that settles the case either way. --tools leaves it only tools that look, and --allowedTools lets it use them
     without asking; no MCP server loads, nor any settings but the copy's own."""
     command = ['claude', '-p', prompt, '--output-format', 'stream-json', '--verbose', '--setting-sources', 'project',
-               '--tools', 'Read,Glob,Grep', '--allowedTools', 'Read,Glob,Grep', '--strict-mcp-config', '--max-turns', '8',
-               '--model', model]
+               '--tools', 'Read,Glob,Grep', '--allowedTools', 'Read,Glob,Grep', '--strict-mcp-config',
+               '--max-turns', '8', '--model', model]
     read = set()
     with subprocess.Popen(command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True) as process:
         for line in process.stdout:
@@ -113,38 +190,6 @@ def shown(path, copy, repo):
     return str(path)
 
 
-def pointed(imported, repo):
-    """The import pack's text, naming a folder on disk it reads by its absolute path, so its rows point at the folder
-    itself from a copy of a fixture."""
-    if not local(imported.origin):
-        return imported.text
-    front = tree.FRONT.match(imported.text)
-    fields = [line for line in front.group(1).split('\n') if not line.startswith('from: ')]
-    origin = os.path.normpath(repo / imported.origin)
-    return '---\n' + '\n'.join([f'from: {origin}', *fields]) + '\n---\n' + imported.text[front.end():]
-
-
-def stage(repo, fixture, pack, into):
-    """Copy fixture into the folder into, with repo's packs synced into it. For the repo's own docs, pack '', that's
-    all of context-packs/, since those docs always sit beside what the repo installs; for an imported pack, only its
-    import pack, since a pack meant to be installed can't know what it will sit beside."""
-    shutil.copytree(fixture, into, symlinks=True, ignore=LEFT_OUT)
-    if (into / ROOT).exists():
-        sys.exit(f'context-packs: {fixture} has a {ROOT.as_posix()}/ folder of its own, and eval puts this repo\'s '
-                 'packs there. Remove it from the fixture.')
-    found = imports.scan(repo)
-    if not pack:
-        shutil.copytree(repo / ROOT, into / ROOT, symlinks=True,
-                        ignore=lambda folder, names: [*LEFT_OUT(folder, names), *[GEN.name] * (Path(folder) == repo / ROOT)])
-    for imported in found:
-        if not pack or imported.id == pack:
-            (into / imported.file).parent.mkdir(parents=True, exist_ok=True)
-            (into / imported.file).write_text(pointed(imported, repo), encoding='utf-8')
-    synced = subprocess.run([sys.executable, str(CLI), '--dir', str(into)], capture_output=True, text=True)
-    if synced.returncode != 0:
-        sys.exit(f'context-packs: syncing the packs into a copy of {fixture} failed:\n{synced.stderr.strip()}')
-
-
 def plural(count, noun):
     return f'{count} {noun}' + 's' * (count != 1)
 
@@ -156,7 +201,7 @@ def status(done, total):
         sys.stdout.flush()
 
 
-def report(case, reads, doc, copies, repo, runs):
+def report(case, reads, doc, copy, repo, runs):
     """Print how the case's runs went, as each read doc or didn't, and return whether every run passed, so a when
     that matches only some of the time shows up."""
     passes = sum((doc in read) == (case.expect == 'reads') for read in reads)
@@ -166,55 +211,64 @@ def report(case, reads, doc, copies, repo, runs):
     first = case.prompt.split('\n')[0]
     print(f'{"✓" if passed else "✗"} {case.name}  {case.expect}  {count}{first}')
     if not passed:
-        docs = sorted({shown(path, copies[case.copy], repo) for read in reads for path in read if path.suffix == '.md'})
+        docs = sorted({shown(path, copy, repo) for read in reads for path in read if path.suffix == '.md'})
         print(f'    read: {", ".join(docs)}' if docs else '    read no docs')
     sys.stdout.flush()
     return passed
 
 
+def where(packs, repo):
+    """What the packs' sessions run in, as the first line says it."""
+    fixtures = sum((repo / pack.evals / 'fixture').is_dir() for pack in packs)
+    repos = sum(pack.top and not (repo / pack.evals / 'fixture').is_dir() for pack in packs)
+    empty = len(packs) - fixtures - repos
+    return ', '.join([*['a copy of the repo'] * repos, *[plural(fixtures, 'fixture')] * bool(fixtures),
+                      *[plural(empty, 'empty folder')] * bool(empty)])
+
+
 def run(root, repo, args):
-    found = list(cases(root, repo))
-    if not found:
-        sys.exit('context-packs: no doc has cases. Write the prompts for a doc in .evals/<doc>.md beside it, as `- ` '
-                 'items under `## Reads` and `## Skips`.')
-    names = sorted({case.name for case in found})
-    unknown = [name for name in args.docs if name not in names]
-    if unknown:
-        sys.exit(f'context-packs: {", ".join(unknown)} has no cases. Docs with cases: {", ".join(names)}.')
-    found = [case for case in found if not args.docs or case.name in args.docs]
     repo = repo.resolve()
+    if args.pack:
+        packs = [Pack(Path(os.path.relpath((repo / args.pack).resolve(), repo)), False)]
+    else:
+        packs = list(installed(root, repo))
+    found = [case for pack in packs for case in cases(pack, repo)]
+    if not found:
+        sys.exit('context-packs: no pack has eval prompts. Write the prompts for a doc in .evals/<doc>.md at the root '
+                 'of its pack, as `- ` items under `## Reads` and `## Skips`.')
+    names = sorted({name for case in found for name in (case.doc, case.name)})
+    unknown = [doc for doc in args.docs if doc not in names]
+    if unknown:
+        sys.exit(f'context-packs: {", ".join(unknown)} has no eval prompts. Docs with them: '
+                 f'{", ".join(sorted({case.name for case in found}))}.')
+    found = [case for case in found if not args.docs or case.doc in args.docs or case.name in args.docs]
+    packs = list(dict.fromkeys(case.pack for case in found))
     with tempfile.TemporaryDirectory(prefix='context-packs-eval-') as temp:
-        # One copy for each fixture and pack it tests, and one of the repo for cases without a fixture, all made before
-        # any session runs.
-        copies = {}
-        for key in dict.fromkeys(case.copy for case in found):
-            copies[key] = Path(temp) / str(len(copies))
-            fixture, pack = key
-            if fixture:
-                stage(repo, fixture, pack, copies[key])
-            else:
-                shutil.copytree(repo, copies[key], symlinks=True, ignore=LEFT_OUT)
-
-        def doc(case):
-            """Where the session finds the case's doc: in its copy, unless it's in a pack read in place and the copy
-            is of a fixture, whose import packs point at the repo."""
-            return ((repo if case.fixture and case.pack else copies[case.copy]) / case.path).resolve()
-
-        fixtures = len({fixture for fixture, _ in copies if fixture})
-        where = ' and '.join([*['a copy of the repo'] * ((None, None) in copies), *[plural(fixtures, 'fixture')] * bool(fixtures)])
+        # Every copy is made, and every prompt matched to its doc, before any session runs.
+        copies, paths = {}, {}
+        for pack in packs:
+            copies[pack] = Path(temp) / str(len(copies))
+            stage(repo, pack, copies[pack])
+            paths[pack] = docs(copies[pack], pack)
+        for case in found:
+            if case.doc not in paths[case.pack]:
+                sys.exit(f'context-packs: {case.pack.evals / case.doc} names no doc in {case.pack.folder}. Name its '
+                         'file by the doc\'s path in the pack.')
         times = f', {args.runs} times each' if args.runs > 1 else ''
         print(f'Running {plural(len(found), "prompt")} for {plural(len({c.name for c in found}), "doc")}{times}, in '
-              f'{where}, on {args.model}…', flush=True)
+              f'{where(packs, repo)}, on {args.model}…', flush=True)
         reads = {index: [] for index in range(len(found))}
         failed = 0
         with ThreadPoolExecutor(4) as pool:
-            runs = {pool.submit(session, case.prompt, copies[case.copy], args.model, doc(case)): index
-                    for index, case in enumerate(found) for _ in range(args.runs)}
+            runs = {pool.submit(session, case.prompt, copies[case.pack], args.model, paths[case.pack][case.doc]):
+                    index for index, case in enumerate(found) for _ in range(args.runs)}
             for done, future in enumerate(as_completed(runs), 1):
                 index = runs[future]
+                case = found[index]
                 reads[index].append(future.result())
                 if len(reads[index]) == args.runs:
-                    failed += not report(found[index], reads[index], doc(found[index]), copies, repo, args.runs)
+                    failed += not report(case, reads[index], paths[case.pack][case.doc], copies[case.pack], repo,
+                                         args.runs)
                 status(done, len(runs))
         status(None, None)
         print(f'{len(found) - failed} passed' if not failed else f'{failed} of {len(found)} failed')
