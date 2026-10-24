@@ -21,6 +21,7 @@ import tree
 
 HEADING = re.compile(r'^## (Reads|Skips)$')
 CLI = Path(__file__).resolve().parent / 'cli.py'
+MARKS = {'passed': '✓', 'failed': '✗', 'errored': '!'}
 # What a session's copy leaves out: history, installed dependencies, and the prompts it's being tested on.
 LEFT_OUT = shutil.ignore_patterns('.git', 'node_modules', '.evals')
 
@@ -160,17 +161,29 @@ def docs(copy, pack):
     return {doc[len(prefix):]: path for doc, path in found.items() if doc.startswith(prefix)}
 
 
+class Run(NamedTuple):
+    """How one session went: the files it read, resolved, and its error if it failed, so its reads settle nothing."""
+    read: set
+    error: str = None
+
+
 def session(prompt, cwd, model, doc):
-    """The files a claude -p session given prompt in cwd read, resolved, ending it as soon as it reads doc, since
-    that settles the case either way. --tools leaves it only tools that look, and --allowedTools lets it use them
-    without asking; no MCP server loads, nor any settings but the copy's own."""
+    """How a claude -p session given prompt in cwd went, ending it as soon as it reads doc, since that settles the
+    case either way. --tools leaves it only tools that look, and --allowedTools lets it use them without asking; no
+    MCP server loads, nor any settings but the copy's own."""
     command = ['claude', '-p', prompt, '--output-format', 'stream-json', '--verbose', '--setting-sources', 'project',
                '--tools', 'Read,Glob,Grep', '--allowedTools', 'Read,Glob,Grep', '--strict-mcp-config',
                '--max-turns', '8', '--model', model]
     read = set()
-    with subprocess.Popen(command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True) as process:
+    with tempfile.TemporaryFile('w+') as stderr, \
+            subprocess.Popen(command, cwd=cwd, stdout=subprocess.PIPE, stderr=stderr, text=True) as process:
         for line in process.stdout:
             message = json.loads(line)
+            if message.get('type') == 'result':
+                # claude flags running out of turns as an error too, but the session just ends there, having read
+                # what it read.
+                failed = message.get('is_error') and message['subtype'] != 'error_max_turns'
+                return Run(read, message['result'] if failed else None)
             if message.get('type') != 'assistant':
                 continue
             for part in message['message']['content']:
@@ -178,8 +191,10 @@ def session(prompt, cwd, model, doc):
                     read.add(Path(part['input']['file_path']).resolve())
             if doc in read:
                 process.kill()
-                break
-    return read
+                return Run(read)
+        process.wait()
+        stderr.seek(0)
+        return Run(read, stderr.read().strip() or f'claude exited with code {process.returncode} without a result')
 
 
 def shown(path, copy, repo):
@@ -201,20 +216,24 @@ def status(done, total):
         sys.stdout.flush()
 
 
-def report(case, reads, doc, copy, repo, runs):
-    """Print how the case's runs went, as each read doc or didn't, and return whether every run passed, so a when
-    that matches only some of the time shows up."""
+def report(case, results, doc, copy, repo, runs):
+    """Print how the case's runs went, as each read doc or didn't, and return 'passed' if every run did, so a when
+    that matches only some of the time shows up, 'errored' if a session failed, or else 'failed'."""
+    errors = list(dict.fromkeys(result.error for result in results if result.error))
+    reads = [result.read for result in results if not result.error]
     passes = sum((doc in read) == (case.expect == 'reads') for read in reads)
-    passed = passes == runs
+    outcome = 'errored' if errors else 'passed' if passes == runs else 'failed'
     status(None, None)
     count = f'{passes}/{runs}  ' if runs > 1 else ''
     first = case.prompt.split('\n')[0]
-    print(f'{"✓" if passed else "✗"} {case.name}  {case.expect}  {count}{first}')
-    if not passed:
+    print(f'{MARKS[outcome]} {case.name}  {case.expect}  {count}{first}')
+    for error in errors:
+        print(f'    error: {error}')
+    if outcome == 'failed':
         docs = sorted({shown(path, copy, repo) for read in reads for path in read if path.suffix == '.md'})
         print(f'    read: {", ".join(docs)}' if docs else '    read no docs')
     sys.stdout.flush()
-    return passed
+    return outcome
 
 
 def where(packs, repo):
@@ -257,20 +276,32 @@ def run(root, repo, args):
         times = f', {args.runs} times each' if args.runs > 1 else ''
         print(f'Running {plural(len(found), "prompt")} for {plural(len({c.name for c in found}), "doc")}{times}, in '
               f'{where(packs, repo)}, on {args.model}…', flush=True)
-        reads = {index: [] for index in range(len(found))}
-        failed = 0
+        results = {index: [] for index in range(len(found))}
+        outcomes = []
         with ThreadPoolExecutor(4) as pool:
             runs = {pool.submit(session, case.prompt, copies[case.pack], args.model, paths[case.pack][case.doc]):
                     index for index, case in enumerate(found) for _ in range(args.runs)}
             for done, future in enumerate(as_completed(runs), 1):
                 index = runs[future]
                 case = found[index]
-                reads[index].append(future.result())
-                if len(reads[index]) == args.runs:
-                    failed += not report(case, reads[index], paths[case.pack][case.doc], copies[case.pack], repo,
-                                         args.runs)
+                results[index].append(future.result())
+                if len(results[index]) == args.runs:
+                    outcomes.append(report(case, results[index], paths[case.pack][case.doc], copies[case.pack],
+                                           repo, args.runs))
                 status(done, len(runs))
         status(None, None)
-        print(f'{len(found) - failed} passed' if not failed else f'{failed} of {len(found)} failed')
-    if failed:
+        failed, errored = outcomes.count('failed'), outcomes.count('errored')
+        print(summary(len(found), failed, errored))
+    if failed or errored:
         sys.exit(1)
+
+
+def summary(total, failed, errored):
+    """The last line: how many passed, or how many failed and errored."""
+    if not failed and not errored:
+        return f'{total} passed'
+    if not errored:
+        return f'{failed} of {total} failed'
+    if not failed:
+        return f'{errored} of {total} errored'
+    return f'{failed} of {total} failed, {errored} errored'

@@ -146,6 +146,45 @@ class EvalTests(EvalCase):
         self.assertIn('✓ testing.md  reads  Help me with writing tests', result.stdout)
         self.assertIn('✗ testing.md  skips  Writing tests again, please', result.stdout)
 
+    def test_session_that_errors_shows_its_error_instead_of_passing(self):
+        self.cases('## Skips\n\n- Rename a variable in the parser\n')
+        self.env['FAKE_CLAUDE_ERROR'] = 'There\'s an issue with the selected model (sonnet).'
+
+        result = self.sync('eval')
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('! testing.md  skips  Rename a variable in the parser\n'
+                      '    error: There\'s an issue with the selected model (sonnet).\n', result.stdout)
+        self.assertEqual(result.stdout.splitlines()[-1], '1 of 1 errored')
+
+    def test_runs_that_error_alike_show_their_error_once_and_count_no_passes(self):
+        self.cases('## Skips\n\n- Rename a variable in the parser\n')
+        self.env['FAKE_CLAUDE_ERROR'] = 'Not logged in.'
+
+        result = self.sync('eval', '--runs', '2')
+
+        self.assertIn('! testing.md  skips  0/2  Rename a variable in the parser\n'
+                      '    error: Not logged in.\n1 of 1 errored\n', result.stdout)
+
+    def test_session_that_ends_without_a_result_shows_what_claude_printed(self):
+        self.cases('## Skips\n\n- Rename a variable in the parser\n')
+        self.env['FAKE_CLAUDE_CRASH'] = 'TypeError: undefined is not a function'
+
+        result = self.sync('eval')
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('! testing.md  skips  Rename a variable in the parser\n'
+                      '    error: TypeError: undefined is not a function\n', result.stdout)
+
+    def test_session_that_runs_out_of_turns_just_ends(self):
+        self.cases('## Skips\n\n- Rename a variable in the parser\n')
+        self.env['FAKE_CLAUDE_MAX_TURNS'] = '1'
+
+        result = self.sync('eval')
+
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn('✓ testing.md  skips  Rename a variable in the parser', result.stdout)
+
     def test_output_says_what_runs_then_how_it_went(self):
         self.cases('## Reads\n\n- Help me with writing tests\n- Writing tests again, please\n')
 
