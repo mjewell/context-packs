@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Stands in for `claude -p` in tests. Reads the instructions file in its working directory, as Claude Code loads it,
 and "reads" the doc of each table row whose when appears in the prompt, writing each read as a tool_use line of
-stream-json, the way the real command does. Appends its arguments and working directory to $FAKE_CLAUDE_LOG."""
+stream-json, the way the real command does. With $FAKE_CLAUDE_SLEEP, it then goes on working that many seconds, as a
+real session does after its reads. Appends its arguments and working directory to $FAKE_CLAUDE_LOG."""
 import json
 import os
 from pathlib import Path
 import re
 import sys
+import time
 
 ROW = re.compile(r'^\| (.+?) \| `(.+?)` \|$', re.MULTILINE)
 
@@ -26,7 +28,8 @@ def main():
         if when.lower() in prompt.lower():
             target = Path(path) if Path(path).is_absolute() else cwd / path
             print(json.dumps({'type': 'assistant', 'message': {'content': [
-                {'type': 'tool_use', 'id': 'toolu_1', 'name': 'Read', 'input': {'file_path': str(target)}}]}}))
+                {'type': 'tool_use', 'id': 'toolu_1', 'name': 'Read', 'input': {'file_path': str(target)}}]}}), flush=True)
+    time.sleep(float(os.environ.get('FAKE_CLAUDE_SLEEP', '0')))
     print(json.dumps({'type': 'result', 'subtype': 'success', 'result': 'Done.'}))
 
 
