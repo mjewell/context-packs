@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from typing import NamedTuple
 
 import eval_output
@@ -162,9 +163,12 @@ def docs(copy, pack):
 
 
 class Run(NamedTuple):
-    """How one session went: the files it read, resolved, and its error if it failed, so its reads settle nothing."""
+    """How one session went: the files it read, resolved, its error if it failed, so its reads settle nothing, what
+    claude says it cost if it ran to the end, and how long it took."""
     read: set
-    error: str = None
+    error: str
+    cost_usd: float
+    duration_ms: int
 
 
 def session(prompt, cwd, model, doc):
@@ -174,7 +178,11 @@ def session(prompt, cwd, model, doc):
     command = ['claude', '-p', prompt, '--output-format', 'stream-json', '--verbose', '--setting-sources', 'project',
                '--tools', 'Read,Glob,Grep', '--allowedTools', 'Read,Glob,Grep', '--strict-mcp-config',
                '--max-turns', '8', '--model', model]
-    read = set()
+    read, start = set(), time.monotonic()
+
+    def ended(error=None, cost_usd=None):
+        return Run(read, error, cost_usd, round((time.monotonic() - start) * 1000))
+
     with tempfile.TemporaryFile('w+') as stderr, \
             subprocess.Popen(command, cwd=cwd, stdout=subprocess.PIPE, stderr=stderr, text=True) as process:
         for line in process.stdout:
@@ -183,7 +191,7 @@ def session(prompt, cwd, model, doc):
                 # claude flags running out of turns as an error too, but the session just ends there, having read
                 # what it read.
                 failed = message.get('is_error') and message['subtype'] != 'error_max_turns'
-                return Run(read, message['result'] if failed else None)
+                return ended(message['result'] if failed else None, message.get('total_cost_usd'))
             if message.get('type') != 'assistant':
                 continue
             for part in message['message']['content']:
@@ -191,10 +199,10 @@ def session(prompt, cwd, model, doc):
                     read.add(Path(part['input']['file_path']).resolve())
             if doc in read:
                 process.kill()
-                return Run(read)
+                return ended()
         process.wait()
         stderr.seek(0)
-        return Run(read, stderr.read().strip() or f'claude exited with code {process.returncode} without a result')
+        return ended(stderr.read().strip() or f'claude exited with code {process.returncode} without a result')
 
 
 class Verdict(NamedTuple):
@@ -239,9 +247,10 @@ def run(root, repo, args):
             if case.doc not in paths[case.pack]:
                 sys.exit(f'context-packs: {case.pack.evals / case.doc} names no doc in {case.pack.folder}. Name its '
                          'file by the doc\'s path in the pack.')
-        eval_output.heading(len(found), len({case.name for case in found}), args.runs, packs, repo, args.model)
+        if not args.json:
+            eval_output.heading(len(found), len({case.name for case in found}), args.runs, packs, repo, args.model)
         results = {index: [] for index in range(len(found))}
-        outcomes = []
+        verdicts = {}
         with ThreadPoolExecutor(4) as pool:
             runs = {pool.submit(session, case.prompt, copies[case.pack], args.model, paths[case.pack][case.doc]):
                     index for index, case in enumerate(found) for _ in range(args.runs)}
@@ -251,13 +260,20 @@ def run(root, repo, args):
                 results[index].append(future.result())
                 if len(results[index]) == args.runs:
                     doc = paths[case.pack][case.doc]
-                    verdict = judge(case, results[index], doc, args.runs)
-                    eval_output.report(case, results[index], verdict, doc, copies[case.pack], repo, args.runs)
-                    outcomes.append(verdict.outcome)
-                eval_output.status(done, len(runs))
-        eval_output.status(None, None)
+                    verdicts[index] = judge(case, results[index], doc, args.runs)
+                    if not args.json:
+                        eval_output.report(case, results[index], verdicts[index], doc, copies[case.pack], repo,
+                                           args.runs)
+                if not args.json:
+                    eval_output.status(done, len(runs))
+        outcomes = [verdict.outcome for verdict in verdicts.values()]
         failed, errored = outcomes.count('failed'), outcomes.count('errored')
-        print(eval_output.summary(len(found), failed, errored))
+        if args.json:
+            print(eval_output.document([(case, results[index], verdicts[index], copies[case.pack], repo)
+                                        for index, case in enumerate(found)], args.model, args.runs))
+        else:
+            eval_output.status(None, None)
+            print(eval_output.summary(len(found), failed, errored))
     if failed or errored:
         sys.exit(1)
 

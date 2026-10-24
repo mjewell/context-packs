@@ -85,6 +85,8 @@ def main():
                                          'repo installs it or not')
     evaluate.add_argument('--runs', type=int, default=1, help='how many times to run each prompt, 1 by default')
     evaluate.add_argument('--model', default='sonnet', help='the model the sessions use, sonnet by default')
+    evaluate.add_argument('--json', action='store_true', help='print one JSON document of each prompt and its runs '
+                                                              'once they finish, instead of lines as they go')
     args = parser.parse_args()
     repo = args.dir
     if not repo.is_dir():

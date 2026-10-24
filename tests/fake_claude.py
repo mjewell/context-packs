@@ -53,7 +53,7 @@ def main():
         # As the real command ends a session that runs out of turns: flagged is_error, with no result.
         print(json.dumps({'type': 'result', 'subtype': 'error_max_turns', 'is_error': True}))
         sys.exit(1)
-    print(json.dumps({'type': 'result', 'subtype': 'success', 'result': 'Done.'}))
+    print(json.dumps({'type': 'result', 'subtype': 'success', 'result': 'Done.', 'total_cost_usd': 0.0123}))
 
 
 main()

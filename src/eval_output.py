@@ -1,4 +1,5 @@
 """What eval prints: what it's about to run, how each prompt went as its runs finish, and how many passed."""
+import json
 import sys
 
 MARKS = {'passed': '✓', 'failed': '✗', 'errored': '!'}
@@ -57,6 +58,17 @@ def report(case, results, verdict, doc, copy, repo, runs):
         # Other docs a passing session read, since a row firing where it shouldn't shows up here first.
         print(f'    also read: {", ".join(others)}')
     sys.stdout.flush()
+
+
+def document(cases, model, runs):
+    """Every case, in the order its file gives it, as (case, its runs, its verdict, the copy it ran in, the repo),
+    with each run's files, as JSON."""
+    return json.dumps({'model': model, 'runs': runs, 'cases': [{
+        'doc': case.name, 'expect': case.expect, 'prompt': case.prompt, 'outcome': verdict.outcome,
+        'passes': verdict.passes,
+        'runs': [{'read': sorted(shown(path, copy, repo) for path in result.read), 'error': result.error,
+                  'cost_usd': result.cost_usd, 'duration_ms': result.duration_ms} for result in results],
+    } for case, results, verdict, copy, repo in cases]}, indent=2, ensure_ascii=False)
 
 
 def summary(total, failed, errored):

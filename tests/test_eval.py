@@ -200,6 +200,48 @@ class EvalTests(EvalCase):
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn('✓ testing.md  skips  Rename a variable in the parser', result.stdout)
 
+    def test_json_prints_only_one_document_of_each_prompt_and_its_runs(self):
+        self.write('context-packs/releasing.md', doc('Releasing a version'))
+        self.sync()
+        self.cases('## Reads\n\n- Help me with writing tests before releasing a version\n\n'
+                   '## Skips\n\n- Rename a variable\n')
+
+        result = self.sync('eval', '--json', '--runs', '2')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = json.loads(result.stdout)
+        self.assertEqual(output['model'], 'sonnet')
+        self.assertEqual(output['runs'], 2)
+        reads, skips = output['cases']
+        self.assertEqual({key: reads[key] for key in ('doc', 'expect', 'prompt', 'outcome', 'passes')},
+                         {'doc': 'testing.md', 'expect': 'reads',
+                          'prompt': 'Help me with writing tests before releasing a version',
+                          'outcome': 'passed', 'passes': 2})
+        self.assertEqual([run['read'] for run in reads['runs']],
+                         [['context-packs/releasing.md', 'context-packs/testing.md']] * 2)
+        self.assertEqual([run['error'] for run in reads['runs']], [None, None])
+        self.assertEqual((skips['prompt'], skips['outcome']), ('Rename a variable', 'passed'))
+
+    def test_json_gives_each_runs_time_and_its_cost_when_it_ran_to_the_end(self):
+        self.cases('## Reads\n\n- Help me with writing tests\n\n## Skips\n\n- Rename a variable\n')
+
+        result = self.sync('eval', '--json')
+
+        (stopped,), (finished,) = (case['runs'] for case in json.loads(result.stdout)['cases'])
+        self.assertEqual((stopped['cost_usd'], finished['cost_usd']), (None, 0.0123))
+        self.assertIsInstance(stopped['duration_ms'], int)
+        self.assertIsInstance(finished['duration_ms'], int)
+
+    def test_json_gives_a_sessions_error_and_still_exits_1(self):
+        self.cases('## Skips\n\n- Rename a variable\n')
+        self.env['FAKE_CLAUDE_ERROR'] = 'Not logged in.'
+
+        result = self.sync('eval', '--json')
+
+        self.assertEqual(result.returncode, 1)
+        (case,) = json.loads(result.stdout)['cases']
+        self.assertEqual((case['outcome'], case['runs'][0]['error']), ('errored', 'Not logged in.'))
+
     def test_output_says_what_runs_then_how_it_went(self):
         self.cases('## Reads\n\n- Help me with writing tests\n- Writing tests again, please\n')
 
