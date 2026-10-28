@@ -97,6 +97,6 @@ Edit only files I own. Plugins, synced skills, and installed dependencies belong
 
 - The CLI is `src/cli.py`, with `src/blocks.py` for the block in `AGENTS.md`, `src/packs.py` for where packs come from, `src/tree.py` for `context-packs/` as a tree of packs, `src/imports.py` for the import packs the commands change, and `src/origins.py` for fetching packs from git. It uses only the Python standard library and `git`, and runs on macOS's system `python3` (3.9).
 - `bin/context-packs.js` is the npm package's bin, which npx runs. It only hands its arguments to the Python CLI.
-- `skills/context-packs/` is the skill this repo ships as a Claude Code plugin, alongside `.claude-plugin/plugin.json`.
+- `skills/` holds the skills this repo ships as a Claude Code plugin, alongside `.claude-plugin/plugin.json`: `context-packs` runs the tool, `pack-rule` writes a rule into a repo's packs, and `pack-backfill` finds a decision the code makes, consistently or not, that the packs don't settle, and hands it to `pack-rule`. They're for anyone using the tool, so they rely on nothing from any one person's packs.
 - Run the tests with `python3 -m unittest discover tests`.
 - This repo's own context docs are in `context-packs/project/`, and its shared rules come from agent-config through the import pack `context-packs/core/`. After adding a doc or changing its `when:` line, run `node bin/context-packs.js` and commit the result.
