@@ -112,7 +112,7 @@ Rather not type commands? [Let your agent run them](#let-your-agent-run-it).
 
 ## Let your agent run it
 
-The `context-packs` skill lets you skip the commands: ask Claude Code or Codex in plain words, and it runs them, shows you what changed, and leaves the result uncommitted for you to review. Install it for every project:
+The `context-packs` skill lets you skip the commands: ask Claude Code or Codex in plain words, and it runs them, shows you what changed, and leaves the result uncommitted for you to review. Install the skills for every project:
 
 ```bash
 npx skills add mjewell/context-packs -g
@@ -128,6 +128,13 @@ Then ask things like:
 - "Sync our project docs"
 
 In Claude Code, `/context-packs` invokes it directly.
+
+## Grow your packs with your agent
+
+Two more skills help write the rules themselves, and the command above installs them too. Pick with `-s`, such as `-s context-packs` for just the first.
+
+- **`pack-rule`** writes one rule into the repo's packs, from a pattern you describe or examples you point at. It looks for a rule that already covers it first, and updates that one rather than adding another. Ask things like "Document that API handlers validate input with Zod".
+- **`pack-backfill`** finds one decision the code makes that no rule settles yet, asks you to confirm it, and writes it with `pack-rule`. It's meant to be cheap enough to run often. In Claude Code, run `/pack-backfill`, or `/pack-backfill src/billing` to look in one area.
 
 ## Why not skills?
 
