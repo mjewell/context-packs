@@ -15,7 +15,7 @@ A **convention** is a decision the code makes, consistently or not, where there'
 
 ## 1. Find a candidate
 
-Look in the area, or for the kind of rule, the user named. Otherwise pick somewhere busy that the docs say little about: compare the folders recent commits touch most with what the docs' `when` lines and topics cover, and start in the busiest one nothing covers. Read a handful of files and the last few commits there until you see a decision made in several places, the same way or not. Note two or three **exemplars** of each way, recent files worth copying, and any **counterexamples**.
+Look in the area, or for the kind of rule, the user named. Otherwise start from a few recent commits, and pick a decision in what they changed that the docs don't appear to settle. Read around it until you've seen it made in several places, the same way or not. Note two or three **exemplars** of each way, recent files worth copying, and any **counterexamples**.
 
 Search the instruction file and the docs it points at for that decision, by meaning as well as by keyword. If a rule already settles it, look for another. Done when you have a candidate nothing settles.
 
