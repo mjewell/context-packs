@@ -61,6 +61,15 @@ class Pack(NamedTuple):
 REPO = Pack('', '.', ROOT.as_posix(), None)
 
 
+def base(repo):
+    """Where the paths in the synced folder's tables start from: its path from the root of the git repo holding it,
+    where sessions start, else its absolute path, since a session above the repos or in a user's config can start
+    anywhere."""
+    repo = repo.resolve()
+    root = next((f for f in (repo, *repo.parents) if (f / '.git').exists()), None)
+    return repo.relative_to(root) if root else repo
+
+
 def place(repo, pack):
     """Where the pack's content is, as an origin and the parts of a folder in it, to tell when two packs overlap."""
     if pack.local:

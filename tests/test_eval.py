@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 import sys
 
-from test_cli import SyncCase, doc
+from test_cli import CLAUSE, SyncCase, doc
 
 FAKE = Path(__file__).resolve().parent / 'fake_claude.py'
 
@@ -88,7 +88,7 @@ class EvalTests(EvalCase):
         self.assertIn('context-packs/.evals/testing.md:4', result.stderr)
         self.assertFalse(self.log.exists())
 
-    def test_sessions_run_read_only_in_a_copy_without_git_or_the_cases(self):
+    def test_sessions_run_read_only_in_a_fresh_repo_without_the_cases(self):
         self.cases('## Reads\n\n- Help me with writing tests\n')
 
         result = self.sync('eval')
@@ -97,7 +97,8 @@ class EvalTests(EvalCase):
         run = json.loads(self.log.read_text())
         self.assertFalse(run['cwd'].startswith(str(self.root)))
         self.assertIn('context-packs/testing.md', run['files'])
-        self.assertFalse([f for f in run['files'] if f.startswith('.git') or '.evals' in f])
+        self.assertIn('.git/HEAD', run['files'])
+        self.assertFalse([f for f in run['files'] if '.evals' in f])
         for flags in (['--output-format', 'stream-json'], ['--setting-sources', 'project'],
                       ['--tools', 'Read,Glob,Grep'], ['--allowedTools', 'Read,Glob,Grep'], ['--strict-mcp-config']):
             self.assertIn(' '.join(flags), ' '.join(run['args']))
@@ -281,13 +282,22 @@ class PackTests(EvalCase):
         self.assertIn('context-packs/rules/pack.md', files)
         self.assertNotIn('context-packs/testing.md', files)
 
+    def test_copy_is_synced_as_a_repo_is(self):
+        self.install()
+
+        result = self.sync('eval', 'deploying.md')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(CLAUSE, self.runs()[0]['instructions'])
+
     def test_pack_without_a_fixture_runs_in_an_empty_folder(self):
         self.install()
 
         self.sync('eval', 'deploying.md')
 
-        self.assertEqual(sorted(self.runs()[0]['files']), ['AGENTS.md', 'CLAUDE.md', 'context-packs',
-                                                           'context-packs/rules', 'context-packs/rules/pack.md'])
+        files = [f for f in self.runs()[0]['files'] if f.split('/')[0] != '.git']
+        self.assertEqual(sorted(files), ['AGENTS.md', 'CLAUDE.md', 'context-packs', 'context-packs/rules',
+                                         'context-packs/rules/pack.md'])
 
     def test_pack_with_a_fixture_runs_in_it_with_only_that_pack(self):
         self.write('rules/.evals/fixture/src/app.ts', 'export {};\n')

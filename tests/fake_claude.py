@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Stands in for `claude -p` in tests. Reads the instructions file in its working directory, as Claude Code loads it,
 and "reads" the doc of each table row whose when appears in the prompt, following rows in what it reads, writing
-each read as a tool_use line of stream-json, the way the real command does. Appends its arguments and working
-directory to $FAKE_CLAUDE_LOG."""
+each read as a tool_use line of stream-json, the way the real command does. Appends its arguments, working
+directory, the files in it and the instructions file it loaded to $FAKE_CLAUDE_LOG."""
 import json
 import os
 from pathlib import Path
@@ -16,9 +16,11 @@ def main():
     args = sys.argv[1:]
     prompt = args[args.index('-p') + 1]
     cwd = Path.cwd()
+    instructions = cwd / 'CLAUDE.md'
+    loaded = instructions.read_text() if instructions.exists() else ''
     if os.environ.get('FAKE_CLAUDE_LOG'):
         with open(os.environ['FAKE_CLAUDE_LOG'], 'a') as log:
-            log.write(json.dumps({'args': args, 'cwd': str(cwd),
+            log.write(json.dumps({'args': args, 'cwd': str(cwd), 'instructions': loaded,
                                   'files': sorted(p.relative_to(cwd).as_posix() for p in cwd.rglob('*'))}) + '\n')
     print(json.dumps({'type': 'system', 'subtype': 'init'}))
     if os.environ.get('FAKE_CLAUDE_CRASH'):
@@ -29,7 +31,6 @@ def main():
         print(json.dumps({'type': 'assistant', 'message': {'content': [{'type': 'text', 'text': error}]}}))
         print(json.dumps({'type': 'result', 'subtype': 'success', 'is_error': True, 'result': error}))
         sys.exit(1)
-    instructions = cwd / 'CLAUDE.md'
     seen = set()
 
     def follow(text):
@@ -45,7 +46,7 @@ def main():
                 if target.is_file():
                     follow(target.read_text())
 
-    follow(instructions.read_text() if instructions.exists() else '')
+    follow(loaded)
     if os.environ.get('FAKE_CLAUDE_MAX_TURNS'):
         # As the real command ends a session that runs out of turns: flagged is_error, with no result.
         print(json.dumps({'type': 'result', 'subtype': 'error_max_turns', 'is_error': True}))

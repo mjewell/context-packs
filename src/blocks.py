@@ -8,17 +8,22 @@ from typing import NamedTuple
 from packs import GEN, ROOT
 
 START = '<!-- context-packs:start -->\n'
-HEADER = (
-    '## Context Packs\n\n'
-    'Context packs bring shared rules and docs in from elsewhere. Each pack has its rules and a table of its context '
-    'docs here, and a doc may hold a table of its own. Before starting work that a row in any of these tables '
-    f'matches, read its doc. The packs here, and everything under `{GEN.as_posix()}/`, are generated from '
-    f'`{ROOT.as_posix()}/`: change them there, never here.\n')
 BLOCK = re.compile(r'^<!-- context-packs:start -->\n(.*?)^<!-- context-packs:end sha256:([0-9a-f]{12}) -->\n?',
                    re.MULTILINE | re.DOTALL)
 MARKER = re.compile(r'^<!-- context-packs:start', re.MULTILINE)
 # A start marker holding a pack's name, as versions before one block per file wrote them.
 OLD_MARKER = re.compile(r'^<!-- context-packs:start (?!-->)', re.MULTILINE)
+
+
+def header(base):
+    """The block's header, saying where the tables' paths start from unless they're absolute."""
+    return ('## Context Packs\n\n'
+            'Context packs bring shared rules and docs in from elsewhere. Each pack has its rules and a table of its '
+            'context docs here, and a doc may hold a table of its own. Before starting work that a row in any of these '
+            'tables matches, read its doc. '
+            + 'The paths in these tables start from the repo root. ' * (not base.is_absolute())
+            + f'The packs here, and everything under `{GEN.as_posix()}/`, are generated from `{ROOT.as_posix()}/`: '
+            'change them there, never here.\n')
 
 
 class Region(NamedTuple):
