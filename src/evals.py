@@ -107,6 +107,11 @@ def pointed(imported, repo):
     return '---\n' + '\n'.join([f'from: {origin}', *fields]) + '\n---\n' + imported.text[front.end():]
 
 
+def init(copy):
+    """Make the copy a git repo with no history, so it syncs and its sessions run as they would in a repo."""
+    subprocess.run(['git', 'init', '--quiet', str(copy)], check=True, capture_output=True)
+
+
 def stage(repo, pack, into):
     """Write the folder the pack's sessions run in a copy of: its fixture, or else the repo for context-packs/ or an
     empty folder, with the pack synced into it alone, or with all of context-packs/ for the pack at the top. A folder
@@ -114,6 +119,7 @@ def stage(repo, pack, into):
     fixture = repo / pack.evals / 'fixture'
     if not fixture.is_dir() and pack.top:
         shutil.copytree(repo, into, symlinks=True, ignore=LEFT_OUT)
+        init(into)
         return
     if fixture.is_dir():
         # Resolved, so a fixture linked from elsewhere is copied like a folder.
@@ -134,6 +140,7 @@ def stage(repo, pack, into):
         (into / ROOT / name(pack)).mkdir(parents=True)
         origin = (repo / pack.folder).resolve()
         (into / ROOT / name(pack) / 'pack.md').write_text(f'---\nfrom: {origin}\n---\n', encoding='utf-8')
+    init(into)
     synced = subprocess.run([sys.executable, str(CLI), '--dir', str(into)], capture_output=True, text=True)
     if synced.returncode != 0:
         sys.exit(f'context-packs: syncing {pack.folder} into a copy of its fixture failed:\n{synced.stderr.strip()}')

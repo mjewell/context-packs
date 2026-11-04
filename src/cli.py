@@ -13,8 +13,8 @@ import tempfile
 import evals
 import imports
 import report
-from blocks import HEADER, block, instructions, region, snapshot
-from packs import GEN, REPO
+from blocks import block, header, instructions, region, snapshot
+from packs import GEN, REPO, base
 import tree
 
 
@@ -26,9 +26,10 @@ def show(found):
 
 def generate(root, out, repo):
     """Write the generated files into out's context-packs/gen/, and return the block, whose hash covers them."""
-    tree.write(root, REPO, repo / REPO.synced, out)
-    rendered = tree.render(root, REPO)
-    return block(HEADER + '\n' * bool(rendered) + rendered, snapshot(out / GEN))
+    start = base(repo)
+    tree.write(root, REPO, repo / REPO.synced, out, start)
+    rendered = tree.render(root, REPO, start)
+    return block(header(start) + '\n' * bool(rendered) + rendered, snapshot(out / GEN))
 
 
 def generated(out):

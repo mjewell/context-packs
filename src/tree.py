@@ -1,6 +1,7 @@
 """The packs in context-packs/ as a tree: the repo's own pack.md and docs, each folder holding a pack.md of its own
 nested inside, and each import pack replaced by the pack it names. A folder without a pack.md only groups files,
 whose docs join the nearest pack's table."""
+import os
 from pathlib import Path
 import re
 import shutil
@@ -204,10 +205,11 @@ def index(node, pack):
     return pack.generated / f'{node.id or "pack"}.md'
 
 
-def table(heading, rows):
-    """A table of (when, path) rows under its heading, or nothing without rows."""
+def table(heading, rows, base):
+    """A table of (when, path) rows under its heading, or nothing without rows, each path starting from base."""
     return (f'{heading}\n\n| When | Read |\n|---|---|\n'
-            + ''.join(f'| {when} | `{path.as_posix()}` |\n' for when, path in rows)) if rows else ''
+            + ''.join(f'| {when} | `{Path(os.path.normpath(base / path)).as_posix()}` |\n' for when, path in rows)
+            ) if rows else ''
 
 
 def name(node, pack):
@@ -219,26 +221,27 @@ def heading(node, pack):
     return f'## {name(node, pack)} context' if name(node, pack) else '## Context'
 
 
-def inline(node, pack):
+def inline(node, pack, base):
     """The pack rendered where its parent's rules and table end, between markers naming it, which only show people
     reading the file where each pack starts and ends."""
-    return (f'<!-- context-packs:pack {name(node, pack)} -->\n{render(node, pack)}'
+    return (f'<!-- context-packs:pack {name(node, pack)} -->\n{render(node, pack, base)}'
             f'<!-- context-packs:pack-end {name(node, pack)} -->\n')
 
 
-def render(node, pack):
+def render(node, pack, base):
     """The node's rules, then its table: a row for each of its docs, and for each pack nested in it or imported
-    into it that gets one. Each of those packs that doesn't is rendered the same way after it."""
+    into it that gets one, its path starting from base. Each of those packs that doesn't is rendered the same way
+    after it."""
     rows = sorted([(d.path[:-len('.md')], d.when, pack.synced / d.path) for d in node.docs]
                   + [(c.id, c.fields['when'], index(c, pack)) for c in node.children if c.row]
                   + [(i.id, i.root.fields['when'], index(i.root, i.pack)) for i in node.imports if i.root.row])
-    inlined = ([inline(c, pack) for c in node.children if not c.row]
-               + [inline(i.root, i.pack) for i in node.imports if not i.root.row])
-    return '\n'.join(part for part in (node.rules, table(heading(node, pack), [r[1:] for r in rows]), *inlined)
-                     if part)
+    inlined = ([inline(c, pack, base) for c in node.children if not c.row]
+               + [inline(i.root, i.pack, base) for i in node.imports if not i.root.row])
+    return '\n'.join(part for part in (node.rules, table(heading(node, pack), [r[1:] for r in rows], base),
+                                        *inlined) if part)
 
 
-def write(root, pack, source, repo):
+def write(root, pack, source, repo, base):
     """Copy the packs' files from source into repo, unless the pack is local, and write the index of each pack that
     gets a row, then do the same for each pack imported into them."""
     for node in [root, *root.nested()]:
@@ -249,6 +252,6 @@ def write(root, pack, source, repo):
         if node.row:
             target = repo / index(node, pack)
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(render(node, pack), encoding='utf-8')
+            target.write_text(render(node, pack, base), encoding='utf-8')
         for imported in node.imports:
-            write(imported.root, imported.pack, imported.source, repo)
+            write(imported.root, imported.pack, imported.source, repo, base)

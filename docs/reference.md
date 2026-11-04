@@ -2,7 +2,7 @@
 
 ## Commands
 
-Each command syncs the current folder, or `--dir <folder>`, and prints what changed. The folder can also hold several repos without being one itself, so sessions started there get the rules too.
+Each command syncs the current folder, or `--dir <folder>`, and prints what changed. The folder can also hold several repos without being one itself, so sessions started there get the rules too. The tables' paths start from the repo root, where sessions start, so a folder inside a repo, such as a package with its own `AGENTS.md`, gets rows naming its path from the root. A folder in no repo gets absolute paths, since a session reading it can start anywhere.
 
 | Command | Does |
 |---|---|
@@ -135,7 +135,7 @@ A pack's prompts run with that pack installed alone, plus everything inside it, 
 
 `eval` runs the prompts of `context-packs/` and of every pack inside it read in place, and `eval --pack <folder>` runs one pack's, whether the repo installs it or not, as for a repo of packs written for others. Name docs as it prints them to run only theirs, and pass `--runs 3` to see whether a result holds up: a prompt passes only if every run does. Pass `--json` to get, once every run finishes, one JSON document instead: each prompt's doc, expectation, outcome and passes, and for each of its runs every file it read, its error, its time, and its cost as claude reports it.
 
-The sessions for `context-packs/` run in a copy of the repo, and for any other pack in an empty folder with just that pack installed. If the prompts are about code that isn't there, put a folder for them to run in at `.evals/fixture/`, such as a small fake project: its copy gets the pack installed and synced instead, with a folder read in place named by its absolute path so its rows still point here. To share a fixture between packs, link each `.evals/fixture` to it. A fixture can't have a `context-packs/` of its own.
+The sessions for `context-packs/` run in a copy of the repo, and for any other pack in an empty folder with just that pack installed. Each copy is a git repo with no history, so it syncs as the repo does. If the prompts are about code that isn't there, put a folder for them to run in at `.evals/fixture/`, such as a small fake project: its copy gets the pack installed and synced instead, with a folder read in place named by its absolute path so its rows still point here. To share a fixture between packs, link each `.evals/fixture` to it. A fixture can't have a `context-packs/` of its own.
 
 Every copy sits outside your folders, without `.git`, `node_modules` or `.evals`, and loads only its own `CLAUDE.md`. Sessions get only the tools that look (`Read`, `Glob` and `Grep`), no MCP servers, and up to 8 turns. Each runs to its end, even after reading its doc, so it shows every doc it reads and what it cost. A prompt that fails lists the docs its session read, and one that passes lists any others it read, where a row matching work it shouldn't shows up first. A session that errors instead, such as one without a login or on a model you can't use, settles nothing: its prompt shows `!` and claude's error, and `eval` exits 1. Sessions use your Claude Code login and cost tokens, about 10–40k each on Sonnet, mostly read from cache, and run on Sonnet unless you pass `--model`. Results depend on the model, and a prompt that passes only on a larger one points at a `when` worth making plainer.
 
