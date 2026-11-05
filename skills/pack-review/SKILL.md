@@ -46,15 +46,14 @@ Group the docs into **units** for checking. Each pack is a unit, holding its own
 
 Give each unit to a subagent, all in parallel. A single small unit can be checked inline. Each one gets the diff and log commands, its docs' paths, and their routing. It reads every doc in full, whatever its routing, since a rule whose doc didn't route can still apply to the change.
 
-For each rule that applies somewhere in the diff, it returns a **ledger** entry:
+For each rule that applies somewhere in the diff, it returns one **ledger** entry:
 
 - the rule, quoted, with its file;
-- where it applies in the diff, as file and line;
-- whether that spot follows the rule or deviates from it;
-- for a deviation, any signs it's deliberate: a comment at the spot, a condition in the code that sets the spot apart, the same deviation made across the diff, or the PR description or commit messages saying so;
-- whether the rule's doc was routed.
+- whether the rule's doc was routed;
+- every spot in the diff where the rule applies, as file and line, each saying whether it follows the rule or deviates from it;
+- for each deviating spot, any signs it's deliberate: a comment at the spot, a condition in the code that sets the spot apart, or the PR description or commit messages saying so.
 
-It reports signs, not a verdict on whether the deviation is right.
+Spots that all deviate the same way are a sign too, and spots that mix following and deviating show the change isn't consistent with itself. It reports signs, not a verdict on whether the deviation is right.
 
 It reports nothing it can't quote a rule for. Done when every unit has reported. Merge their entries into one ledger.
 
@@ -76,10 +75,10 @@ The walk isn't exhaustive. A missed choice turns up in a later review or a `pack
 
 From the ledger:
 
-- Each entry that deviates from its rule is a deviates finding, carrying whether its doc was routed.
-- Two entries on the same spot that point opposite ways are conflicting.
+- Each entry with a deviating spot is one deviates finding, listing those spots and carrying whether its doc was routed.
+- Two entries that share a spot and point opposite ways are conflicting.
 
-Add the uncovered choices from step 4. Merge findings that two units reported about the same spot.
+Add the uncovered choices from step 4. Merge findings that two units reported about the same rule.
 
 ## 6. Report
 
