@@ -1,6 +1,6 @@
 ---
 name: pack-review
-description: Review a PR or branch against a repo's context packs. Find where it breaks a written rule, and the gaps in the packs it shows, such as a rule its doc's `when` didn't reach or a choice no rule settles.
+description: Review a PR or branch against a repo's context packs. Find where it departs from a written rule, whether that rule's `when` reached the work, and the choices it makes that no rule covers.
 argument-hint: "[PR number, branch, or commit range]"
 disable-model-invocation: true
 ---
@@ -10,20 +10,20 @@ disable-model-invocation: true
 Done when:
 
 - every doc the repo puts in front of an agent was read in full against the diff, by you or a subagent;
-- every violation reported quotes the rule it breaks and the line that breaks it, and says whether the rule's doc was routed to the work;
-- the diff was walked for choices no rule covers, and each such gap says how the existing code makes that choice;
-- the user has seen a summary of every finding and gone through them one at a time;
-- the `pack-rule` skill was run once for each gap the user accepted.
+- every departure from a rule quotes the rule and the line that departs from it, says whether the rule's doc was routed to the work, and gives any signs the departure is deliberate;
+- the diff was walked for choices no rule covers, and each uncovered choice says how the existing code makes it;
+- the user has seen a summary of every finding, gone through them one at a time, and said what to do about each;
+- the `pack-rule` skill was run once for each finding the user wants recorded in the packs.
 
-This review checks the change only against what the repo's packs and instruction file say. Bugs, style no rule mentions, and whether the change does what it set out to do are for other reviews. A finding with no rule to quote is either a gap or out of scope.
+This review checks the change only against what the repo's packs and instruction file say. Bugs, style no rule mentions, and whether the change does what it set out to do are for other reviews. A finding with no rule to quote is either uncovered or out of scope.
 
-A **violation** is a place where the diff breaks a written rule. It gets fixed in the change. A **gap** is knowledge the packs are missing, or hold in a way that didn't work:
+Each finding is one of three kinds:
 
-- **Unreachable**: the diff breaks a rule whose doc's `when` doesn't match the work. The fix is the `when`, not the rule.
-- **Weak**: the diff breaks a rule whose doc's `when` does match, and the wording would let an agent read it and still go the other way.
-- **Stale**: the change deliberately moves away from a convention a rule still describes.
+- **Deviates**: the change departs from a written rule. Each deviation says whether the rule's doc was routed, meaning its `when` matches the work. When it wasn't, the author's agent may not have read the rule, though a rule read and ignored looks the same in the diff.
 - **Conflicting**: two rules point opposite ways at the same spot.
-- **Unsettled**: the change makes a choice an agent would copy, another way would be reasonable, and no rule covers it.
+- **Uncovered**: the change makes a choice an agent would copy, another way would be reasonable, and no rule covers it.
+
+A departure can mean the change is wrong, the rule lacks an exception the change shows, or the convention has moved on. The diff alone can't settle which, so report the departure with its evidence and leave the call to the user.
 
 ## 1. Pin the diff
 
@@ -46,18 +46,21 @@ Group the docs into **units** for checking. Each pack is a unit, holding its own
 
 ## 3. Check each unit against the diff
 
-Give each unit to a subagent, all in parallel. A single small unit can be checked inline. Each one gets the diff and log commands, its docs' paths, and their routing. It reads every doc in full, whatever its routing, since the docs that didn't route are where unreachable rules show up.
+Give each unit to a subagent, all in parallel. A single small unit can be checked inline. Each one gets the diff and log commands, its docs' paths, and their routing. It reads every doc in full, whatever its routing, since a rule whose doc didn't route can still apply to the change.
 
 For each rule that applies somewhere in the diff, it returns a **ledger** entry:
 
 - the rule, quoted, with its file;
 - where it applies in the diff, as file and line;
-- whether that spot follows the rule, breaks it, or moves away from it on purpose so the rule is now stale;
+- whether that spot follows the rule or departs from it;
+- for a departure, any signs it's deliberate: a comment at the spot, a condition in the code that sets the spot apart, the same departure made across the diff, or the PR description or commit messages saying so;
 - whether the rule's doc was routed.
+
+It reports signs, not a verdict on whether the departure is right.
 
 It reports nothing it can't quote a rule for. Done when every unit has reported. Merge their entries into one ledger.
 
-## 4. Look for unsettled choices
+## 4. Look for uncovered choices
 
 After step 3, one subagent walks the diff hunk by hunk with the merged ledger. It looks for choices an agent would copy, where another way would be reasonable, that no ledger entry covers: where a kind of logic lives, how a kind of file is shaped, which library or style it uses, how errors travel, how a kind of thing is named. It leaves out choices with no real alternative, what a linter, formatter or type check enforces, and one-off logic.
 
@@ -69,24 +72,27 @@ For each choice, it finds how the existing code makes it, with two or three **ex
 
 Before reporting a choice, it searches the docs for a rule that settles it, by meaning as well as by keyword. If one does, the choice belongs in the ledger instead.
 
-The walk isn't exhaustive. A missed gap turns up in a later review or a `pack-backfill` run, while each weak candidate costs the user a turn. Report the strongest few.
+The walk isn't exhaustive. A missed choice turns up in a later review or a `pack-backfill` run, while each weak candidate costs the user a turn. Report the strongest few.
 
 ## 5. Sort the findings
 
 From the ledger:
 
-- Each broken rule is a violation. If its doc wasn't routed, it's also an unreachable gap. If it was routed, it's a weak gap only when the wording leaves room to go the other way. A routed, clear rule that was broken is just a violation.
-- Each stale entry is a stale gap.
-- Two entries on the same spot that point opposite ways are a conflicting gap.
+- Each departure from a rule deviates, carrying whether its doc was routed.
+- Two entries on the same spot that point opposite ways are conflicting.
 
-Add the unsettled choices from step 4. Merge findings that two units reported about the same spot.
+Add the uncovered choices from step 4. Merge findings that two units reported about the same spot.
 
 ## 6. Report
 
-Start with a summary: the number of violations and gaps, and a line for each, violations first. Then go through them one at a time. For each, quote the rule or the hunk, give your take, and wait for the user before moving on.
+Start with a summary: the number of findings of each kind, and a line for each. A deviation's line says whether its doc was routed. Then go through them one at a time. For each, quote the rule or the hunk, give any signs the departure is deliberate, give your take, and wait for the user to say what to do:
+
+- **Deviates**: fix the change, or change the rule by sharpening its wording, adding the exception the change shows, or replacing it. When the rule's doc wasn't routed, its `when` may also need fixing, whichever way the rest goes.
+- **Conflicting**: which rule wins.
+- **Uncovered**: whether to write it, and which way new code should follow.
 
 Keep the review in chat. Posting it to the PR writes to an external system: do it only if the user asks, and show them the comments first.
 
-## 7. Hand off the gaps
+## 7. Hand off what to record
 
-Run the `pack-rule` skill once for each gap the user accepts, since it writes one rule per run. Pass it its kind, the ledger entries or hunks behind it, its exemplars, and the user's answer on which way new code should follow. Leave the violations for the change's author, unless the user asks you to fix them.
+Run the `pack-rule` skill once for each finding the user wants recorded in the packs, since it writes one rule per run. Pass it the finding's kind, whether its doc was routed, the ledger entries or hunks behind it, any signs of a deliberate departure, its exemplars, and the user's answer. Leave fixes to the change for its author, unless the user asks you to make them.
