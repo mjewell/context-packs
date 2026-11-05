@@ -55,11 +55,11 @@ For each rule that applies somewhere in the diff, it returns one **ledger** entr
 
 Spots that all deviate the same way are a sign too, and spots that mix following and deviating show the change isn't consistent with itself. It reports signs, not a verdict on whether the deviation is right.
 
-It reports nothing it can't quote a rule for. Done when every unit has reported. Merge their entries into one ledger.
+It reports nothing it can't quote a rule for. Done when every unit has reported. Merge their entries into one ledger, kept by rule. The gap pass and the check for conflicts read it by spot instead: for each hunk, the rules that apply to it.
 
 ## 4. Look for uncovered choices
 
-After step 3, one subagent walks the diff hunk by hunk with the merged ledger. It looks for kinds of decision that will come up again, where another way would be reasonable, that no ledger entry covers: where a kind of logic lives, how a kind of file is shaped, which library or style it uses, how errors travel, how a kind of thing is named. It leaves out choices with no real alternative, what a linter, formatter or type check enforces, and one-off logic.
+After step 3, one subagent walks the diff hunk by hunk with the ledger arranged by spot. It looks for kinds of decision that will come up again, where another way would be reasonable, that no ledger entry covers: where a kind of logic lives, how a kind of file is shaped, which library or style it uses, how errors travel, how a kind of thing is named. It leaves out choices with no real alternative, what a linter, formatter or type check enforces, and one-off logic.
 
 For each choice, it finds how the existing code makes it, with two or three **exemplars** of each way:
 
