@@ -55,7 +55,7 @@ For each rule that applies somewhere in the diff, it returns one **ledger** entr
 
 Spots that all deviate the same way are a sign too, and spots that mix following and deviating show the change isn't consistent with itself. It reports signs, not a verdict on whether the deviation is right.
 
-It reports nothing it can't quote a rule for. Done when every unit has reported. Merge their entries into one ledger, kept by rule. The gap pass and the check for conflicts read it by spot instead: for each hunk, the rules that apply to it.
+It reports nothing it can't quote a rule for. Done when every unit has reported. Merge their entries into one ledger.
 
 ## 4. Look for uncovered choices
 
