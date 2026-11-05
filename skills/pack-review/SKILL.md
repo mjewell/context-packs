@@ -1,6 +1,6 @@
 ---
 name: pack-review
-description: Review a PR or branch against a repo's context packs. Find where it departs from a written rule, whether that rule's `when` reached the work, and the choices it makes that no rule covers.
+description: Review a PR or branch against a repo's context packs. Find where it deviates from a written rule, whether that rule's `when` reached the work, and the choices it makes that no rule covers.
 argument-hint: "[PR number, branch, or commit range]"
 disable-model-invocation: true
 ---
@@ -10,20 +10,20 @@ disable-model-invocation: true
 Done when:
 
 - every doc the repo puts in front of an agent was read in full against the diff, by you or a subagent;
-- every departure from a rule quotes the rule and the line that departs from it, says whether the rule's doc was routed to the work, and gives any signs the departure is deliberate;
+- every deviation from a rule quotes the rule and the line that deviates from it, says whether the rule's doc was routed to the work, and gives any signs the deviation is deliberate;
 - the diff was walked for choices no rule covers, and each uncovered choice says how the existing code makes it;
 - the user has seen a summary of every finding, gone through them one at a time, and said what to do about each;
 - the `pack-rule` skill was run once for each finding the user wants recorded in the packs.
 
-This review checks the change only against what the repo's packs and instruction file say. Bugs, style no rule mentions, and whether the change does what it set out to do are for other reviews. A finding with no rule to quote is either uncovered or out of scope.
+This review checks the change only against what the repo's packs and instruction file say. Bugs, style no rule mentions, and whether the change does what it set out to do are for other reviews. A finding with no rule to quote is uncovered when it's a choice an agent would copy and another way would be reasonable. Anything else without a rule, such as a bug, is for other reviews, and this one leaves it out.
 
 Each finding is one of three kinds:
 
-- **Deviates**: the change departs from a written rule. Each deviation says whether the rule's doc was routed, meaning its `when` matches the work. When it wasn't, the author's agent may not have read the rule, though a rule read and ignored looks the same in the diff.
+- **Deviates**: the change deviates from a written rule. Each deviation says whether the rule's doc was routed, meaning its `when` matches the work. When it wasn't, the author's agent may not have read the rule, though a rule read and ignored looks the same in the diff.
 - **Conflicting**: two rules point opposite ways at the same spot.
 - **Uncovered**: the change makes a choice an agent would copy, another way would be reasonable, and no rule covers it.
 
-A departure can mean the change is wrong, the rule lacks an exception the change shows, or the convention has moved on. The diff alone can't settle which, so report the departure with its evidence and leave the call to the user.
+A deviation can mean the change is wrong, the rule lacks an exception the change shows, or the convention has moved on. The diff alone can't settle which, so report the deviation with its evidence and leave the call to the user.
 
 ## 1. Pin the diff
 
@@ -52,11 +52,11 @@ For each rule that applies somewhere in the diff, it returns a **ledger** entry:
 
 - the rule, quoted, with its file;
 - where it applies in the diff, as file and line;
-- whether that spot follows the rule or departs from it;
-- for a departure, any signs it's deliberate: a comment at the spot, a condition in the code that sets the spot apart, the same departure made across the diff, or the PR description or commit messages saying so;
+- whether that spot follows the rule or deviates from it;
+- for a deviation, any signs it's deliberate: a comment at the spot, a condition in the code that sets the spot apart, the same deviation made across the diff, or the PR description or commit messages saying so;
 - whether the rule's doc was routed.
 
-It reports signs, not a verdict on whether the departure is right.
+It reports signs, not a verdict on whether the deviation is right.
 
 It reports nothing it can't quote a rule for. Done when every unit has reported. Merge their entries into one ledger.
 
@@ -78,14 +78,14 @@ The walk isn't exhaustive. A missed choice turns up in a later review or a `pack
 
 From the ledger:
 
-- Each departure from a rule deviates, carrying whether its doc was routed.
+- Each entry that deviates from its rule is a deviates finding, carrying whether its doc was routed.
 - Two entries on the same spot that point opposite ways are conflicting.
 
 Add the uncovered choices from step 4. Merge findings that two units reported about the same spot.
 
 ## 6. Report
 
-Start with a summary: the number of findings of each kind, and a line for each. A deviation's line says whether its doc was routed. Then go through them one at a time. For each, quote the rule or the hunk, give any signs the departure is deliberate, give your take, and wait for the user to say what to do:
+Start with a summary: the number of findings of each kind, and a line for each. A deviation's line says whether its doc was routed. Then go through them one at a time. For each, quote the rule or the hunk, give any signs the deviation is deliberate, give your take, and wait for the user to say what to do:
 
 - **Deviates**: fix the change, or change the rule by sharpening its wording, adding the exception the change shows, or replacing it. When the rule's doc wasn't routed, its `when` may also need fixing, whichever way the rest goes.
 - **Conflicting**: which rule wins.
@@ -95,4 +95,4 @@ Keep the review in chat. Posting it to the PR writes to an external system: do i
 
 ## 7. Hand off what to record
 
-Run the `pack-rule` skill once for each finding the user wants recorded in the packs, since it writes one rule per run. Pass it the finding's kind, whether its doc was routed, the ledger entries or hunks behind it, any signs of a deliberate departure, its exemplars, and the user's answer. Leave fixes to the change for its author, unless the user asks you to make them.
+Run the `pack-rule` skill once for each finding the user wants recorded in the packs, since it writes one rule per run. Pass it the finding's kind, whether its doc was routed, the ledger entries or hunks behind it, any signs of a deliberate deviation, its exemplars, and the user's answer. Leave fixes to the change for its author, unless the user asks you to make them.
