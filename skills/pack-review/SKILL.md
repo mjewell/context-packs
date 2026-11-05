@@ -15,7 +15,7 @@ Done when:
 - the user has seen a summary of every finding, gone through them one at a time, and said what to do about each;
 - the `pack-rule` skill was run once for each finding the user wants recorded in the packs.
 
-This review checks the change only against what the repo's packs and instruction file say. Bugs, style no rule mentions, and whether the change does what it set out to do are for other reviews.
+This review checks the change only against what the repo's packs and instruction file say. Bugs, and whether the change does what it set out to do, are for other reviews.
 
 Each finding is one of three kinds:
 
