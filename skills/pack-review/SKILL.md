@@ -13,7 +13,7 @@ Done when:
 - every violation reported quotes the rule it breaks and the line that breaks it, and says whether the rule's doc was routed to the work;
 - the diff was walked for choices no rule covers, and each such gap says how the existing code makes that choice;
 - the user has seen a summary of every finding and gone through them one at a time;
-- each gap the user accepted was handed to the `pack-rule` skill, one per run.
+- the `pack-rule` skill was run once for each gap the user accepted.
 
 This review checks the change only against what the repo's packs and instruction file say. Bugs, style no rule mentions, and whether the change does what it set out to do are for other reviews. A finding with no rule to quote is either a gap or out of scope.
 
@@ -89,4 +89,4 @@ Keep the review in chat. Posting it to the PR writes to an external system: do i
 
 ## 7. Hand off the gaps
 
-Hand each gap the user accepts to the `pack-rule` skill, one per run. Pass its kind, the ledger entries or hunks behind it, its exemplars, and the user's answer on which way new code should follow. Leave the violations for the change's author, unless the user asks you to fix them.
+Run the `pack-rule` skill once for each gap the user accepts, since it writes one rule per run. Pass it its kind, the ledger entries or hunks behind it, its exemplars, and the user's answer on which way new code should follow. Leave the violations for the change's author, unless the user asks you to fix them.
