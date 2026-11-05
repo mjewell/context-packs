@@ -21,7 +21,7 @@ Each finding is one of three kinds:
 
 - **Deviates**: the change deviates from a written rule. The change may be wrong, the rule may lack an exception, or the convention may have moved on. The diff can't tell which, so the user decides. Each deviation also says whether the rule's doc was routed, meaning its `when` matches the work.
 - **Conflicting**: two rules point opposite ways at the same spot.
-- **Uncovered**: the change makes a choice an agent would copy, another way would be reasonable, and no rule covers it.
+- **Uncovered**: the change makes a kind of decision that will come up again, another way would be reasonable, and no rule covers it.
 
 ## 1. Pin the diff
 
@@ -60,7 +60,7 @@ It reports nothing it can't quote a rule for. Done when every unit has reported.
 
 ## 4. Look for uncovered choices
 
-After step 3, one subagent walks the diff hunk by hunk with the merged ledger. It looks for choices an agent would copy, where another way would be reasonable, that no ledger entry covers: where a kind of logic lives, how a kind of file is shaped, which library or style it uses, how errors travel, how a kind of thing is named. It leaves out choices with no real alternative, what a linter, formatter or type check enforces, and one-off logic.
+After step 3, one subagent walks the diff hunk by hunk with the merged ledger. It looks for kinds of decision that will come up again, where another way would be reasonable, that no ledger entry covers: where a kind of logic lives, how a kind of file is shaped, which library or style it uses, how errors travel, how a kind of thing is named. It leaves out choices with no real alternative, what a linter, formatter or type check enforces, and one-off logic.
 
 For each choice, it finds how the existing code makes it, with two or three **exemplars** of each way:
 
