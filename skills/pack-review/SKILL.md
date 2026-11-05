@@ -19,11 +19,9 @@ This review checks the change only against what the repo's packs and instruction
 
 Each finding is one of three kinds:
 
-- **Deviates**: the change deviates from a written rule. Each deviation says whether the rule's doc was routed, meaning its `when` matches the work. When it wasn't, the author's agent may not have read the rule, though a rule read and ignored looks the same in the diff.
+- **Deviates**: the change deviates from a written rule. The change may be wrong, the rule may lack an exception, or the convention may have moved on. The diff can't tell which, so the user decides. Each deviation also says whether the rule's doc was routed, meaning its `when` matches the work.
 - **Conflicting**: two rules point opposite ways at the same spot.
 - **Uncovered**: the change makes a choice an agent would copy, another way would be reasonable, and no rule covers it.
-
-A deviation can mean the change is wrong, the rule lacks an exception the change shows, or the convention has moved on. The diff alone can't settle which, so report the deviation with its evidence and leave the call to the user.
 
 ## 1. Pin the diff
 
