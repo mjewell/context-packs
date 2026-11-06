@@ -104,7 +104,7 @@ The block ends with a hash of its text and the files under `context-packs/gen/`.
 `check` renders every pack the way a sync would, and fails if `AGENTS.md` or a file in `context-packs/gen/` differs, such as after a `when:` line or a pinned `ref` changed without a resync, or after synced content was edited in place:
 
 ```yaml
-- uses: actions/checkout@v4
+- uses: actions/checkout@v6
 - run: npx --yes context-packs check
 ```
 
@@ -162,7 +162,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
