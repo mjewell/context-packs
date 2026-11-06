@@ -21,4 +21,4 @@ jobs:
       # The action from this checkout, unlike the reference's @main, so a PR that changes it reviews with its change.
       - uses: ./review
         with:
-          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

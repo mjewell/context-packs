@@ -171,6 +171,8 @@ jobs:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
+With a Pro or Max subscription instead of an API key, run `claude setup-token` locally, add what it prints as the secret `CLAUDE_CODE_OAUTH_TOKEN`, and pass `claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}` in place of `anthropic-api-key`. Reviews then count against the subscription's usage limits.
+
 It reviews a PR when it's opened or marked ready, and again on each push. A newer push cancels a review still running. Pin `@main` to a release tag once you've tried it. Pass `model` to review with a model other than Claude Code's default.
 
 Each review posts:

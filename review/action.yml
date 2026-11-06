@@ -2,8 +2,13 @@ name: pack-review
 description: Review a PR against the repo's context packs with claude-code-action, comment on what it finds, and keep a summary for the author to go through locally.
 inputs:
   anthropic-api-key:
-    description: An Anthropic API key for the review agent.
-    required: true
+    description: An Anthropic API key for the review agent. Pass this or claude-code-oauth-token.
+    required: false
+    default: ''
+  claude-code-oauth-token:
+    description: A Claude Code OAuth token, from `claude setup-token`, so the review uses a Pro or Max subscription. Pass this or anthropic-api-key.
+    required: false
+    default: ''
   model:
     description: The model to review with, if not Claude Code's default.
     required: false
@@ -33,7 +38,9 @@ runs:
       # v1.0.268, pinned by commit since a tag can move.
       uses: anthropics/claude-code-action@c0949c50a78c1ec8ce2647db36629b870e715d0c
       with:
+        # claude-code-action stops with an error when neither is set.
         anthropic_api_key: ${{ inputs.anthropic-api-key }}
+        claude_code_oauth_token: ${{ inputs.claude-code-oauth-token }}
         github_token: ${{ github.token }}
         prompt: /context-packs:pack-review ci ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}
         claude_args: ${{ steps.prepare.outputs.claude-args }}
