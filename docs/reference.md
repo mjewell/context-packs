@@ -143,7 +143,7 @@ Prompts close to a row's `when` that shouldn't match it, or that match only thro
 
 ## Reviewing PRs in CI
 
-The `review` action runs the `pack-review` skill on a PR and posts what it finds. The author then goes through the findings in a local session. Add a workflow such as `.github/workflows/pack-review.yml`:
+The `review` action runs the `pack-review` skill on a PR with [claude-code-action](https://github.com/anthropics/claude-code-action), and posts what it finds. The author then goes through the findings in a local session. Add a workflow such as `.github/workflows/pack-review.yml`:
 
 ```yaml
 name: pack-review
@@ -166,7 +166,6 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-          persist-credentials: false
       - uses: mjewell/context-packs/review@main
         with:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -176,14 +175,14 @@ It reviews a PR when it's opened or marked ready, and again on each push. A newe
 
 Each review posts:
 
-- **A comment on the diff for each deviation and conflict**, and for each uncovered choice that adds a second way beside an existing one. On later pushes, the review replies in its own threads when a finding changed or someone answered it there, and resolves a thread whose finding is gone. It doesn't reply to a thread when nothing about its finding changed.
-- **One summary comment**, edited on each run, counting the findings. It ends with every finding, including the uncovered choices it didn't comment on, as base64-encoded JSON in a hidden block.
+- **A comment on the diff for each deviation and conflict**, and for each uncovered choice that adds a second way beside an existing one. On later pushes, the agent replies in its own threads when a finding changed or someone answered it there, and resolves a thread whose finding is gone. It doesn't reply to a thread when nothing about its finding changed.
+- **One summary comment**, edited on each run, counting the findings. It ends with every finding as JSON in a `<details>` block, including the uncovered choices it didn't comment on. A step after the agent writes it from the agent's answer, so it's there however the agent's run went.
 
-To go through the findings, the author runs `/pack-review <PR number>` in Claude Code with the PR's branch checked out. The skill reads the summary's block rather than reviewing again, goes through each finding with the author, and runs `pack-rule` for each one they want recorded. Neither run commits or pushes.
+To go through the findings, the author runs `/pack-review <PR number>` in Claude Code with the PR's branch checked out. The skill reads the summary's JSON rather than reviewing again, goes through each finding with the author, and runs `pack-rule` for each one they want recorded. Neither run commits or pushes.
 
-The review agent reads text anyone with access to the PR could have written, so it runs with no GitHub token, and with tools that only read the checkout and a shell for `git diff`, `git log` and `git show`. Before it starts, a script fetches the PR's description, comments and review threads, keeping only what was written by people whose role on the repo is owner, member or collaborator, and by pack-review itself. After it finishes, another script posts its findings. That script checks everything before writing anything, and acts only on threads pack-review started. A PR with more than 100 comments, reviews, threads, or comments in one thread stops the review, since a review that missed some would be wrong.
+The agent reads text anyone with access to the PR could have written, so it reads and writes the PR only through the action's own tools. They show it only what was written by people whose role on the repo is owner, member or collaborator, and by pack-review itself. They let it reply to and resolve only threads pack-review started. They remove what a reader of the comment wouldn't see, such as HTML comments and invisible characters, from everything it reads and writes, and redact anything that looks like an Anthropic key or GitHub token. Its other tools only read the checkout, with a shell for `git diff`, `git log` and `git show`. claude-code-action runs it only when whoever triggered the run has write access. A PR with more than 100 comments, reviews, threads, or comments in one thread can't be read, since a review that missed some would be wrong.
 
-Each run costs about what a review in chat does. The job's log prints what it cost.
+Each run costs about what a review in chat does.
 
 ## Upgrading from 0.6
 
