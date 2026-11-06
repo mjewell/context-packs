@@ -1,8 +1,7 @@
-"""The GitHub GraphQL API, as the review scripts use it. Reads the token, the repo and the API's URL from the
-variables GitHub Actions sets."""
+"""GitHub's API, as the review scripts use it. Reads the token, the repo and the API's URLs from the variables GitHub
+Actions sets."""
 import json
 import os
-import sys
 import urllib.error
 import urllib.request
 
@@ -32,35 +31,60 @@ query PullRequest($owner: String!, $name: String!, $number: Int!) {{
 }}'''
 
 
-def graphql(operation, query, variables):
-    """The data GitHub answers the operation with. Stops on any error, naming the operation."""
-    request = urllib.request.Request(
-        os.environ.get('GITHUB_GRAPHQL_URL', 'https://api.github.com/graphql'),
-        data=json.dumps({'operationName': operation, 'query': query, 'variables': variables}).encode(),
-        headers={'Authorization': f'bearer {os.environ["GITHUB_TOKEN"]}', 'Content-Type': 'application/json'})
+class GitHubError(Exception):
+    """GitHub refused a request, or answered with more than pack-review reads."""
+
+
+def repository():
+    return os.environ['GITHUB_REPOSITORY'].split('/')
+
+
+def send(url, body, what):
+    request = urllib.request.Request(url, data=json.dumps(body).encode(), headers={
+        'Authorization': f'bearer {os.environ["GITHUB_TOKEN"]}', 'Content-Type': 'application/json',
+        'Accept': 'application/vnd.github+json'})
     try:
         with urllib.request.urlopen(request) as response:
-            answer = json.load(response)
+            return json.load(response)
     except urllib.error.HTTPError as error:
-        sys.exit(f'pack-review: GitHub refused {operation} with HTTP {error.code}: {error.read().decode()}')
+        answer = error.read().decode()
+        try:
+            found = json.loads(answer)
+            answer = '; '.join([found.get('message', '')] + [e.get('message', str(e))
+                                                            for e in found.get('errors', [])])
+        except ValueError:
+            pass
+        raise GitHubError(f'GitHub refused {what} with HTTP {error.code}: {answer}') from None
+
+
+def graphql(operation, query, variables):
+    """The data GitHub answers the operation with."""
+    url = os.environ.get('GITHUB_GRAPHQL_URL', 'https://api.github.com/graphql')
+    answer = send(url, {'operationName': operation, 'query': query, 'variables': variables}, operation)
     if answer.get('errors'):
-        sys.exit(f'pack-review: GitHub refused {operation}: '
-                 + '; '.join(error['message'] for error in answer['errors']))
+        raise GitHubError(f'GitHub refused {operation}: ' + '; '.join(e['message'] for e in answer['errors']))
     return answer['data']
 
 
+def post(path, body):
+    """POST to a REST path under the repo, such as pulls/7/comments."""
+    owner, name = repository()
+    url = f'{os.environ.get("GITHUB_API_URL", "https://api.github.com")}/repos/{owner}/{name}/{path}'
+    return send(url, body, f'POST {path}')
+
+
 def nodes(connection, listing):
-    """A list's items, stopping if it has another page, since a review that silently missed some would be wrong."""
+    """A list's items, refusing one with another page, since a review that silently missed some would be wrong."""
     if connection['pageInfo']['hasNextPage']:
-        sys.exit(f'pack-review: the PR has more than {PAGE} {listing}, and pack-review reads only one page of them.')
+        raise GitHubError(f'The PR has more than {PAGE} {listing}, and pack-review reads only one page of them.')
     return connection['nodes']
 
 
 def pull_request(number):
     """The PR's raw data, with every list checked to fit on one page."""
-    owner, name = os.environ['GITHUB_REPOSITORY'].split('/')
-    found = graphql('PullRequest', PULL_REQUEST, {'owner': owner, 'name': name, 'number': number})
-    pr = found['repository']['pullRequest']
+    owner, name = repository()
+    pr = graphql('PullRequest', PULL_REQUEST, {'owner': owner, 'name': name, 'number': number})
+    pr = pr['repository']['pullRequest']
     pr['comments'] = nodes(pr['comments'], 'comments')
     pr['reviews'] = nodes(pr['reviews'], 'reviews')
     pr['reviewThreads'] = nodes(pr['reviewThreads'], 'review threads')
@@ -76,3 +100,13 @@ def own(comment):
 
 def trusted(comment):
     return comment['authorAssociation'] in TRUSTED
+
+
+def started(pr):
+    """The ids of the threads pack-review started."""
+    return {thread['id'] for thread in pr['reviewThreads'] if own(thread['comments'][0])}
+
+
+def signed(body):
+    """A comment as pack-review posts it: marked as Claude's for people, and as pack-review's for the next run."""
+    return f'🤖 {body}\n\n{MARKER}'

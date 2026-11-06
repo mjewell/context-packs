@@ -1,5 +1,6 @@
-"""Stands in for GitHub's GraphQL API in tests: an HTTP server on a free local port that answers each request with
-the raw response its test set for the request's operation, and records every request it gets."""
+"""Stands in for GitHub's API in tests: an HTTP server on a free local port that answers each request with the raw
+response its test set, keyed by the GraphQL operation's name or by a REST request's method and path, and records every
+request it gets."""
 import http.server
 import json
 import threading
@@ -14,11 +15,17 @@ class FakeGitHub:
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_POST(self):
                 request = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
-                fake.requests.append({'path': self.path, 'authorization': self.headers.get('Authorization'),
-                                      **request})
-                response = fake.responses[request['operationName']]
-                body = json.dumps(response(request['variables']) if callable(response) else response).encode()
-                self.send_response(200)
+                if self.path == '/graphql':
+                    key, recorded = request['operationName'], request
+                    argument = request['variables']
+                else:
+                    key, recorded = f'POST {self.path}', {'operationName': f'POST {self.path}', 'body': request}
+                    argument = request
+                fake.requests.append({'authorization': self.headers.get('Authorization'), **recorded})
+                response = fake.responses[key]
+                status, answer = response(argument) if callable(response) else response
+                body = json.dumps(answer).encode()
+                self.send_response(status)
                 self.send_header('Content-Type', 'application/json')
                 self.send_header('Content-Length', str(len(body)))
                 self.end_headers()
@@ -32,7 +39,7 @@ class FakeGitHub:
 
     @property
     def url(self):
-        return f'http://127.0.0.1:{self.server.server_address[1]}/graphql'
+        return f'http://127.0.0.1:{self.server.server_address[1]}'
 
     def stop(self):
         self.server.shutdown()
@@ -40,6 +47,13 @@ class FakeGitHub:
 
     def operations(self):
         return [request['operationName'] for request in self.requests]
+
+    def writes(self):
+        return [name for name in self.operations() if name != 'PullRequest']
+
+
+def ok(data):
+    return 200, {'data': data}
 
 
 def connection(nodes, more=False):
@@ -63,12 +77,12 @@ def thread(comments, id='PRRT_1', path='src/app.ts', line=12, resolved=False, ou
 
 
 def pull_request(title='Add refunds', body='Adds a refund endpoint.', login='alice', association='MEMBER',
-                 comments=(), reviews=(), threads=(), more=()):
+                 comments=(), reviews=(), threads=(), more=(), head='h' * 40):
     """The PullRequest query's response. more names the lists that have another page."""
-    return {'data': {'repository': {'pullRequest': {
+    return ok({'repository': {'pullRequest': {
         'id': 'PR_1', 'title': title, 'body': body, 'author': {'login': login}, 'authorAssociation': association,
-        'baseRefOid': 'b' * 40, 'headRefOid': 'h' * 40,
+        'baseRefOid': 'b' * 40, 'headRefOid': head,
         'comments': connection(list(comments), 'comments' in more),
         'reviews': connection(list(reviews), 'reviews' in more),
         'reviewThreads': connection(list(threads), 'reviewThreads' in more),
-    }}}}
+    }}})
