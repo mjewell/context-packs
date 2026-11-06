@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """The review agent's tools for its PR, as an MCP server over stdin and stdout. read_comments gives it what people
-trusted on the repo and pack-review itself wrote. open_thread, reply and resolve write to the PR, and reply and
-resolve only on threads pack-review started. Everything read and written is cleaned of what a reader of the PR
-wouldn't see, and everything written is marked as pack-review's. The token comes from the environment, which the
-agent's tools can't read."""
+trusted on the repo and pack-review itself wrote. open_thread and reply write to the PR, and reply only on threads
+pack-review started. There's no tool to resolve a thread, since GitHub refuses that to the workflow's token.
+Everything read and written is cleaned of what a reader of the PR wouldn't see, and everything written is marked as
+pack-review's. The token comes from the environment, which the agent's tools can't read."""
 import argparse
 import json
 import sys
@@ -20,12 +20,9 @@ TOOLS = [
                     'the 🤖 and the marker are added for you.',
      {'path': STRING, 'line': {'type': 'integer'}, 'body': STRING}),
     ('reply', 'Reply in a thread you started.', {'thread': THREAD, 'body': STRING}),
-    ('resolve', 'Post a closing note saying why, then resolve a thread you started.', {'thread': THREAD, 'note': STRING}),
 ]
 ADD_REPLY = '''mutation AddReply($input: AddPullRequestReviewThreadReplyInput!) {
   addPullRequestReviewThreadReply(input: $input) { clientMutationId } }'''
-RESOLVE = '''mutation Resolve($input: ResolveReviewThreadInput!) {
-  resolveReviewThread(input: $input) { clientMutationId } }'''
 
 
 class Refused(Exception):
@@ -77,20 +74,11 @@ class Tools:
         if id not in github.started(github.pull_request(self.number)):
             raise Refused(f'{id} is not a thread pack-review started, so you may not write to it.')
 
-    def add_reply(self, id, body):
-        github.graphql('AddReply', ADD_REPLY, {'input': {'pullRequestReviewThreadId': id,
-                                                         'body': github.signed(clean(body))}})
-
     def reply(self, thread, body):
         self.check(thread)
-        self.add_reply(thread, body)
+        github.graphql('AddReply', ADD_REPLY, {'input': {'pullRequestReviewThreadId': thread,
+                                                         'body': github.signed(clean(body))}})
         return f'Replied in {thread}.'
-
-    def resolve(self, thread, note):
-        self.check(thread)
-        self.add_reply(thread, note)
-        github.graphql('Resolve', RESOLVE, {'input': {'threadId': thread}})
-        return f'Resolved {thread}.'
 
 
 def listed():

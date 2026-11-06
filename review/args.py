@@ -10,7 +10,7 @@ import sys
 
 REVIEW = Path(__file__).resolve().parent
 SERVER = 'pack-review'
-TOOLS = ['read_comments', 'open_thread', 'reply', 'resolve']
+TOOLS = ['read_comments', 'open_thread', 'reply']
 # The agent reads the PR, which is untrusted text, so its own tools only read: confined by --restricted to the
 # checkout, without .git/config, where claude-code-action keeps its token, and with a shell only for git commands
 # that read. It writes to the PR only through the review's tools.

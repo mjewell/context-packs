@@ -7,8 +7,7 @@ import unittest
 from review_case import REVIEW
 
 HEAD = 'h' * 40
-TOOLS = ['mcp__pack-review__read_comments', 'mcp__pack-review__open_thread', 'mcp__pack-review__reply',
-         'mcp__pack-review__resolve']
+TOOLS = ['mcp__pack-review__read_comments', 'mcp__pack-review__open_thread', 'mcp__pack-review__reply']
 
 
 class ArgsTests(unittest.TestCase):
