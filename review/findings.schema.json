@@ -1,0 +1,87 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["findings", "threads"],
+  "properties": {
+    "findings": {
+      "type": "array",
+      "description": "Every finding of the review, as pack-review's steps 1 to 5 sort them.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "inline", "headline", "rules", "spots", "deliberate", "exemplars", "take"],
+        "properties": {
+          "kind": {"enum": ["deviates", "conflicting", "uncovered"]},
+          "inline": {
+            "type": "boolean",
+            "description": "Whether the finding gets a comment on the PR: true for every deviation and conflict, and for an uncovered choice that adds a second way beside an existing one. Others wait for the author's local run."
+          },
+          "headline": {"type": "string", "description": "The finding in one line."},
+          "rules": {
+            "type": "array",
+            "description": "The rule a deviation departs from, the two rules of a conflict, or none for an uncovered choice.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["file", "quote", "routed"],
+              "properties": {
+                "file": {"type": "string", "description": "The file holding the rule, from the repo root."},
+                "quote": {"type": "string", "description": "The rule, quoted."},
+                "routed": {"type": "boolean", "description": "Whether the rule reached the work: inlined, or in a doc whose when matches it."}
+              }
+            }
+          },
+          "spots": {
+            "type": "array",
+            "description": "Where in the head commit the finding applies.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "line", "follows"],
+              "properties": {
+                "path": {"type": "string"},
+                "line": {"type": "integer", "description": "The line in the file at the head commit."},
+                "follows": {"type": "boolean", "description": "Whether the spot follows the rule. Always false for an uncovered choice."}
+              }
+            }
+          },
+          "deliberate": {
+            "type": "array",
+            "description": "Signs a deviation is deliberate, each quoting its source: a comment at the spot, a condition that sets it apart, the PR description, a commit message, or a comment on the PR.",
+            "items": {"type": "string"}
+          },
+          "exemplars": {
+            "type": "array",
+            "description": "For an uncovered choice, each way the existing code makes it.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["way", "examples"],
+              "properties": {
+                "way": {"type": "string"},
+                "examples": {"type": "array", "items": {"type": "string", "description": "A file and line, as path:line."}}
+              }
+            }
+          },
+          "take": {"type": "string", "description": "What you'd do about it, for the author to accept or overrule."}
+        }
+      }
+    },
+    "threads": {
+      "type": "array",
+      "description": "What to do on the PR's review threads, given the threads you started earlier: open one for an inline finding that has none, reply where a finding changed or a person asked something, and resolve one whose finding is gone. Act only on threads marked pack_review.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action", "body"],
+        "properties": {
+          "action": {"enum": ["new", "reply", "resolve"]},
+          "thread": {"type": "string", "description": "For reply and resolve: the thread's id."},
+          "path": {"type": "string", "description": "For new: the file to comment on."},
+          "line": {"type": "integer", "description": "For new: the line at the head commit, which must be in the diff."},
+          "body": {"type": "string", "description": "The comment, in Markdown. For resolve, the closing note saying why."}
+        }
+      }
+    }
+  }
+}
