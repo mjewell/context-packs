@@ -44,6 +44,12 @@ runs:
         github_token: ${{ github.token }}
         prompt: /context-packs:pack-review ci ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}
         claude_args: ${{ steps.prepare.outputs.claude-args }}
+    - name: Show what the agent did
+      if: always() && steps.review.outputs.execution_file != ''
+      shell: bash
+      env:
+        TRANSCRIPT: ${{ steps.review.outputs.execution_file }}
+      run: python3 "$GITHUB_ACTION_PATH/transcript.py" --file "$TRANSCRIPT"
     - name: Post the summary
       shell: bash
       env:
