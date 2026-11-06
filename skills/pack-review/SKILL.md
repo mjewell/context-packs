@@ -1,7 +1,7 @@
 ---
 name: pack-review
 description: Review a PR or branch against a repo's context packs. Find where it deviates from a written rule, whether that rule's `when` reached the work, and the choices it makes that no rule covers.
-argument-hint: "[PR number, branch, or commit range] | ci <base>...<head>"
+argument-hint: "[PR number or owner/repo#number, branch, or commit range] | ci <base>...<head>"
 disable-model-invocation: true
 ---
 
@@ -27,9 +27,9 @@ Each finding is one of three kinds:
 
 ## Where it runs
 
-- **In chat**, with a PR, branch or range: every step below.
+- **In chat**, with a PR, branch or range: every step below. A PR named as `owner/repo#number` is in that repo: from a folder above the repos, work in its checkout.
 - **In CI**, with the arguments `ci <base>...<head>`: steps 1 to 5, comments on the PR for some findings, and every finding returned as your answer, as described in [In CI](#in-ci). Nobody is there to answer a question.
-- **From a PR that CI reviewed**: when the user names a PR whose summary comment holds pack-review's findings, steps 6 and 7 on those findings, as described in [From a CI review](#from-a-ci-review). Steps 1 to 5 already ran in CI, so don't run them again.
+- **From a PR that CI reviewed**: when the user names a PR, by number or as `owner/repo#number`, whose summary comment holds pack-review's findings, steps 6 and 7 on those findings, as described in [From a CI review](#from-a-ci-review). Steps 1 to 5 already ran in CI, so don't run them again.
 
 ## 1. Pin the diff
 
@@ -121,7 +121,7 @@ A step after you posts the summary comment from your answer, so don't post one y
 
 ## From a CI review
 
-CI posts one summary comment on the PR, which ends with every finding as JSON in a `<details>` block:
+CI posts one summary comment on the PR. It lists every finding for people, under whether CI commented on it, and ends with every finding as JSON in a `<details>` block:
 
 ````text
 <details><summary>Findings for the local review</summary>

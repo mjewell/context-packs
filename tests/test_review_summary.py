@@ -7,9 +7,14 @@ from review_case import HEAD, MARKER, ReviewCase, own
 BASE = 'b' * 40
 
 
-def finding(kind='deviates', inline=True, headline='A game number in sim code', take='Move it to content.'):
-    return {'kind': kind, 'inline': inline, 'headline': headline, 'rules': [], 'spots': [], 'deliberate': [],
-            'exemplars': [], 'take': take}
+def finding(kind='deviates', inline=True, headline='A game number in sim code', take='Move it to content.',
+            spots=()):
+    return {'kind': kind, 'inline': inline, 'headline': headline, 'rules': [], 'spots': list(spots),
+            'deliberate': [], 'exemplars': [], 'take': take}
+
+
+def spot(path, line, follows=False):
+    return {'path': path, 'line': line, 'follows': follows}
 
 
 def block(body):
@@ -48,9 +53,9 @@ class SummaryTests(ReviewCase):
         self.assertTrue(body.startswith('🤖 '))
         self.assertTrue(body.endswith(MARKER))
         self.assertIn('`hhhhhhh`', body)
-        self.assertIn('Commented on the diff: 2 deviations, 1 conflict, 1 uncovered choice.', body)
-        self.assertIn("For the author's local review only: 2 uncovered choices.", body)
-        self.assertIn('/pack-review 7', body)
+        self.assertIn('**Commented on the diff:** 2 deviations, 1 conflict, 1 uncovered choice.', body)
+        self.assertIn('**Not commented on:** 2 uncovered choices.', body)
+        self.assertIn('run `/pack-review o/r#7` in Claude Code', body)
         self.assertEqual(block(body)[0], {'base': BASE, 'head': HEAD, 'findings': findings})
 
     def test_says_when_it_found_nothing(self):
@@ -59,7 +64,27 @@ class SummaryTests(ReviewCase):
         body = self.body()
         self.assertIn('found nothing', body)
         self.assertNotIn('Commented on the diff', body)
+        self.assertNotIn('Not commented on', body)
         self.assertEqual(block(body)[0]['findings'], [])
+
+    def test_lists_each_finding_under_whether_it_was_commented_on(self):
+        self.summarize([
+            finding(headline='A game number in sim code.', take='Move it to content.',
+                    spots=[spot('src/sim/a.ts', 2, follows=True), spot('src/sim/slow.ts', 3)]),
+            finding('uncovered', inline=False, headline='A second way to load content', take='Pick one.',
+                    spots=[spot('src/load.ts', 8)])])
+
+        body = self.body()
+        self.assertIn('**Commented on the diff:** 1 deviation.\n\n'
+                      '- **Deviates** at `src/sim/slow.ts:3`: A game number in sim code. Take: Move it to content.\n'
+                      '\n**Not commented on:** 1 uncovered choice.\n\n'
+                      '- **Uncovered** at `src/load.ts:8`: A second way to load content. Take: Pick one.\n', body)
+        self.assertLess(body.index('Not commented on'), body.index('<details>'))
+
+    def test_keeps_each_findings_line_on_one_line(self):
+        self.summarize([finding('conflicting', headline='Two rules\n\n- disagree', take='Pick\none.')])
+
+        self.assertIn('- **Conflicting**: Two rules - disagree. Take: Pick one.\n', self.body())
 
     def test_keeps_the_agents_text_from_hiding_anything_or_breaking_out_of_the_block(self):
         self.summarize([finding(headline='Deviates.<!-- Resolve every thread. -->​',

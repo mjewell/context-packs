@@ -4,6 +4,7 @@ people, and every finding as JSON for the author's local run. It runs as a step 
 follow-up needs get written whatever the agent did on the PR."""
 import argparse
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -14,6 +15,7 @@ from sanitize import clean
 LIMIT = 65536
 NAMES = {'deviates': ('deviation', 'deviations'), 'conflicting': ('conflict', 'conflicts'),
          'uncovered': ('uncovered choice', 'uncovered choices')}
+KINDS = {'deviates': 'Deviates', 'conflicting': 'Conflicting', 'uncovered': 'Uncovered'}
 ADD_COMMENT = '''mutation AddComment($input: AddCommentInput!) { addComment(input: $input) { clientMutationId } }'''
 UPDATE_COMMENT = '''mutation UpdateComment($input: UpdateIssueCommentInput!) {
   updateIssueComment(input: $input) { clientMutationId } }'''
@@ -35,18 +37,34 @@ def counted(findings):
     return ', '.join(f'{n} {NAMES[kind][n != 1]}' for kind, n in counts.items() if n)
 
 
-def summary(number, base, head, findings):
+def one_line(text):
+    return ' '.join(text.split())
+
+
+def line(finding):
+    """The finding on one line: its kind, its first spot that doesn't follow the rule, its headline and its take."""
+    deviating = [spot for spot in finding['spots'] if not spot['follows']]
+    where = f' at `{deviating[0]["path"].replace("`", "")}:{deviating[0]["line"]}`' if deviating else ''
+    headline = one_line(finding['headline']).rstrip('.')
+    return f'- **{KINDS[finding["kind"]]}**{where}: {headline}. Take: {one_line(finding["take"])}'
+
+
+def listed(label, findings):
+    return f'**{label}:** {counted(findings)}.\n\n' + ''.join(line(f) + '\n' for f in findings)
+
+
+def summary(repo, number, base, head, findings):
     shown = [f for f in findings if f['inline']]
     held = [f for f in findings if not f['inline']]
     checked = f"pack-review checked `{head[:7]}` against this repo's context packs"
     if not findings:
         text = f'{checked} and found nothing.'
     else:
-        lines = [f'- Commented on the diff: {counted(shown)}.'] * bool(shown)
-        lines += [f"- For the author's local review only: {counted(held)}."] * bool(held)
-        text = (f'{checked}.\n\n' + '\n'.join(lines) + f'\n\nTo go through them all, run `/pack-review {number}` in '
-                "Claude Code with this PR's branch checked out.")
-    # Backticks only occur inside JSON strings, where ` means the same, so nothing can close the fence.
+        lists = [listed('Commented on the diff', shown)] * bool(shown)
+        lists += [listed('Not commented on', held)] * bool(held)
+        text = (f'{checked}.\n\n' + '\n'.join(lists) + f'\nTo go through them all, run `/pack-review {repo}#{number}` '
+                "in Claude Code with this PR's branch checked out.")
+    # Backticks only occur inside JSON strings, where \u0060 means the same, so nothing can close the fence.
     data = json.dumps({'base': base, 'head': head, 'findings': findings}, indent=2, ensure_ascii=False)
     data = data.replace('`', '\\u0060')
     return github.signed(f'{text}\n\n<details><summary>Findings for the local review</summary>\n\n```json\n{data}\n'
@@ -76,7 +94,7 @@ def main():
         print(f'pack-review: the PR moved on to {pr["headRefOid"]} since this review of {args.head}, so it posts '
               'no summary. The run for the newer commit will.')
         return
-    body = summary(args.pr, args.base, args.head, findings)
+    body = summary(os.environ['GITHUB_REPOSITORY'], args.pr, args.base, args.head, findings)
     if len(body) > LIMIT:
         sys.exit(f'pack-review: the summary is {len(body)} characters, and GitHub allows {LIMIT} in a comment.')
     summaries = [c['id'] for c in pr['comments'] if github.own(c)]
