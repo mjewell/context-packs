@@ -42,4 +42,5 @@ def main():
     print(' '.join(shlex.quote(value) for value in values))
 
 
-main()
+if __name__ == '__main__':
+    main()

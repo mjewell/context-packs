@@ -108,7 +108,8 @@ def main():
     print(f'pack-review: posted the summary of {len(findings)} findings.')
 
 
-try:
-    main()
-except github.GitHubError as error:
-    sys.exit(f'pack-review: {error}')
+if __name__ == '__main__':
+    try:
+        main()
+    except github.GitHubError as error:
+        sys.exit(f'pack-review: {error}')

@@ -54,4 +54,5 @@ def main():
     print(json.dumps({'type': 'result', 'subtype': 'success', 'result': 'Done.', 'total_cost_usd': 0.0123}))
 
 
-main()
+if __name__ == '__main__':
+    main()
