@@ -1,0 +1,58 @@
+name: pack-review
+description: Review a PR against the repo's context packs, and post the findings to it for the author to go through locally.
+inputs:
+  anthropic-api-key:
+    description: An Anthropic API key for the review agent.
+    required: true
+  model:
+    description: The model to review with, if not Claude Code's default.
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Check the checkout
+      shell: bash
+      env:
+        HEAD: ${{ github.event.pull_request.head.sha }}
+      run: |
+        # The agent reads the PR, which is untrusted text, so nothing it can read may hold a token.
+        if git config --get-regexp '^http\..*\.extraheader$' > /dev/null; then
+          echo "::error::The checkout kept its token in .git/config. Check out with persist-credentials: false."
+          exit 1
+        fi
+        if [ "$(git rev-parse HEAD)" != "$HEAD" ]; then
+          echo "::error::The PR's head, $HEAD, isn't checked out. Check out with ref: \${{ github.event.pull_request.head.sha }}."
+          exit 1
+        fi
+        mkdir -p "$RUNNER_TEMP/pack-review"
+    - name: Install Claude Code
+      shell: bash
+      # Pinned, since the review relies on its flags for tools, output and plugins.
+      run: npm install --global --no-fund --no-audit @anthropic-ai/claude-code@2.1.318
+    - name: Fetch the PR's comments
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        PR: ${{ github.event.pull_request.number }}
+      run: python3 "$GITHUB_ACTION_PATH/fetch.py" --pr "$PR" --out "$RUNNER_TEMP/pack-review/comments.json"
+    - name: Review
+      shell: bash
+      env:
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        # Blanked in case the workflow sets it for every step: the agent holds no GitHub token.
+        GITHUB_TOKEN: ''
+        GH_TOKEN: ''
+        BASE: ${{ github.event.pull_request.base.sha }}
+        HEAD: ${{ github.event.pull_request.head.sha }}
+        MODEL: ${{ inputs.model }}
+      run: |
+        python3 "$GITHUB_ACTION_PATH/gather.py" --base "$BASE" --head "$HEAD" \
+          --comments "$RUNNER_TEMP/pack-review/comments.json" --out "$RUNNER_TEMP/pack-review/findings.json" \
+          ${MODEL:+--model "$MODEL"}
+    - name: Post the findings
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        PR: ${{ github.event.pull_request.number }}
+      run: python3 "$GITHUB_ACTION_PATH/post.py" --pr "$PR" --findings "$RUNNER_TEMP/pack-review/findings.json"

@@ -141,6 +141,50 @@ Every copy sits outside your folders, without `.git`, `node_modules` or `.evals`
 
 Prompts close to a row's `when` that shouldn't match it, or that match only through a clause that's easy to miss, are the ones worth writing.
 
+## Reviewing PRs in CI
+
+The `review` action runs the `pack-review` skill on a PR and posts what it finds. The author then goes through the findings in a local session. Add a workflow such as `.github/workflows/pack-review.yml`:
+
+```yaml
+name: pack-review
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+jobs:
+  review:
+    # Drafts wait until they're ready. PRs from forks get no secrets, so they're skipped.
+    if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pack-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: mjewell/context-packs/review@main
+        with:
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+It reviews a PR when it's opened or marked ready, and again on each push. A newer push cancels a review still running. Pin `@main` to a release tag once you've tried it. Pass `model` to review with a model other than Claude Code's default.
+
+Each review posts:
+
+- **A comment on the diff for each deviation and conflict**, and for each uncovered choice that adds a second way beside an existing one. On later pushes, the review replies in its own threads when a finding changed or someone answered it there, and resolves a thread whose finding is gone. It doesn't reply to a thread when nothing about its finding changed.
+- **One summary comment**, edited on each run, counting the findings. It ends with every finding, including the uncovered choices it didn't comment on, as base64-encoded JSON in a hidden block.
+
+To go through the findings, the author runs `/pack-review <PR number>` in Claude Code with the PR's branch checked out. The skill reads the summary's block rather than reviewing again, goes through each finding with the author, and runs `pack-rule` for each one they want recorded. Neither run commits or pushes.
+
+The review agent reads text anyone with access to the PR could have written, so it runs with no GitHub token, and with tools that only read the checkout and a shell for `git diff`, `git log` and `git show`. Before it starts, a script fetches the PR's description, comments and review threads, keeping only what was written by people whose role on the repo is owner, member or collaborator, and by pack-review itself. After it finishes, another script posts its findings. That script checks everything before writing anything, and acts only on threads pack-review started. A PR with more than 100 comments, reviews, threads, or comments in one thread stops the review, since a review that missed some would be wrong.
+
+Each run costs about what a review in chat does. The job's log prints what it cost.
+
 ## Upgrading from 0.6
 
 0.7 keeps packs in `context-packs/` and writes one block, where 0.6 kept them in `docs/agents/` with a block for each. A 0.6 file stops the sync and prints the two lines to use instead. To move a repo over:
