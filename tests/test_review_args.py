@@ -37,7 +37,7 @@ class ArgsTests(unittest.TestCase):
             'command': 'python3', 'args': [str(REVIEW / 'tools.py'), '--pr', '7', '--head', HEAD]}}})
         self.assertIn('--strict-mcp-config', args)
 
-    def test_gives_the_agent_tools_that_read_the_checkout_and_its_review_tools_and_no_shell_but_git(self):
+    def test_gives_the_agent_tools_that_read_the_checkout_and_its_review_tools(self):
         args = self.args()
 
         self.assertEqual(self.flag(args, '--tools'), 'Read,Glob,Grep,Bash,Agent')
