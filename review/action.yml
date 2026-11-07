@@ -33,11 +33,13 @@ runs:
         HEAD: ${{ github.event.pull_request.head.sha }}
         MODEL: ${{ inputs.model }}
       # The agent has no shell, so it reads the diff and log from files. A new folder outside the checkout, so no path
-      # the PR controls, such as a symlink, decides where they're written.
+      # the PR controls, such as a symlink, decides where they're written. docs.txt lists every doc the tables point
+      # at, which the read gates hold the agent to.
       run: |
         inputs=$(mktemp -d "$RUNNER_TEMP/pack-review.XXXXXX")
         git diff --no-ext-diff --no-textconv "$BASE...$HEAD" > "$inputs/diff.patch"
         git log --no-decorate "$BASE..$HEAD" > "$inputs/log.txt"
+        python3 "$GITHUB_ACTION_PATH/../src/cli.py" docs > "$inputs/docs.txt"
         echo "inputs=$inputs" >> "$GITHUB_OUTPUT"
         echo "claude-args=$(python3 "$GITHUB_ACTION_PATH/args.py" --inputs "$inputs" --model "$MODEL")" >> "$GITHUB_OUTPUT"
     - name: Review
@@ -57,6 +59,18 @@ runs:
       env:
         TRANSCRIPT: ${{ steps.review.outputs.execution_file }}
       run: python3 "$GITHUB_ACTION_PATH/transcript.py" --file "$TRANSCRIPT"
+    - name: Check the agent read every doc
+      shell: bash
+      env:
+        UNREAD: ${{ steps.prepare.outputs.inputs }}/unread.txt
+      # The answer gate lets the answer through after sending the agent back three times, and lists what it still
+      # hadn't read. Findings from a review that skipped docs aren't posted, so the last summary stays.
+      run: |
+        if [ -e "$UNREAD" ]; then
+          echo "::error::The review answered without reading these docs, so it posts nothing:"
+          cat "$UNREAD"
+          exit 1
+        fi
     - name: Post the summary
       shell: bash
       env:
