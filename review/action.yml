@@ -1,5 +1,5 @@
 name: pack-review
-description: Review a PR against the repo's context packs with claude-code-action, comment on what it finds, and keep a summary for the author to go through locally.
+description: Review a PR against the repo's context packs with claude-code-action, and post a summary of what it finds for the author to go through locally.
 inputs:
   anthropic-api-key:
     description: An Anthropic API key for the review agent. Pass this or claude-code-oauth-token.
@@ -29,7 +29,6 @@ runs:
       id: prepare
       shell: bash
       env:
-        PR: ${{ github.event.pull_request.number }}
         BASE: ${{ github.event.pull_request.base.sha }}
         HEAD: ${{ github.event.pull_request.head.sha }}
         MODEL: ${{ inputs.model }}
@@ -40,7 +39,7 @@ runs:
         git diff --no-ext-diff --no-textconv "$BASE...$HEAD" > "$inputs/diff.patch"
         git log --no-decorate "$BASE..$HEAD" > "$inputs/log.txt"
         echo "inputs=$inputs" >> "$GITHUB_OUTPUT"
-        echo "claude-args=$(python3 "$GITHUB_ACTION_PATH/args.py" --pr "$PR" --head "$HEAD" --inputs "$inputs" --model "$MODEL")" >> "$GITHUB_OUTPUT"
+        echo "claude-args=$(python3 "$GITHUB_ACTION_PATH/args.py" --inputs "$inputs" --model "$MODEL")" >> "$GITHUB_OUTPUT"
     - name: Review
       id: review
       # v1.0.268, pinned by commit since a tag can move.

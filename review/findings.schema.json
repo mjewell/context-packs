@@ -7,13 +7,12 @@
   "properties": {
     "findings": {
       "type": "array",
-      "description": "Every finding of the review, as pack-review's steps 1 to 5 sort them, including those you didn't comment on.",
+      "description": "Every finding of the review, as pack-review's steps 1 to 5 sort them.",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": [
           "kind",
-          "inline",
           "headline",
           "rules",
           "spots",
@@ -28,10 +27,6 @@
               "conflicting",
               "uncovered"
             ]
-          },
-          "inline": {
-            "type": "boolean",
-            "description": "Whether the finding gets a comment on the PR: true for every deviation and conflict, and for an uncovered choice that adds a second way beside an existing one. Others wait for the author's local run."
           },
           "headline": {
             "type": "string",
@@ -92,7 +87,7 @@
           },
           "deliberate": {
             "type": "array",
-            "description": "Signs a deviation is deliberate, each quoting its source: a comment at the spot, a condition that sets it apart, the PR description, a commit message, or a comment on the PR.",
+            "description": "Signs a deviation is deliberate, each quoting its source: a comment at the spot, a condition that sets it apart, or a commit message.",
             "items": {
               "type": "string"
             }

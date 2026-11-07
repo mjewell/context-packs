@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Post or update pack-review's one summary comment on a PR, from the findings the review agent returned: counts for
-people, and every finding as JSON for the author's local run. It runs as a step after the agent, so the findings the
-follow-up needs get written whatever the agent did on the PR."""
+people, and every finding as JSON for the author's local run. It runs as a step after the agent, which can't write to
+the PR."""
 import argparse
 import json
 import os
@@ -15,7 +15,6 @@ from sanitize import clean
 LIMIT = 65536
 NAMES = {'deviates': ('deviation', 'deviations'), 'conflicting': ('conflict', 'conflicts'),
          'uncovered': ('uncovered choice', 'uncovered choices')}
-KINDS = {'deviates': 'Deviates', 'conflicting': 'Conflicting', 'uncovered': 'Uncovered'}
 ADD_COMMENT = '''mutation AddComment($input: AddCommentInput!) { addComment(input: $input) { clientMutationId } }'''
 UPDATE_COMMENT = '''mutation UpdateComment($input: UpdateIssueCommentInput!) {
   updateIssueComment(input: $input) { clientMutationId } }'''
@@ -37,33 +36,14 @@ def counted(findings):
     return ', '.join(f'{n} {NAMES[kind][n != 1]}' for kind, n in counts.items() if n)
 
 
-def one_line(text):
-    return ' '.join(text.split())
-
-
-def line(finding):
-    """The finding on one line: its kind, its first spot that doesn't follow the rule, its headline and its take."""
-    deviating = [spot for spot in finding['spots'] if not spot['follows']]
-    where = f' at `{deviating[0]["path"].replace("`", "")}:{deviating[0]["line"]}`' if deviating else ''
-    headline = one_line(finding['headline']).rstrip('.')
-    return f'- **{KINDS[finding["kind"]]}**{where}: {headline}. Take: {one_line(finding["take"])}'
-
-
-def listed(label, findings):
-    return f'**{label}:** {counted(findings)}.\n\n' + ''.join(line(f) + '\n' for f in findings)
-
-
 def summary(repo, number, base, head, findings):
-    shown = [f for f in findings if f['inline']]
-    held = [f for f in findings if not f['inline']]
-    checked = f"pack-review checked `{head[:7]}` against this repo's context packs"
-    if not findings:
-        text = f'{checked} and found nothing.'
-    else:
-        lists = [listed('Commented on the diff', shown)] * bool(shown)
-        lists += [listed('Not commented on', held)] * bool(held)
-        text = (f'{checked}.\n\n' + '\n'.join(lists) + f'\nTo go through them all, run `/pack-review {repo}#{number}` '
-                "in Claude Code with this PR's branch checked out.")
+    """The counts for people, and every finding as JSON. The agent's text appears only in the JSON, where nothing
+    renders, so nothing it writes can show people something other than what the author's local run reads."""
+    found = counted(findings) or 'nothing'
+    text = f"pack-review checked `{head[:7]}` against this repo's context packs and found {found}."
+    if findings:
+        text += (f"\n\nTo go through them, run `/pack-review {repo}#{number}` in Claude Code with this PR's branch "
+                 'checked out.')
     # Backticks only occur inside JSON strings, where \u0060 means the same, so nothing can close the fence.
     data = json.dumps({'base': base, 'head': head, 'findings': findings}, indent=2, ensure_ascii=False)
     data = data.replace('`', '\\u0060')

@@ -7,25 +7,14 @@ import urllib.request
 
 # Ends every comment pack-review writes, so its own comments can be told from others the same token wrote.
 MARKER = '<!-- pack-review -->'
-# Roles on the repo whose comments the review agent reads. Anyone can comment on a public repo.
-TRUSTED = {'OWNER', 'MEMBER', 'COLLABORATOR'}
 PAGE = 100
 
-COMMENT = 'author { login } authorAssociation viewerDidAuthor body'
 PULL_REQUEST = f'''
 query PullRequest($owner: String!, $name: String!, $number: Int!) {{
   repository(owner: $owner, name: $name) {{
     pullRequest(number: $number) {{
-      id title body authorAssociation author {{ login }} baseRefOid headRefOid
-      comments(first: {PAGE}) {{ pageInfo {{ hasNextPage }} nodes {{ id {COMMENT} }} }}
-      reviews(first: {PAGE}) {{ pageInfo {{ hasNextPage }} nodes {{ state {COMMENT} }} }}
-      reviewThreads(first: {PAGE}) {{
-        pageInfo {{ hasNextPage }}
-        nodes {{
-          id isResolved isOutdated path line
-          comments(first: {PAGE}) {{ pageInfo {{ hasNextPage }} nodes {{ {COMMENT} }} }}
-        }}
-      }}
+      id headRefOid
+      comments(first: {PAGE}) {{ pageInfo {{ hasNextPage }} nodes {{ id viewerDidAuthor body }} }}
     }}
   }}
 }}'''
@@ -66,13 +55,6 @@ def graphql(operation, query, variables):
     return answer['data']
 
 
-def post(path, body):
-    """POST to a REST path under the repo, such as pulls/7/comments."""
-    owner, name = repository()
-    url = f'{os.environ.get("GITHUB_API_URL", "https://api.github.com")}/repos/{owner}/{name}/{path}'
-    return send(url, body, f'POST {path}')
-
-
 def nodes(connection, listing):
     """A list's items, refusing one with another page, since a review that silently missed some would be wrong."""
     if connection['pageInfo']['hasNextPage']:
@@ -81,30 +63,17 @@ def nodes(connection, listing):
 
 
 def pull_request(number):
-    """The PR's raw data, with every list checked to fit on one page."""
+    """The PR's id, head and comments, checked to fit on one page."""
     owner, name = repository()
     pr = graphql('PullRequest', PULL_REQUEST, {'owner': owner, 'name': name, 'number': number})
     pr = pr['repository']['pullRequest']
     pr['comments'] = nodes(pr['comments'], 'comments')
-    pr['reviews'] = nodes(pr['reviews'], 'reviews')
-    pr['reviewThreads'] = nodes(pr['reviewThreads'], 'review threads')
-    for thread in pr['reviewThreads']:
-        thread['comments'] = nodes(thread['comments'], f'comments of review thread {thread["id"]}')
     return pr
 
 
 def own(comment):
     """Whether pack-review wrote the comment: the token's identity wrote it, and it ends with the marker."""
     return comment['viewerDidAuthor'] and comment['body'].rstrip().endswith(MARKER)
-
-
-def trusted(comment):
-    return comment['authorAssociation'] in TRUSTED
-
-
-def started(pr):
-    """The ids of the threads pack-review started."""
-    return {thread['id'] for thread in pr['reviewThreads'] if own(thread['comments'][0])}
 
 
 def signed(body):

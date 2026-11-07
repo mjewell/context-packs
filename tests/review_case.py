@@ -1,4 +1,3 @@
-import json
 import os
 from pathlib import Path
 import subprocess
@@ -15,7 +14,7 @@ HEAD = 'h' * 40
 
 def own(body, id='IC_1'):
     """A comment pack-review posted earlier."""
-    return comment(f'🤖 {body}\n\n{MARKER}', login='github-actions', association='NONE', mine=True, id=id)
+    return comment(f'🤖 {body}\n\n{MARKER}', mine=True, id=id)
 
 
 class ReviewCase(unittest.TestCase):
@@ -35,48 +34,7 @@ class ReviewCase(unittest.TestCase):
                               env=self.env, capture_output=True, text=True)
 
     def sent(self, operation):
-        """What each request for the operation sent: a GraphQL operation's variables, or a REST request's body."""
-        return [request.get('variables', request.get('body')) for request in self.github.requests
+        """The variables each request for the operation sent."""
+        return [request['variables'] for request in self.github.requests
                 if request['operationName'] == operation]
 
-
-class Mcp:
-    """A client for the review's MCP server, speaking JSON-RPC over its stdin and stdout as Claude Code does."""
-
-    def __init__(self, case, *args):
-        self.process = subprocess.Popen([sys.executable, str(REVIEW / 'tools.py'), *map(str, args)], cwd=case.root,
-                                        env=case.env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                        stderr=subprocess.PIPE, text=True)
-        case.addCleanup(self.close)
-        self.next = 0
-
-    def send(self, method, params=None, notify=False):
-        message = {'jsonrpc': '2.0', 'method': method, **({'params': params} if params is not None else {})}
-        if not notify:
-            self.next += 1
-            message['id'] = self.next
-        self.process.stdin.write(json.dumps(message) + '\n')
-        self.process.stdin.flush()
-        if notify:
-            return None
-        answer = json.loads(self.process.stdout.readline())
-        assert answer['id'] == self.next, answer
-        return answer
-
-    def start(self):
-        answer = self.send('initialize', {'protocolVersion': '2025-06-18', 'capabilities': {},
-                                          'clientInfo': {'name': 'test', 'version': '1'}})
-        self.send('notifications/initialized', notify=True)
-        return answer
-
-    def call(self, name, **arguments):
-        """The tool's result: its text, and whether it's an error."""
-        result = self.send('tools/call', {'name': name, 'arguments': arguments})['result']
-        [content] = result['content']
-        return content['text'], result.get('isError', False)
-
-    def close(self):
-        self.process.stdin.close()
-        self.process.wait(5)
-        self.process.stdout.close()
-        self.process.stderr.close()
