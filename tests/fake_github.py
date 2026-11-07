@@ -59,7 +59,7 @@ def comment(body, mine=False, id='IC_1'):
     return {'id': id, 'viewerDidAuthor': mine, 'body': body}
 
 
-def pull_request(comments=(), more=False, head='h' * 40):
+def pull_request(comments=(), more=False, head='h' * 40, base_ref='main'):
     """The PullRequest query's response. more is whether its comments have another page."""
     return ok({'repository': {'pullRequest': {
-        'id': 'PR_1', 'headRefOid': head, 'comments': connection(list(comments), more)}}})
+        'id': 'PR_1', 'headRefOid': head, 'baseRefName': base_ref, 'comments': connection(list(comments), more)}}})

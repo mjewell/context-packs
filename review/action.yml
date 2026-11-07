@@ -64,8 +64,9 @@ runs:
         FINDINGS: ${{ steps.review.outputs.structured_output }}
         PR: ${{ github.event.pull_request.number }}
         BASE: ${{ github.event.pull_request.base.sha }}
+        BASE_REF: ${{ github.event.pull_request.base.ref }}
         HEAD: ${{ github.event.pull_request.head.sha }}
       run: |
         printf '%s' "$FINDINGS" > "$RUNNER_TEMP/pack-review-findings.json"
-        python3 "$GITHUB_ACTION_PATH/summary.py" --pr "$PR" --base "$BASE" --head "$HEAD" \
+        python3 "$GITHUB_ACTION_PATH/summary.py" --pr "$PR" --base "$BASE" --base-ref "$BASE_REF" --head "$HEAD" \
           --findings "$RUNNER_TEMP/pack-review-findings.json"

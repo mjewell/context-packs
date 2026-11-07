@@ -149,11 +149,14 @@ The `review` action runs the `pack-review` skill on a PR with [claude-code-actio
 name: pack-review
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review, synchronize]
+    types: [opened, reopened, ready_for_review, synchronize, edited]
 jobs:
   review:
-    # Drafts wait until they're ready. PRs from forks get no secrets, so they're skipped.
-    if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
+    # Drafts wait until they're ready. PRs from forks get no secrets, so they're skipped. An edit reviews again only
+    # when it changed the base branch, so the findings match the new diff.
+    if: >-
+      ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from) }}
     runs-on: ubuntu-latest
     concurrency:
       group: pack-review-${{ github.event.pull_request.number }}
@@ -173,9 +176,9 @@ jobs:
 
 With a Pro or Max subscription instead of an API key, run `claude setup-token` locally, add what it prints as the secret `CLAUDE_CODE_OAUTH_TOKEN`, and pass `claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}` in place of `anthropic-api-key`. Reviews then count against the subscription's usage limits.
 
-It reviews a PR when it's opened or marked ready, and again on each push. A newer push cancels a review still running. Pin `@main` to a release tag once you've tried it. Pass `model` to review with a model other than Claude Code's default.
+It reviews a PR when it's opened or marked ready, again on each push, and again when its base branch changes. A newer push cancels a review still running. Pin `@main` to a release tag once you've tried it. Pass `model` to review with a model other than Claude Code's default.
 
-Each review posts **one summary comment**, edited on each run. It counts the findings, and ends with every finding as JSON in a `<details>` block for the local run. A step after the agent writes it from the agent's answer. A run that fails posts nothing and leaves the last summary, which names the commit it reviewed. It comments nothing on the diff.
+Each review posts **one summary comment**, edited on each run. It counts the findings, and ends with every finding as JSON in a `<details>` block for the local run. A step after the agent writes it from the agent's answer. A run that fails posts nothing and leaves the last summary, which names the commit and base branch it reviewed. It comments nothing on the diff.
 
 To go through the findings, the author runs `/pack-review <owner>/<repo>#<number>` in Claude Code with the PR's branch checked out, as the summary says. Naming the repo lets it work from a session in a folder above the repos; inside the repo, the number alone does. The skill reads the summary's JSON rather than reviewing again, goes through each finding with the author, and runs `pack-rule` for each one they want recorded. Neither run commits or pushes.
 

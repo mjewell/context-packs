@@ -30,10 +30,11 @@ class SummaryTests(ReviewCase):
         super().setUp()
         self.github.responses.update({'PullRequest': pull_request(), 'AddComment': ok({}), 'UpdateComment': ok({})})
 
-    def summarize(self, findings=(), output=None, head=HEAD):
+    def summarize(self, findings=(), output=None, head=HEAD, base_ref='main'):
         (self.root / 'output.json').write_text(
             output if output is not None else json.dumps({'findings': list(findings)}))
-        return self.script('summary', '--pr', 7, '--base', BASE, '--head', head, '--findings', 'output.json')
+        return self.script('summary', '--pr', 7, '--base', BASE, '--base-ref', base_ref, '--head', head,
+                           '--findings', 'output.json')
 
     def body(self):
         [sent] = self.sent('AddComment') or self.sent('UpdateComment')
@@ -54,7 +55,7 @@ class SummaryTests(ReviewCase):
         self.assertIn("pack-review checked `hhhhhhh` against this repo's context packs and found 2 deviations, "
                       '1 conflict, 3 uncovered choices.', body)
         self.assertIn('run `/pack-review o/r#7` in Claude Code', body)
-        self.assertEqual(block(body)[0], {'base': BASE, 'head': HEAD, 'findings': findings})
+        self.assertEqual(block(body)[0], {'base': BASE, 'base_ref': 'main', 'head': HEAD, 'findings': findings})
 
     def test_says_when_it_found_nothing(self):
         self.summarize([])
@@ -118,6 +119,13 @@ class SummaryTests(ReviewCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(f'moved on to {HEAD}', result.stdout)
+        self.assertEqual(self.github.writes(), [])
+
+    def test_posts_nothing_when_the_pr_moved_to_another_base_branch_since_the_review(self):
+        result = self.summarize([finding()], base_ref='release')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('moved from release to main', result.stdout)
         self.assertEqual(self.github.writes(), [])
 
     def test_stops_when_the_review_returned_no_findings(self):

@@ -13,7 +13,7 @@ PULL_REQUEST = f'''
 query PullRequest($owner: String!, $name: String!, $number: Int!) {{
   repository(owner: $owner, name: $name) {{
     pullRequest(number: $number) {{
-      id headRefOid
+      id headRefOid baseRefName
       comments(first: {PAGE}) {{ pageInfo {{ hasNextPage }} nodes {{ id viewerDidAuthor body }} }}
     }}
   }}
@@ -63,7 +63,7 @@ def nodes(connection, listing):
 
 
 def pull_request(number):
-    """The PR's id, head and comments, checked to fit on one page."""
+    """The PR's id, head, base branch and comments, checked to fit on one page."""
     owner, name = repository()
     pr = graphql('PullRequest', PULL_REQUEST, {'owner': owner, 'name': name, 'number': number})
     pr = pr['repository']['pullRequest']

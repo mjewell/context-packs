@@ -36,7 +36,7 @@ def counted(findings):
     return ', '.join(f'{n} {NAMES[kind][n != 1]}' for kind, n in counts.items() if n)
 
 
-def summary(repo, number, base, head, findings):
+def summary(repo, number, base, base_ref, head, findings):
     """The counts for people, and every finding as JSON. The agent's text appears only in the JSON, where nothing
     renders, so nothing it writes can show people something other than what the author's local run reads."""
     found = counted(findings) or 'nothing'
@@ -45,7 +45,8 @@ def summary(repo, number, base, head, findings):
         text += (f"\n\nTo go through them, run `/pack-review {repo}#{number}` in Claude Code with this PR's branch "
                  'checked out.')
     # Backticks only occur inside JSON strings, where \u0060 means the same, so nothing can close the fence.
-    data = json.dumps({'base': base, 'head': head, 'findings': findings}, indent=2, ensure_ascii=False)
+    data = json.dumps({'base': base, 'base_ref': base_ref, 'head': head, 'findings': findings}, indent=2,
+                      ensure_ascii=False)
     data = data.replace('`', '\\u0060')
     return github.signed(f'{text}\n\n<details><summary>Findings for the local review</summary>\n\n```json\n{data}\n'
                          '```\n\n</details>')
@@ -65,6 +66,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pr', type=int, required=True, help='the PR number')
     parser.add_argument('--base', required=True, help='the commit the reviewed change starts from')
+    parser.add_argument('--base-ref', required=True, help='the branch the PR was to merge into when it was reviewed')
     parser.add_argument('--head', required=True, help='the commit that was reviewed')
     parser.add_argument('--findings', type=Path, required=True, help="the review agent's structured output")
     args = parser.parse_args()
@@ -74,7 +76,11 @@ def main():
         print(f'pack-review: the PR moved on to {pr["headRefOid"]} since this review of {args.head}, so it posts '
               'no summary. The run for the newer commit will.')
         return
-    body = summary(os.environ['GITHUB_REPOSITORY'], args.pr, args.base, args.head, findings)
+    if pr['baseRefName'] != args.base_ref:
+        print(f'pack-review: the PR moved from {args.base_ref} to {pr["baseRefName"]} since this review, so it posts '
+              'no summary. The run for the new base will.')
+        return
+    body = summary(os.environ['GITHUB_REPOSITORY'], args.pr, args.base, args.base_ref, args.head, findings)
     if len(body) > LIMIT:
         sys.exit(f'pack-review: the summary is {len(body)} characters, and GitHub allows {LIMIT} in a comment.')
     summaries = [c['id'] for c in pr['comments'] if github.own(c)]
