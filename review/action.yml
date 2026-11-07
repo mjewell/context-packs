@@ -49,7 +49,7 @@ runs:
         anthropic_api_key: ${{ inputs.anthropic-api-key }}
         claude_code_oauth_token: ${{ inputs.claude-code-oauth-token }}
         github_token: ${{ github.token }}
-        prompt: /context-packs:pack-review ci ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} ${{ steps.prepare.outputs.inputs }}
+        prompt: /context-packs:pack-findings ci ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} ${{ steps.prepare.outputs.inputs }}
         claude_args: ${{ steps.prepare.outputs.claude-args }}
     - name: Show what the agent did
       if: always() && steps.review.outputs.execution_file != ''

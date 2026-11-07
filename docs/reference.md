@@ -143,7 +143,7 @@ Prompts close to a row's `when` that shouldn't match it, or that match only thro
 
 ## Reviewing PRs in CI
 
-The `review` action runs the `pack-review` skill on a PR with [claude-code-action](https://github.com/anthropics/claude-code-action), and posts what it finds. The author then goes through the findings in a local session. Add a workflow such as `.github/workflows/pack-review.yml`:
+The `review` action runs the `pack-findings` skill on a PR with [claude-code-action](https://github.com/anthropics/claude-code-action), and posts what it finds. The author then goes through the findings in a local session. Add a workflow such as `.github/workflows/pack-review.yml`:
 
 ```yaml
 name: pack-review
@@ -180,7 +180,7 @@ It reviews a PR when it's opened or marked ready, again on each push, and again 
 
 Each review posts **one summary comment**, edited on each run. It counts the findings, and ends with every finding as JSON in a `<details>` block for the local run. A step after the agent writes it from the agent's answer. A run that fails posts nothing and leaves the last summary, which names the commit and base branch it reviewed. It comments nothing on the diff.
 
-To go through the findings, the author runs `/pack-review <owner>/<repo>#<number>` in Claude Code with the PR's branch checked out, as the summary says. Naming the repo lets it work from a session in a folder above the repos; inside the repo, the number alone does. The skill reads the summary's JSON rather than reviewing again, goes through each finding with the author, and runs `pack-rule` for each one they want recorded. Neither run commits or pushes.
+To go through the findings, the author runs `/pack-review <owner>/<repo>#<number>` in Claude Code with the PR's branch checked out, as the summary says. Naming the repo lets it work from a session in a folder above the repos; inside the repo, the number alone does. `pack-review` reads the summary's JSON rather than finding them again, goes through each finding with the author, and runs `pack-rule` for each one they want recorded. Neither run commits or pushes.
 
 The diff and the repo's files can hold text written to steer the agent, so the agent can't reach the PR, and its tools only read the checkout and the diff and log the action writes for it. It has no shell. Its findings appear only in the summary's JSON block, where everything shows as written, with invisible characters removed and anything that looks like an Anthropic key or GitHub token redacted. claude-code-action runs it only when whoever triggered the run has write access. A PR with more than 100 comments can't get a summary, since one that missed its earlier summary would post a second.
 
