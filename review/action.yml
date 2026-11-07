@@ -30,9 +30,17 @@ runs:
       shell: bash
       env:
         PR: ${{ github.event.pull_request.number }}
+        BASE: ${{ github.event.pull_request.base.sha }}
         HEAD: ${{ github.event.pull_request.head.sha }}
         MODEL: ${{ inputs.model }}
-      run: echo "claude-args=$(python3 "$GITHUB_ACTION_PATH/args.py" --pr "$PR" --head "$HEAD" --model "$MODEL")" >> "$GITHUB_OUTPUT"
+      # The agent has no shell, so it reads the diff and log from files. A new folder outside the checkout, so no path
+      # the PR controls, such as a symlink, decides where they're written.
+      run: |
+        inputs=$(mktemp -d "$RUNNER_TEMP/pack-review.XXXXXX")
+        git diff --no-ext-diff --no-textconv "$BASE...$HEAD" > "$inputs/diff.patch"
+        git log --no-decorate "$BASE..$HEAD" > "$inputs/log.txt"
+        echo "inputs=$inputs" >> "$GITHUB_OUTPUT"
+        echo "claude-args=$(python3 "$GITHUB_ACTION_PATH/args.py" --pr "$PR" --head "$HEAD" --inputs "$inputs" --model "$MODEL")" >> "$GITHUB_OUTPUT"
     - name: Review
       id: review
       # v1.0.268, pinned by commit since a tag can move.
@@ -42,7 +50,7 @@ runs:
         anthropic_api_key: ${{ inputs.anthropic-api-key }}
         claude_code_oauth_token: ${{ inputs.claude-code-oauth-token }}
         github_token: ${{ github.token }}
-        prompt: /context-packs:pack-review ci ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}
+        prompt: /context-packs:pack-review ci ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} ${{ steps.prepare.outputs.inputs }}
         claude_args: ${{ steps.prepare.outputs.claude-args }}
     - name: Show what the agent did
       if: always() && steps.review.outputs.execution_file != ''

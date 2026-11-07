@@ -1,7 +1,7 @@
 ---
 name: pack-review
 description: Review a PR or branch against a repo's context packs. Find where it deviates from a written rule, whether that rule's `when` reached the work, and the choices it makes that no rule covers.
-argument-hint: "[PR number or owner/repo#number, branch, or commit range] | ci <base>...<head>"
+argument-hint: "[PR number or owner/repo#number, branch, or commit range] | ci <base>...<head> <folder>"
 disable-model-invocation: true
 ---
 
@@ -28,7 +28,7 @@ Each finding is one of three kinds:
 ## Where it runs
 
 - **In chat**, with a PR, branch or range: every step below. A PR named as `owner/repo#number` is in that repo: from a folder above the repos, work in its checkout.
-- **In CI**, with the arguments `ci <base>...<head>`: steps 1 to 5, comments on the PR for some findings, and every finding returned as your answer, as described in [In CI](#in-ci). Nobody is there to answer a question.
+- **In CI**, with the arguments `ci <base>...<head> <folder>`: steps 1 to 5, comments on the PR for some findings, and every finding returned as your answer, as described in [In CI](#in-ci). Nobody is there to answer a question.
 - **From a PR that CI reviewed**: when the user names a PR, by number or as `owner/repo#number`, whose summary comment holds pack-review's findings, steps 6 and 7 on those findings, as described in [From a CI review](#from-a-ci-review). Steps 1 to 5 already ran in CI, so don't run them again.
 
 ## 1. Pin the diff
@@ -52,7 +52,7 @@ Group the docs into **units** for checking. Each pack is a unit, holding its own
 
 ## 3. Check each unit against the diff
 
-Give each unit to a subagent, all in parallel. A single small unit can be checked inline. Each one gets the diff and log commands, its docs' paths, and their routing. It reads every doc in full, whatever its routing, since a rule whose doc didn't route can still apply to the change.
+Give each unit to a subagent, all in parallel. A single small unit can be checked inline. Each one gets the diff and log commands, or in CI their files, its docs' paths, and their routing. It reads every doc in full, whatever its routing, since a rule whose doc didn't route can still apply to the change.
 
 For each rule that applies somewhere in the diff, it returns one **ledger** entry:
 
@@ -104,7 +104,7 @@ Run the `pack-rule` skill once for each finding the user wants recorded in the p
 
 ## In CI
 
-The base and head are given, and the head is checked out. Your tools for the PR come from the `pack-review` MCP server:
+The base and head are given, and the head is checked out. You have no shell: the folder holds the diff, as `diff.patch`, and the full log, as `log.txt`, in place of step 1's commands. Read them in pages if they're long. Your tools for the PR come from the `pack-review` MCP server:
 
 - `read_comments` gives the PR's description, the comments and reviews of people with a trusted role on the repo, and the review threads, with `pack_review` marking the threads and comments you wrote on earlier runs. Read it in step 1, alongside the commit messages.
 - `open_thread` and `reply` write to the PR. `reply` works only on threads marked `pack_review`. There's no tool to resolve a thread: a person does that. Each adds the 🤖 and the marker that tells your comments apart, and removes raw HTML outside code, so write plain Markdown.

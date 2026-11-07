@@ -7,6 +7,7 @@ import unittest
 from review_case import REVIEW
 
 HEAD = 'h' * 40
+INPUTS = '/runner/temp/pack-review.abc123'
 TOOLS = ['mcp__pack-review__read_comments', 'mcp__pack-review__open_thread', 'mcp__pack-review__reply']
 
 
@@ -14,8 +15,8 @@ class ArgsTests(unittest.TestCase):
     """The arguments the review action hands claude-code-action for the agent."""
 
     def args(self, *extra):
-        run = subprocess.run([sys.executable, str(REVIEW / 'args.py'), '--pr', '7', '--head', HEAD, *extra],
-                             capture_output=True, text=True, check=True)
+        run = subprocess.run([sys.executable, str(REVIEW / 'args.py'), '--pr', '7', '--head', HEAD, '--inputs', INPUTS,
+                              *extra], capture_output=True, text=True, check=True)
         self.assertEqual(run.stdout.count('\n'), 1)
         return shlex.split(run.stdout)
 
@@ -37,13 +38,12 @@ class ArgsTests(unittest.TestCase):
             'command': 'python3', 'args': [str(REVIEW / 'tools.py'), '--pr', '7', '--head', HEAD]}}})
         self.assertIn('--strict-mcp-config', args)
 
-    def test_gives_the_agent_tools_that_read_the_checkout_and_its_review_tools(self):
+    def test_gives_the_agent_tools_that_only_read_the_checkout_and_the_diff_and_its_review_tools(self):
         args = self.args()
 
-        self.assertEqual(self.flag(args, '--tools'), 'Read,Glob,Grep,Bash,Agent')
-        self.assertEqual(self.flag(args, '--allowedTools').split(','),
-                         ['Read', 'Glob', 'Grep', 'Agent', 'Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git show:*)',
-                          *TOOLS])
+        self.assertEqual(self.flag(args, '--tools'), 'Read,Glob,Grep,Agent')
+        self.assertEqual(self.flag(args, '--allowedTools').split(','), ['Read', 'Glob', 'Grep', 'Agent', *TOOLS])
+        self.assertEqual(self.flag(args, '--add-dir'), INPUTS)
         self.assertEqual(self.flag(args, '--disallowedTools'), 'Read(./.git/**)')
         self.assertIn('--restricted', args)
 
@@ -52,8 +52,8 @@ class ArgsTests(unittest.TestCase):
         self.assertNotIn('--model', self.args('--model', ''))
 
     def test_quotes_each_value_whole_so_any_shell_style_parser_reads_it_the_same(self):
-        line = subprocess.run([sys.executable, str(REVIEW / 'args.py'), '--pr', '7', '--head', HEAD],
-                              capture_output=True, text=True, check=True).stdout
+        line = subprocess.run([sys.executable, str(REVIEW / 'args.py'), '--pr', '7', '--head', HEAD,
+                               '--inputs', INPUTS], capture_output=True, text=True, check=True).stdout
         for value in shlex.split(line):
             quoted = shlex.quote(value)
             self.assertTrue(quoted == value or (quoted.startswith("'") and quoted.count("'") == 2), value[:60])
