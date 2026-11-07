@@ -104,7 +104,7 @@ The block ends with a hash of its text and the files under `context-packs/gen/`.
 `check` renders every pack the way a sync would, and fails if `AGENTS.md` or a file in `context-packs/gen/` differs, such as after a `when:` line or a pinned `ref` changed without a resync, or after synced content was edited in place:
 
 ```yaml
-- uses: actions/checkout@v4
+- uses: actions/checkout@v6
 - run: npx --yes context-packs check
 ```
 
@@ -140,6 +140,51 @@ The sessions for `context-packs/` run in a copy of the repo, and for any other p
 Every copy sits outside your folders, without `.git`, `node_modules` or `.evals`, and loads only its own `CLAUDE.md`. Sessions get only the tools that look (`Read`, `Glob` and `Grep`), no MCP servers, and up to 8 turns. Each runs to its end, even after reading its doc, so it shows every doc it reads and what it cost. A prompt that fails lists the docs its session read, and one that passes lists any others it read, where a row matching work it shouldn't shows up first. A session that errors instead, such as one without a login or on a model you can't use, settles nothing: its prompt shows `!` and claude's error, and `eval` exits 1. Sessions use your Claude Code login and cost tokens, about 10–40k each on Sonnet, mostly read from cache, and run on Sonnet unless you pass `--model`. Results depend on the model, and a prompt that passes only on a larger one points at a `when` worth making plainer.
 
 Prompts close to a row's `when` that shouldn't match it, or that match only through a clause that's easy to miss, are the ones worth writing.
+
+## Reviewing PRs in CI
+
+The `review` action runs the `pack-review` skill on a PR with [claude-code-action](https://github.com/anthropics/claude-code-action), and posts what it finds. The author then goes through the findings in a local session. Add a workflow such as `.github/workflows/pack-review.yml`:
+
+```yaml
+name: pack-review
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize, edited]
+jobs:
+  review:
+    # Drafts wait until they're ready. PRs from forks get no secrets, so they're skipped. An edit reviews again only
+    # when it changed the base branch, so the findings match the new diff.
+    if: >-
+      ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from) }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pack-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: mjewell/context-packs/review@main
+        with:
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+With a Pro or Max subscription instead of an API key, run `claude setup-token` locally, add what it prints as the secret `CLAUDE_CODE_OAUTH_TOKEN`, and pass `claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}` in place of `anthropic-api-key`. Reviews then count against the subscription's usage limits.
+
+It reviews a PR when it's opened or marked ready, again on each push, and again when its base branch changes. A newer push cancels a review still running. Pin `@main` to a release tag once you've tried it. Pass `model` to review with a model other than Claude Code's default.
+
+Each review posts **one summary comment**, edited on each run. It counts the findings, and ends with every finding as JSON in a `<details>` block for the local run. A step after the agent writes it from the agent's answer. A run that fails posts nothing and leaves the last summary, which names the commit and base branch it reviewed. It comments nothing on the diff.
+
+To go through the findings, the author runs `/pack-review <owner>/<repo>#<number>` in Claude Code with the PR's branch checked out, as the summary says. Naming the repo lets it work from a session in a folder above the repos; inside the repo, the number alone does. The skill reads the summary's JSON rather than reviewing again, goes through each finding with the author, and runs `pack-rule` for each one they want recorded. Neither run commits or pushes.
+
+The diff and the repo's files can hold text written to steer the agent, so the agent can't reach the PR, and its tools only read the checkout and the diff and log the action writes for it. It has no shell. Its findings appear only in the summary's JSON block, where everything shows as written, with invisible characters removed and anything that looks like an Anthropic key or GitHub token redacted. claude-code-action runs it only when whoever triggered the run has write access. A PR with more than 100 comments can't get a summary, since one that missed its earlier summary would post a second.
+
+Each run costs about what a review in chat does.
 
 ## Upgrading from 0.6
 

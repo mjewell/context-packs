@@ -13,6 +13,7 @@ Context packs bring shared rules and docs in from elsewhere. Each pack has its r
 |---|---|
 | Changing how packs are written, pinned or updated | `context-packs/project/design.md` |
 | Releasing a new version to npm | `context-packs/project/releasing.md` |
+| Changing the `review/` action, or how `pack-review` runs in CI or reads a CI review | `context-packs/project/review.md` |
 
 <!-- context-packs:pack core -->
 ## Collaboration
@@ -111,12 +112,13 @@ Edit only files I own. Plugins, synced skills, and installed dependencies belong
 | Writing or changing tests, or fixing a bug | `context-packs/gen/core/testing.md` |
 | Writing commit messages, PR titles or descriptions, changelog entries, READMEs, or anything else others will read without session context | `context-packs/gen/core/writing-for-humans.md` |
 <!-- context-packs:pack-end core -->
-<!-- context-packs:end sha256:5918e3db0c36 -->
+<!-- context-packs:end sha256:5cb7211c098e -->
 
 ## Project
 
 - The CLI is `src/cli.py`, with `src/blocks.py` for the block in `AGENTS.md`, `src/packs.py` for where packs come from, `src/tree.py` for `context-packs/` as a tree of packs, `src/imports.py` for the import packs the commands change, and `src/origins.py` for fetching packs from git. It uses only the Python standard library and `git`, and runs on macOS's system `python3` (3.9).
 - `bin/context-packs.js` is the npm package's bin, which npx runs. It only hands its arguments to the Python CLI.
 - `skills/` holds the skills this repo ships as a Claude Code plugin, alongside `.claude-plugin/plugin.json`: `context-packs` runs the tool, `pack-rule` writes a rule into a repo's packs, `pack-backfill` finds a decision the code makes, consistently or not, that the packs don't settle, and hands it to `pack-rule`, and `pack-review` checks a change against the packs and hands what they should record to `pack-rule`. They're for anyone using the tool, so they rely on nothing from any one person's packs.
+- `review/` is the GitHub Action that runs `pack-review` on a PR through claude-code-action: `args.py` builds the agent's arguments, `summary.py` posts the summary from the agent's answer, `transcript.py` prints the agent's tool calls in the job's log, `sanitize.py` cleans the agent's findings before they're posted, and `github.py` holds the GitHub API. Like the CLI, they use only the Python standard library.
 - Run the tests with `python3 -m unittest discover tests`.
 - This repo's own context docs are in `context-packs/project/`, and its shared rules come from agent-config through the import pack `context-packs/core/`. After adding a doc or changing its `when:` line, run `node bin/context-packs.js` and commit the result.
