@@ -100,8 +100,9 @@ def answer(inputs, docs, hook):
                                               if finished.exists() else ())}
     done = read(transcripts, Path(hook['cwd']))
     missing = [doc for doc in docs if doc not in done]
-    # A step after the agent fails the job while this list exists. It's written at every denial, since an agent sent
-    # back can stop without answering again, and it stays when the gate gives up and lets the answer through.
+    # The summary lists these docs, so a review that skipped some is posted as partial. The list is written at every
+    # denial, since an agent sent back can stop without answering again, and it stays when the gate gives up and
+    # lets the answer through.
     listed = inputs / 'unread.txt'
     if missing:
         listed.write_text(''.join(f'{doc}\n' for doc in missing), encoding='utf-8')

@@ -59,19 +59,6 @@ runs:
       env:
         TRANSCRIPT: ${{ steps.review.outputs.execution_file }}
       run: python3 "$GITHUB_ACTION_PATH/transcript.py" --file "$TRANSCRIPT"
-    - name: Check the agent read every doc
-      shell: bash
-      env:
-        UNREAD: ${{ steps.prepare.outputs.inputs }}/unread.txt
-      # The answer gate lists the docs still unread whenever it sends the agent back, and keeps the list if the agent
-      # stops there or the gate gives up after three tries. Findings from a review that skipped docs aren't posted,
-      # so the last summary stays.
-      run: |
-        if [ -e "$UNREAD" ]; then
-          echo "::error::The review finished without reading these docs, so it posts nothing:"
-          cat "$UNREAD"
-          exit 1
-        fi
     - name: Post the summary
       shell: bash
       env:
@@ -81,7 +68,10 @@ runs:
         BASE: ${{ github.event.pull_request.base.sha }}
         BASE_REF: ${{ github.event.pull_request.base.ref }}
         HEAD: ${{ github.event.pull_request.head.sha }}
+        INPUTS: ${{ steps.prepare.outputs.inputs }}
+      # The answer gate leaves unread.txt when it let the answer through with docs still unread, and the summary
+      # lists them, so the author gets a partial review rather than none.
       run: |
         printf '%s' "$FINDINGS" > "$RUNNER_TEMP/pack-review-findings.json"
         python3 "$GITHUB_ACTION_PATH/summary.py" --pr "$PR" --base "$BASE" --base-ref "$BASE_REF" --head "$HEAD" \
-          --findings "$RUNNER_TEMP/pack-review-findings.json"
+          --findings "$RUNNER_TEMP/pack-review-findings.json" --unread "$INPUTS/unread.txt"

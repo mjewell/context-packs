@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Post or update pack-review's one summary comment on a PR, from the findings the review agent returned: counts for
-people, and every finding as JSON for the author's local run. It runs as a step after the agent, which can't write to
-the PR."""
+people, and every finding as JSON for the author's local run, with any docs the agent didn't read. It runs as a step
+after the agent, which can't write to the PR."""
 import argparse
 import json
 import os
@@ -36,17 +36,21 @@ def counted(findings):
     return ', '.join(f'{n} {NAMES[kind][n != 1]}' for kind, n in counts.items() if n)
 
 
-def summary(repo, number, base, base_ref, head, findings):
-    """The counts for people, and every finding as JSON. The agent's text appears only in the JSON, where nothing
-    renders, so nothing it writes can show people something other than what the author's local run reads."""
+def summary(repo, number, base, base_ref, head, findings, unread):
+    """The counts for people, and every finding and unread doc as JSON. The agent's text and the docs' paths appear
+    only in the JSON, where nothing renders, so nothing they hold can show people something other than what the
+    author's local run reads."""
     found = counted(findings) or 'nothing'
     text = f"pack-review checked `{head[:7]}` against this repo's context packs and found {found}."
-    if findings:
+    if unread:
+        text += (f' The review should read every doc the tables point at, and it skipped {len(unread)}. That\'s most '
+                 'likely a problem in pack-review, not in your docs. The JSON lists them.')
+    if findings or unread:
         text += (f"\n\nTo go through them, run `/pack-review {repo}#{number}` in Claude Code with this PR's branch "
                  'checked out.')
     # Backticks only occur inside JSON strings, where \u0060 means the same, so nothing can close the fence.
-    data = json.dumps({'base': base, 'base_ref': base_ref, 'head': head, 'findings': findings}, indent=2,
-                      ensure_ascii=False)
+    data = json.dumps({'base': base, 'base_ref': base_ref, 'head': head, 'findings': findings, 'unread': unread},
+                      indent=2, ensure_ascii=False)
     data = data.replace('`', '\\u0060')
     return github.signed(f'{text}\n\n<details><summary>Findings for the local review</summary>\n\n```json\n{data}\n'
                          '```\n\n</details>')
@@ -62,6 +66,11 @@ def findings_in(path):
     return cleaned(output['findings'])
 
 
+def unread_in(path):
+    """The docs the read gate listed as unread when it let the answer through: none when it left no list."""
+    return cleaned(path.read_text(encoding='utf-8').splitlines()) if path.exists() else []
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pr', type=int, required=True, help='the PR number')
@@ -69,8 +78,11 @@ def main():
     parser.add_argument('--base-ref', required=True, help='the branch the PR was to merge into when it was reviewed')
     parser.add_argument('--head', required=True, help='the commit that was reviewed')
     parser.add_argument('--findings', type=Path, required=True, help="the review agent's structured output")
+    parser.add_argument('--unread', type=Path, required=True,
+                        help="where the read gate lists the docs the agent didn't read, if it didn't read them all")
     args = parser.parse_args()
     findings = findings_in(args.findings)
+    unread = unread_in(args.unread)
     pr = github.pull_request(args.pr)
     if pr['headRefOid'] != args.head:
         print(f'pack-review: the PR moved on to {pr["headRefOid"]} since this review of {args.head}, so it posts '
@@ -80,7 +92,7 @@ def main():
         print(f'pack-review: the PR moved from {args.base_ref} to {pr["baseRefName"]} since this review, so it posts '
               'no summary. The run for the new base will.')
         return
-    body = summary(os.environ['GITHUB_REPOSITORY'], args.pr, args.base, args.base_ref, args.head, findings)
+    body = summary(os.environ['GITHUB_REPOSITORY'], args.pr, args.base, args.base_ref, args.head, findings, unread)
     if len(body) > LIMIT:
         sys.exit(f'pack-review: the summary is {len(body)} characters, and GitHub allows {LIMIT} in a comment.')
     summaries = [c['id'] for c in pr['comments'] if github.own(c)]
