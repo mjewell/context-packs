@@ -205,11 +205,15 @@ def index(node, pack):
     return pack.generated / f'{node.id or "pack"}.md'
 
 
+def shown(base, path):
+    """A path as a table shows it, starting from base."""
+    return Path(os.path.normpath(base / path)).as_posix()
+
+
 def table(heading, rows, base):
     """A table of (when, path) rows under its heading, or nothing without rows, each path starting from base."""
     return (f'{heading}\n\n| When | Read |\n|---|---|\n'
-            + ''.join(f'| {when} | `{Path(os.path.normpath(base / path)).as_posix()}` |\n' for when, path in rows)
-            ) if rows else ''
+            + ''.join(f'| {when} | `{shown(base, path)}` |\n' for when, path in rows)) if rows else ''
 
 
 def name(node, pack):
@@ -228,16 +232,29 @@ def inline(node, pack, base):
             f'<!-- context-packs:pack-end {name(node, pack)} -->\n')
 
 
+def rows(node, pack):
+    """The node's table, as (when, path) rows: one for each of its docs, and for each pack nested in it or imported
+    into it that gets one."""
+    return [row[1:] for row in sorted(
+        [(d.path[:-len('.md')], d.when, pack.synced / d.path) for d in node.docs]
+        + [(c.id, c.fields['when'], index(c, pack)) for c in node.children if c.row]
+        + [(i.id, i.root.fields['when'], index(i.root, i.pack)) for i in node.imports if i.root.row])]
+
+
+def pointed(node, pack, base):
+    """Every path the node's table points at, and the tables of the packs nested in it or imported into it, each
+    starting from base."""
+    return [*(shown(base, path) for _, path in rows(node, pack)),
+            *(path for child in node.children for path in pointed(child, pack, base)),
+            *(path for i in node.imports for path in pointed(i.root, i.pack, base))]
+
+
 def render(node, pack, base):
-    """The node's rules, then its table: a row for each of its docs, and for each pack nested in it or imported
-    into it that gets one, its path starting from base. Each of those packs that doesn't is rendered the same way
-    after it."""
-    rows = sorted([(d.path[:-len('.md')], d.when, pack.synced / d.path) for d in node.docs]
-                  + [(c.id, c.fields['when'], index(c, pack)) for c in node.children if c.row]
-                  + [(i.id, i.root.fields['when'], index(i.root, i.pack)) for i in node.imports if i.root.row])
+    """The node's rules, then its table, each path starting from base. Each pack nested in it or imported into it
+    that gets no row is rendered the same way after it."""
     inlined = ([inline(c, pack, base) for c in node.children if not c.row]
                + [inline(i.root, i.pack, base) for i in node.imports if not i.root.row])
-    return '\n'.join(part for part in (node.rules, table(heading(node, pack), [r[1:] for r in rows], base),
+    return '\n'.join(part for part in (node.rules, table(heading(node, pack), rows(node, pack), base),
                                         *inlined) if part)
 
 
