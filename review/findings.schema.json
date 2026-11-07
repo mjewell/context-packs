@@ -7,7 +7,7 @@
   "properties": {
     "findings": {
       "type": "array",
-      "description": "Every finding of the review, as pack-review's steps 1 to 5 sort them.",
+      "description": "Every finding of the review, as the pack-findings skill sorts them.",
       "items": {
         "type": "object",
         "additionalProperties": false,

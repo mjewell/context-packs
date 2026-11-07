@@ -132,11 +132,12 @@ In Claude Code, `/context-packs` invokes it directly.
 
 ## Grow your packs with your agent
 
-Three more skills help write and apply the rules themselves, and the command above installs them too. Pick with `-s`, such as `-s context-packs` for just the first.
+Four more skills help write and apply the rules themselves, and the command above installs them too. Pick with `-s`, such as `-s context-packs` for just the first.
 
 - **`pack-rule`** writes one rule into the repo's packs, from a pattern you describe or examples you point at. It looks for a rule that already covers it first, and updates that one rather than adding another. Ask things like "Document that API handlers validate input with Zod".
 - **`pack-backfill`** finds one decision the code makes that no rule settles yet, asks you to confirm it, and writes it with `pack-rule`. It's meant to be cheap enough to run often. In Claude Code, run `/pack-backfill`, or `/pack-backfill src/billing` to look in one area.
-- **`pack-review`** reviews a PR or branch against the repo's packs. It reports where the change deviates from a rule, whether that rule's `when` reached the work, and choices the change makes that no rule covers. You decide whether the change or the rule needs fixing, and each rule to record goes to `pack-rule`. In Claude Code, run `/pack-review 42` for a PR, or `/pack-review my-branch`. The `review` action runs it on each PR in CI and posts what it finds, for the author to go through in a local session: see [Reviewing PRs in CI](docs/reference.md#reviewing-prs-in-ci).
+- **`pack-findings`** checks a PR or branch against the repo's packs. It reports where the change deviates from a rule, whether that rule's `when` reached the work, and choices the change makes that no rule covers. In Claude Code, run `/pack-findings my-branch` to see them.
+- **`pack-review`** goes through those findings with you. You decide whether the change or the rule needs fixing, and each rule to record goes to `pack-rule`. It runs `pack-findings` itself, so `/pack-review 42` for a PR, or `/pack-review my-branch`, does both. The `review` action runs `pack-findings` on each PR in CI and posts what it finds, for the author to go through in a local session: see [Reviewing PRs in CI](docs/reference.md#reviewing-prs-in-ci).
 
 ## Why not skills?
 

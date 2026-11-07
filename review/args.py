@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Print, on one line, the claude_args the review action hands claude-code-action: the pack-review skill, the schema
+"""Print, on one line, the claude_args the review action hands claude-code-action: the pack-findings skill, the schema
 the agent's answer is checked against, and tools that only read the checkout and the folder holding the diff and log.
 claude-code-action splits the line the way a shell would."""
 import argparse
