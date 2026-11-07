@@ -81,13 +81,16 @@ def answer(inputs, docs, hook):
                                               if finished.exists() else ())}
     done = set().union(*(read(transcript, Path(hook['cwd'])) for transcript in transcripts))
     missing = [doc for doc in docs if doc not in done]
+    # A step after the agent fails the job while this list exists. It's written at every denial, since an agent sent
+    # back can stop without answering again, and it stays when the gate gives up and lets the answer through.
+    listed = inputs / 'unread.txt'
+    if missing:
+        listed.write_text(''.join(f'{doc}\n' for doc in missing), encoding='utf-8')
+    elif listed.exists():
+        listed.unlink()
     if missing and denied(hook['transcript_path']) < SENDS:
         return {'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'deny',
                                        'permissionDecisionReason': unread(missing, 'answer')}}
-    if missing:
-        # The answer goes through, so the run keeps its transcript, and a step after the agent fails the job with
-        # this list.
-        (inputs / 'unread.txt').write_text(''.join(f'{doc}\n' for doc in missing), encoding='utf-8')
     return None
 
 

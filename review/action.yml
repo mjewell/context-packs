@@ -63,11 +63,12 @@ runs:
       shell: bash
       env:
         UNREAD: ${{ steps.prepare.outputs.inputs }}/unread.txt
-      # The answer gate lets the answer through after sending the agent back three times, and lists what it still
-      # hadn't read. Findings from a review that skipped docs aren't posted, so the last summary stays.
+      # The answer gate lists the docs still unread whenever it sends the agent back, and keeps the list if the agent
+      # stops there or the gate gives up after three tries. Findings from a review that skipped docs aren't posted,
+      # so the last summary stays.
       run: |
         if [ -e "$UNREAD" ]; then
-          echo "::error::The review answered without reading these docs, so it posts nothing:"
+          echo "::error::The review finished without reading these docs, so it posts nothing:"
           cat "$UNREAD"
           exit 1
         fi

@@ -166,3 +166,18 @@ class ReadGateTests(ReviewCase):
 
         self.assertIsNone(self.answer())
         self.assertFalse((self.inputs / 'unread.txt').exists())
+
+    def test_lists_what_went_unread_when_the_agent_stops_after_a_denial(self):
+        self.main.read(DOCS[0])
+
+        self.denied(self.answer())
+
+        self.assertEqual((self.inputs / 'unread.txt').read_text(), f'{DOCS[1]}\n{DOCS[2]}\n')
+
+    def test_clears_the_list_once_the_docs_are_read(self):
+        self.denied(self.answer())
+        for doc in DOCS:
+            self.main.read(doc)
+
+        self.assertIsNone(self.answer())
+        self.assertFalse((self.inputs / 'unread.txt').exists())
