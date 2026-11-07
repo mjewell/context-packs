@@ -4,6 +4,8 @@ from review_case import ReviewCase
 
 DOCS = ['context-packs/gen/core/testing.md', 'context-packs/gen/core/git-and-prs.md',
         'context-packs/project/review.md']
+# How many lines each doc in the checkout has.
+LINES = 30
 
 
 class Transcript:
@@ -33,8 +35,9 @@ class Transcript:
         self.add('user', [{'type': 'tool_result', 'tool_use_id': id, 'content': result,
                            **({'is_error': True} if error else {})}])
 
-    def read(self, doc, error=False):
-        self.call('Read', {'file_path': str(self.checkout / doc)},
+    def read(self, doc, error=False, **page):
+        """A Read of the doc, with the offset and limit given in page, if any."""
+        self.call('Read', {'file_path': str(self.checkout / doc), **page},
                   'File does not exist.' if error else '1\tA rule.\n', error)
 
 
@@ -47,6 +50,9 @@ class ReadGateTests(ReviewCase):
         self.inputs = self.root / 'inputs'
         self.inputs.mkdir()
         (self.inputs / 'docs.txt').write_text(''.join(f'{doc}\n' for doc in DOCS))
+        for doc in DOCS:
+            (self.checkout / doc).parent.mkdir(parents=True, exist_ok=True)
+            (self.checkout / doc).write_text(''.join(f'Rule {n}.\n' for n in range(1, LINES + 1)))
         self.sessions = self.root / 'projects' / 'session'
         self.main = Transcript(self.root / 'projects' / 'session.jsonl', self.checkout, sidechain=False)
         self.subagents = 0
@@ -181,3 +187,23 @@ class ReadGateTests(ReviewCase):
 
         self.assertIsNone(self.answer())
         self.assertFalse((self.inputs / 'unread.txt').exists())
+
+    def test_doesnt_count_a_read_of_part_of_a_doc(self):
+        subagent = self.subagent(DOCS[:1])
+        subagent.read(DOCS[0], limit=12)
+
+        self.assertIn(DOCS[0], self.stop(subagent)['reason'])
+
+    def test_counts_pages_that_together_cover_a_doc(self):
+        subagent = self.subagent(DOCS[:1])
+        subagent.read(DOCS[0], limit=12)
+        subagent.read(DOCS[0], offset=13, limit=LINES)
+
+        self.assertIsNone(self.stop(subagent))
+
+    def test_doesnt_count_pages_that_leave_a_gap(self):
+        subagent = self.subagent(DOCS[:1])
+        subagent.read(DOCS[0], limit=12)
+        subagent.read(DOCS[0], offset=14, limit=LINES)
+
+        self.assertIn(DOCS[0], self.stop(subagent)['reason'])
