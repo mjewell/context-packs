@@ -21,7 +21,7 @@ UPDATE_COMMENT = '''mutation UpdateComment($input: UpdateIssueCommentInput!) {
 
 
 def cleaned(value):
-    """The agent's findings with every string cleaned of what a reader wouldn't see."""
+    """The agent's findings with invisible characters removed and secrets redacted from every string."""
     if isinstance(value, str):
         return clean(value)
     if isinstance(value, list):
