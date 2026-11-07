@@ -1,3 +1,5 @@
+import shutil
+
 from test_cli import SyncCase, doc
 
 
@@ -34,3 +36,29 @@ class DocsTests(SyncCase):
 
         self.assertEqual([path for path in listed if f'`{path}`' not in tables], [])
         self.assertTrue(all((self.repo / path).is_file() for path in listed))
+
+    def test_reads_the_synced_tables_without_fetching_any_pack(self):
+        expected = self.sync('docs').stdout
+        shutil.rmtree(self.root / 'house-rules.git')
+        shutil.rmtree(self.root / 'cache')
+
+        result = self.sync('docs')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, expected)
+
+
+class SubfolderDocsTests(SyncCase):
+    """A folder inside a repo, whose tables' paths start from the repo root."""
+
+    def test_lists_and_reads_paths_from_the_repo_root(self):
+        self.write('packages/web/context-packs/frontend/pack.md', doc('Editing `web/**`', 'Keep components small.\n'))
+        self.write('packages/web/context-packs/frontend/react.md', doc('Writing React components'))
+        folder = str(self.repo / 'packages' / 'web')
+        self.assertEqual(self.sync('--dir', folder).returncode, 0)
+
+        result = self.sync('--dir', folder, 'docs')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, 'packages/web/context-packs/frontend/react.md\n'
+                                        'packages/web/context-packs/gen/frontend.md\n')

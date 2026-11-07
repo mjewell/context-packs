@@ -13,6 +13,7 @@ import tempfile
 import evals
 import imports
 import report
+import tables
 from blocks import block, header, instructions, region, snapshot
 from packs import GEN, REPO, base
 import tree
@@ -101,13 +102,13 @@ def main():
     if args.command == 'list':
         show(before)
         return
+    if args.command == 'docs':
+        print(''.join(f'{path}\n' for path in sorted(tables.pointed(repo, found.block))), end='')
+        return
     edits = imports.command(args, repo, before)
 
     with imports.applied(repo, edits), contextlib.ExitStack() as stack:
         root = tree.load(repo, stack)
-        if args.command == 'docs':
-            print(''.join(f'{path}\n' for path in sorted(tree.pointed(root, REPO, base(repo)))), end='')
-            return
         if args.command in ('check', 'eval'):
             out = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix='context-packs-check-')))
             check(file, found, generate(root, out, repo), out, repo)

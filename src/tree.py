@@ -241,14 +241,6 @@ def rows(node, pack):
         + [(i.id, i.root.fields['when'], index(i.root, i.pack)) for i in node.imports if i.root.row])]
 
 
-def pointed(node, pack, base):
-    """Every path the node's table points at, and the tables of the packs nested in it or imported into it, each
-    starting from base."""
-    return [*(shown(base, path) for _, path in rows(node, pack)),
-            *(path for child in node.children for path in pointed(child, pack, base)),
-            *(path for i in node.imports for path in pointed(i.root, i.pack, base))]
-
-
 def render(node, pack, base):
     """The node's rules, then its table, each path starting from base. Each pack nested in it or imported into it
     that gets no row is rendered the same way after it."""
