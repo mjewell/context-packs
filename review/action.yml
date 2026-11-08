@@ -40,7 +40,7 @@ runs:
         git diff --no-ext-diff --no-textconv "$BASE...$HEAD" > "$inputs/diff.patch"
         git log --no-decorate "$BASE..$HEAD" > "$inputs/log.txt"
         echo "inputs=$inputs" >> "$GITHUB_OUTPUT"
-        python3 "$GITHUB_ACTION_PATH/../src/cli.py" docs \
+        python3 "$GITHUB_ACTION_PATH/../src/cli.py" docs | tee "$inputs/docs.txt" \
           | python3 "$GITHUB_ACTION_PATH/prompt.py" --base "$BASE" --head "$HEAD" --inputs "$inputs" >> "$GITHUB_OUTPUT"
         echo "claude-args=$(python3 "$GITHUB_ACTION_PATH/args.py" --inputs "$inputs" --model "$MODEL")" >> "$GITHUB_OUTPUT"
     - name: Review
@@ -69,7 +69,11 @@ runs:
         BASE: ${{ github.event.pull_request.base.sha }}
         BASE_REF: ${{ github.event.pull_request.base.ref }}
         HEAD: ${{ github.event.pull_request.head.sha }}
+        INPUTS: ${{ steps.prepare.outputs.inputs }}
+        TRANSCRIPT: ${{ steps.review.outputs.execution_file }}
+      # The summary lists the docs no agent read in full, from the transcript, so a review that skipped one is posted
+      # as partial.
       run: |
         printf '%s' "$FINDINGS" > "$RUNNER_TEMP/pack-review-findings.json"
         python3 "$GITHUB_ACTION_PATH/summary.py" --pr "$PR" --base "$BASE" --base-ref "$BASE_REF" --head "$HEAD" \
-          --findings "$RUNNER_TEMP/pack-review-findings.json"
+          --findings "$RUNNER_TEMP/pack-review-findings.json" --transcript "$TRANSCRIPT" --docs "$INPUTS/docs.txt"

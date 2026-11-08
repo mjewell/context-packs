@@ -5,6 +5,7 @@ from fake_github import comment, ok, pull_request
 from review_case import HEAD, MARKER, ReviewCase, own
 
 BASE = 'b' * 40
+DOC = 'One.\nTwo.\nThree.\n'
 
 
 def finding(kind='deviates', headline='A game number in sim code', take='Move it to content.', spots=()):
@@ -22,23 +23,34 @@ def block(body):
     return json.loads(found.group(1)), found.group(1)
 
 
-class SummaryTests(ReviewCase):
-    """The one summary comment each review keeps current: counts for people, and every finding as JSON for the
-    author's local run."""
+class SummaryCase(ReviewCase):
+    """A run about to post its summary: the agent's answer, the docs the tables point at, checked out here, and the
+    transcript of what the agent did."""
 
     def setUp(self):
         super().setUp()
         self.github.responses.update({'PullRequest': pull_request(), 'AddComment': ok({}), 'UpdateComment': ok({})})
 
-    def summarize(self, findings=(), output=None, head=HEAD, base_ref='main'):
+    def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', docs=(), messages=()):
+        """Post the summary of the agent's output, with docs as `context-packs docs` lists them, each pack a list."""
         (self.root / 'output.json').write_text(
             output if output is not None else json.dumps({'findings': list(findings)}))
+        for path in (path for pack in docs for path in pack):
+            (self.root / path).parent.mkdir(parents=True, exist_ok=True)
+            (self.root / path).write_text(DOC)
+        (self.root / 'docs.txt').write_text('\n'.join(''.join(f'{path}\n' for path in pack) for pack in docs))
+        (self.root / 'transcript.json').write_text(json.dumps(list(messages)))
         return self.script('summary', '--pr', 7, '--base', BASE, '--base-ref', base_ref, '--head', head,
-                           '--findings', 'output.json')
+                           '--findings', 'output.json', '--transcript', 'transcript.json', '--docs', 'docs.txt')
 
     def body(self):
         [sent] = self.sent('AddComment') or self.sent('UpdateComment')
         return sent['input']['body']
+
+
+class SummaryTests(SummaryCase):
+    """The one summary comment each review keeps current: counts for people, and every finding as JSON for the
+    author's local run."""
 
     def test_posts_a_summary_counting_the_findings_and_holding_them_all(self):
         findings = [finding(), finding(), finding('conflicting'), finding('uncovered'), finding('uncovered'),
@@ -55,7 +67,9 @@ class SummaryTests(ReviewCase):
         self.assertIn("pack-review checked `hhhhhhh` against this repo's context packs and found 2 deviations, "
                       '1 conflict, 3 uncovered choices.', body)
         self.assertIn('run `/pack-review o/r#7` in Claude Code', body)
-        self.assertEqual(block(body)[0], {'base': BASE, 'base_ref': 'main', 'head': HEAD, 'findings': findings})
+        self.assertEqual(block(body)[0], {'base': BASE, 'base_ref': 'main', 'head': HEAD, 'findings': findings,
+                                          'unread': []})
+        self.assertNotIn('skipped', body)
 
     def test_says_when_it_found_nothing(self):
         self.summarize([])
@@ -64,6 +78,25 @@ class SummaryTests(ReviewCase):
         self.assertIn('found nothing.', body)
         self.assertNotIn('/pack-review', body)
         self.assertEqual(block(body)[0]['findings'], [])
+
+    def test_says_a_review_that_skipped_docs_is_partial_and_lists_them_in_the_block(self):
+        unread = ['context-packs/project/review.md', 'context-packs/gen/core/testing.md']
+
+        result = self.summarize([], docs=[unread])
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        body = self.body()
+        self.assertIn('The review should read every doc the tables point at, and it skipped 2. That\'s most likely a '
+                      'problem in the review action, not in your docs.', body)
+        self.assertIn('run `/pack-review o/r#7` in Claude Code', body)
+        self.assertEqual(block(body)[0]['unread'], unread)
+        self.assertEqual(body.count('review.md'), 1)
+        self.assertGreater(body.index('review.md'), body.index('<details>'))
+
+    def test_cleans_the_unread_paths_like_the_findings(self):
+        self.summarize([], docs=[['context-packs/a\u200b.md']])
+
+        self.assertEqual(block(self.body())[0]['unread'], ['context-packs/a.md'])
 
     def test_shows_the_agents_text_only_inside_the_json_block(self):
         self.summarize([finding(headline='A second way to load content', take='Pick one.',
