@@ -1,13 +1,10 @@
 import json
-from pathlib import Path
 import shlex
 import subprocess
 import sys
-import tempfile
 import unittest
 
 from review_case import REVIEW
-from test_review_reads import Transcript
 
 INPUTS = '/runner/temp/pack-review.abc123'
 
@@ -56,47 +53,3 @@ class ArgsTests(unittest.TestCase):
         for value in shlex.split(line):
             quoted = shlex.quote(value)
             self.assertTrue(quoted == value or (quoted.startswith("'") and quoted.count("'") == 2), value[:60])
-
-
-class HookTests(unittest.TestCase):
-    """The hooks the arguments install: run as Claude Code runs a hook's command, through a shell with its input on
-    stdin, each reaches its read gate with the folder holding docs.txt."""
-
-    def setUp(self):
-        temp = tempfile.TemporaryDirectory(prefix='context-packs-hooks-')
-        self.addCleanup(temp.cleanup)
-        self.root = Path(temp.name)
-        self.inputs, self.checkout = self.root / 'pack-review.abc123', self.root / 'checkout'
-        self.inputs.mkdir()
-        (self.inputs / 'docs.txt').write_text('AGENTS.md\n')
-        self.main = Transcript(self.root / 'session.jsonl', self.checkout, sidechain=False)
-        run = subprocess.run([sys.executable, str(REVIEW / 'args.py'), '--inputs', str(self.inputs)],
-                             capture_output=True, text=True, check=True)
-        args = shlex.split(run.stdout)
-        self.hooks = json.loads(args[args.index('--settings') + 1])['hooks']
-
-    def run_hook(self, event, input):
-        [entry] = self.hooks[event]
-        [hook] = entry['hooks']
-        self.assertEqual(hook['type'], 'command')
-        run = subprocess.run(hook['command'], shell=True, input=json.dumps(input), capture_output=True, text=True)
-        self.assertEqual(run.returncode, 0, run.stderr)
-        return entry, json.loads(run.stdout)
-
-    def test_holds_the_answer_until_the_docs_are_read(self):
-        entry, decision = self.run_hook('PreToolUse', {
-            'hook_event_name': 'PreToolUse', 'cwd': str(self.checkout), 'transcript_path': str(self.main.path),
-            'tool_name': 'StructuredOutput', 'tool_input': {'findings': []}})
-
-        self.assertEqual(entry['matcher'], 'StructuredOutput')
-        self.assertEqual(decision['hookSpecificOutput']['permissionDecision'], 'deny')
-
-    def test_holds_each_subagent_until_its_docs_are_read(self):
-        subagent = Transcript(self.root / 'session' / 'subagents' / 'agent-1.jsonl', self.checkout, sidechain=True)
-        subagent.prompt(f'Check {self.checkout / "AGENTS.md"} against the diff.')
-
-        _, decision = self.run_hook('SubagentStop', {
-            'hook_event_name': 'SubagentStop', 'cwd': str(self.checkout), 'transcript_path': str(self.main.path),
-            'agent_transcript_path': str(subagent.path)})
-
-        self.assertEqual(decision['decision'], 'block')

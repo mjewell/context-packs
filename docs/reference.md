@@ -14,7 +14,7 @@ Each command syncs the current folder, or `--dir <folder>`, and prints what chan
 | `update <id> --ref R` | Pins one pack to a tag or commit |
 | `list` | Lists each import pack, where its pack comes from, and its pin |
 | `check` | Exits 1, naming what's stale, if a sync would change anything, and writes nothing |
-| `docs` | Prints the path of every doc and nested pack's index the tables point at, one per line. It reads the synced tables, so it fetches no pack, and writes nothing. The `review` action uses it to check that its agent read them all |
+| `docs` | Prints the path of every doc and nested pack's index the tables point at, one per line. It reads the synced tables, so it fetches no pack, and writes nothing. |
 | `eval [doc…] [--pack F] [--runs N] [--model M]` | Runs each pack's eval prompts, checking that an agent reads each doc when it should, and only then |
 
 A pack's id is its import pack's folder under `context-packs/`, such as `core` or `server/database`. Moving the folder changes the id.
@@ -179,7 +179,7 @@ With a Pro or Max subscription instead of an API key, run `claude setup-token` l
 
 It reviews a PR when it's opened or marked ready, again on each push, and again when its base branch changes. A newer push cancels a review still running. Pin `@main` to a release tag once you've tried it. Pass `model` to review with a model other than Claude Code's default.
 
-Each review posts **one summary comment**, edited on each run. It counts the findings, and ends with every finding as JSON in a `<details>` block for the local run. A step after the agent writes it from the agent's answer. A run that fails posts nothing and leaves the last summary, which names the commit and base branch it reviewed. The agent can't answer until it has read every doc the tables point at. If it still hasn't after being sent back three times, the summary lists the docs it skipped, as a partial review. It comments nothing on the diff.
+Each review posts **one summary comment**, edited on each run. It counts the findings, and ends with every finding as JSON in a `<details>` block for the local run. A step after the agent writes it from the agent's answer. A run that fails posts nothing and leaves the last summary, which names the commit and base branch it reviewed. It comments nothing on the diff.
 
 To go through the findings, the author runs `/pack-review <owner>/<repo>#<number>` in Claude Code with the PR's branch checked out, as the summary says. Naming the repo lets it work from a session in a folder above the repos; inside the repo, the number alone does. `pack-review` reads the summary's JSON rather than finding them again, goes through each finding with the author, and runs `pack-rule` for each one they want recorded. Neither run commits or pushes.
 

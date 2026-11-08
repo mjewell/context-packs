@@ -33,13 +33,11 @@ runs:
         HEAD: ${{ github.event.pull_request.head.sha }}
         MODEL: ${{ inputs.model }}
       # The agent has no shell, so it reads the diff and log from files. A new folder outside the checkout, so no path
-      # the PR controls, such as a symlink, decides where they're written. docs.txt lists every doc the tables point
-      # at, which the read gates hold the agent to.
+      # the PR controls, such as a symlink, decides where they're written.
       run: |
         inputs=$(mktemp -d "$RUNNER_TEMP/pack-review.XXXXXX")
         git diff --no-ext-diff --no-textconv "$BASE...$HEAD" > "$inputs/diff.patch"
         git log --no-decorate "$BASE..$HEAD" > "$inputs/log.txt"
-        python3 "$GITHUB_ACTION_PATH/../src/cli.py" docs > "$inputs/docs.txt"
         echo "inputs=$inputs" >> "$GITHUB_OUTPUT"
         echo "claude-args=$(python3 "$GITHUB_ACTION_PATH/args.py" --inputs "$inputs" --model "$MODEL")" >> "$GITHUB_OUTPUT"
     - name: Review
@@ -68,10 +66,7 @@ runs:
         BASE: ${{ github.event.pull_request.base.sha }}
         BASE_REF: ${{ github.event.pull_request.base.ref }}
         HEAD: ${{ github.event.pull_request.head.sha }}
-        INPUTS: ${{ steps.prepare.outputs.inputs }}
-      # The answer gate leaves unread.txt when it let the answer through with docs still unread, and the summary
-      # lists them, so the author gets a partial review rather than none.
       run: |
         printf '%s' "$FINDINGS" > "$RUNNER_TEMP/pack-review-findings.json"
         python3 "$GITHUB_ACTION_PATH/summary.py" --pr "$PR" --base "$BASE" --base-ref "$BASE_REF" --head "$HEAD" \
-          --findings "$RUNNER_TEMP/pack-review-findings.json" --unread "$INPUTS/unread.txt"
+          --findings "$RUNNER_TEMP/pack-review-findings.json"

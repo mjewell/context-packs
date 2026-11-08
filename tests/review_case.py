@@ -29,9 +29,9 @@ class ReviewCase(unittest.TestCase):
         self.env = {**os.environ, 'GITHUB_TOKEN': 'token-1', 'GITHUB_REPOSITORY': 'o/r',
                     'GITHUB_API_URL': self.github.url, 'GITHUB_GRAPHQL_URL': f'{self.github.url}/graphql'}
 
-    def script(self, name, *args, input=None):
+    def script(self, name, *args):
         return subprocess.run([sys.executable, str(REVIEW / f'{name}.py'), *map(str, args)], cwd=self.root,
-                              env=self.env, input=input, capture_output=True, text=True)
+                              env=self.env, capture_output=True, text=True)
 
     def sent(self, operation):
         """The variables each request for the operation sent."""

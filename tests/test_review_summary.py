@@ -30,14 +30,11 @@ class SummaryTests(ReviewCase):
         super().setUp()
         self.github.responses.update({'PullRequest': pull_request(), 'AddComment': ok({}), 'UpdateComment': ok({})})
 
-    def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', unread=None):
-        """Post the summary of the agent's output, with unread as the docs the read gate listed, if it listed any."""
+    def summarize(self, findings=(), output=None, head=HEAD, base_ref='main'):
         (self.root / 'output.json').write_text(
             output if output is not None else json.dumps({'findings': list(findings)}))
-        if unread is not None:
-            (self.root / 'unread.txt').write_text(''.join(f'{path}\n' for path in unread))
         return self.script('summary', '--pr', 7, '--base', BASE, '--base-ref', base_ref, '--head', head,
-                           '--findings', 'output.json', '--unread', 'unread.txt')
+                           '--findings', 'output.json')
 
     def body(self):
         [sent] = self.sent('AddComment') or self.sent('UpdateComment')
@@ -58,9 +55,7 @@ class SummaryTests(ReviewCase):
         self.assertIn("pack-review checked `hhhhhhh` against this repo's context packs and found 2 deviations, "
                       '1 conflict, 3 uncovered choices.', body)
         self.assertIn('run `/pack-review o/r#7` in Claude Code', body)
-        self.assertEqual(block(body)[0], {'base': BASE, 'base_ref': 'main', 'head': HEAD, 'findings': findings,
-                                          'unread': []})
-        self.assertNotIn('skipped', body)
+        self.assertEqual(block(body)[0], {'base': BASE, 'base_ref': 'main', 'head': HEAD, 'findings': findings})
 
     def test_says_when_it_found_nothing(self):
         self.summarize([])
@@ -69,25 +64,6 @@ class SummaryTests(ReviewCase):
         self.assertIn('found nothing.', body)
         self.assertNotIn('/pack-review', body)
         self.assertEqual(block(body)[0]['findings'], [])
-
-    def test_says_a_review_that_skipped_docs_is_partial_and_lists_them_in_the_block(self):
-        unread = ['context-packs/project/review.md', 'context-packs/gen/core/testing.md']
-
-        result = self.summarize([], unread=unread)
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        body = self.body()
-        self.assertIn('The review should read every doc the tables point at, and it skipped 2. That\'s most likely a '
-                      'problem in pack-review, not in your docs.', body)
-        self.assertIn('run `/pack-review o/r#7` in Claude Code', body)
-        self.assertEqual(block(body)[0]['unread'], unread)
-        self.assertEqual(body.count('review.md'), 1)
-        self.assertGreater(body.index('review.md'), body.index('<details>'))
-
-    def test_cleans_the_unread_paths_like_the_findings(self):
-        self.summarize([], unread=['context-packs/a\u200b.md'])
-
-        self.assertEqual(block(self.body())[0]['unread'], ['context-packs/a.md'])
 
     def test_shows_the_agents_text_only_inside_the_json_block(self):
         self.summarize([finding(headline='A second way to load content', take='Pick one.',
