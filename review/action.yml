@@ -33,12 +33,15 @@ runs:
         HEAD: ${{ github.event.pull_request.head.sha }}
         MODEL: ${{ inputs.model }}
       # The agent has no shell, so it reads the diff and log from files. A new folder outside the checkout, so no path
-      # the PR controls, such as a symlink, decides where they're written.
+      # the PR controls, such as a symlink, decides where they're written. The prompt lists every doc the tables point at,
+      # by pack, for the agent to give each pack's docs to its own subagent.
       run: |
         inputs=$(mktemp -d "$RUNNER_TEMP/pack-review.XXXXXX")
         git diff --no-ext-diff --no-textconv "$BASE...$HEAD" > "$inputs/diff.patch"
         git log --no-decorate "$BASE..$HEAD" > "$inputs/log.txt"
         echo "inputs=$inputs" >> "$GITHUB_OUTPUT"
+        python3 "$GITHUB_ACTION_PATH/../src/cli.py" docs \
+          | python3 "$GITHUB_ACTION_PATH/prompt.py" --base "$BASE" --head "$HEAD" --inputs "$inputs" >> "$GITHUB_OUTPUT"
         echo "claude-args=$(python3 "$GITHUB_ACTION_PATH/args.py" --inputs "$inputs" --model "$MODEL")" >> "$GITHUB_OUTPUT"
     - name: Review
       id: review
@@ -49,7 +52,7 @@ runs:
         anthropic_api_key: ${{ inputs.anthropic-api-key }}
         claude_code_oauth_token: ${{ inputs.claude-code-oauth-token }}
         github_token: ${{ github.token }}
-        prompt: /context-packs:pack-findings ci ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} ${{ steps.prepare.outputs.inputs }}
+        prompt: ${{ steps.prepare.outputs.prompt }}
         claude_args: ${{ steps.prepare.outputs.claude-args }}
     - name: Show what the agent did
       if: always() && steps.review.outputs.execution_file != ''
