@@ -13,6 +13,7 @@ import tempfile
 import evals
 import imports
 import report
+import tables
 from blocks import block, header, instructions, region, snapshot
 from packs import GEN, REPO, base
 import tree
@@ -78,6 +79,8 @@ def main():
     update.add_argument('--ref', help='a tag or commit to pin the one named pack to instead')
     commands.add_parser('list', help='list the import packs, where each comes from, and its pin')
     commands.add_parser('check', help='exit 1 if a sync would change anything, writing nothing')
+    commands.add_parser('docs', help="print the path of every doc and index the packs' tables point at, one per line, "
+                                     'with a blank line between packs, writing nothing')
     evaluate = commands.add_parser('eval', help="run each pack's eval prompts: ones that should, or shouldn't, make an "
                                                 'agent read a doc, each as a claude -p session with the pack alone')
     evaluate.add_argument('docs', nargs='*', help='the docs whose cases to run, as eval names them, such as '
@@ -98,6 +101,9 @@ def main():
     before = imports.scan(repo)
     if args.command == 'list':
         show(before)
+        return
+    if args.command == 'docs':
+        print('\n'.join(''.join(f'{path}\n' for path in unit) for unit in tables.units(repo, found.block)), end='')
         return
     edits = imports.command(args, repo, before)
 
