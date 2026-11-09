@@ -13,7 +13,7 @@ Context packs bring shared rules and docs in from elsewhere. Each pack has its r
 |---|---|
 | Changing how packs are written, pinned or updated | `context-packs/project/design.md` |
 | Releasing a new version to npm | `context-packs/project/releasing.md` |
-| Changing the `review/` action, how `pack-findings` runs in CI, or how `pack-review` reads a CI review | `context-packs/project/review.md` |
+| Changing the review workflow or `review/`, how `pack-findings` runs in CI, or how `pack-review` reads a CI review | `context-packs/project/review.md` |
 
 <!-- context-packs:pack core -->
 ## Collaboration
@@ -112,11 +112,11 @@ Edit only files I own. Plugins, synced skills, and installed dependencies belong
 | Writing or changing tests, or fixing a bug | `context-packs/gen/core/testing.md` |
 | Writing commit messages, PR titles or descriptions, changelog entries, READMEs, or anything else others will read without session context | `context-packs/gen/core/writing-for-humans.md` |
 <!-- context-packs:pack-end core -->
-<!-- context-packs:end sha256:311d5aa0a20b -->
+<!-- context-packs:end sha256:0fbeb40bd444 -->
 
 ## Project
 
-- The CLI and the `review/` action use only the Python standard library and `git`, and run on macOS's system `python3` (3.9).
+- The CLI and the `review/` scripts use only the Python standard library and `git`, and run on macOS's system `python3` (3.9).
 - The npm package's bin only hands its arguments to the Python CLI, so the logic stays in Python.
 - The skills in `skills/` are for anyone using the tool, so they rely on nothing from any one person's packs.
 - Run the tests with `python3 -m unittest discover tests`.

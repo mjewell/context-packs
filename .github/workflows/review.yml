@@ -1,0 +1,194 @@
+name: pack-review
+# Review a PR against the repo's context packs, and post a summary for the author to go through locally. One agent
+# checks each unit of docs, all at the same time, then one more merges their answers. Call it from a workflow that runs
+# on pull_request, as docs/reference.md shows. Each job checks out this workflow's own commit for its scripts and the
+# skill, from job.workflow_repository and job.workflow_sha, since the github context belongs to the caller.
+on:
+  workflow_call:
+    inputs:
+      model:
+        description: The model to review with, if not Claude Code's default.
+        type: string
+        default: ''
+    secrets:
+      anthropic-api-key:
+        description: An Anthropic API key for the review agents. Pass this or claude-code-oauth-token.
+        required: false
+      claude-code-oauth-token:
+        description: A Claude Code OAuth token, from `claude setup-token`, so the review uses a Pro or Max subscription.
+        required: false
+jobs:
+  plan:
+    # Drafts wait until they're ready. PRs from forks get no secrets, so they're skipped. An edit reviews again only
+    # when it changed the base branch, so the findings match the new diff.
+    if: >-
+      ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.units.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/checkout@v6
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .pack-review
+          persist-credentials: false
+      - name: List the units
+        id: units
+        env:
+          TOOL_REPOSITORY: ${{ job.workflow_repository }}
+          TOOL_SHA: ${{ job.workflow_sha }}
+        # The tool moves out of the checkout, so nothing reads it as the PR's.
+        run: |
+          echo "pack-review from $TOOL_REPOSITORY@$TOOL_SHA"
+          mv .pack-review "$RUNNER_TEMP/pack-review"
+          python3 "$RUNNER_TEMP/pack-review/src/cli.py" docs | python3 "$RUNNER_TEMP/pack-review/review/units.py" \
+            >> "$GITHUB_OUTPUT"
+  unit:
+    needs: plan
+    name: unit ${{ matrix.unit }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/checkout@v6
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .pack-review
+          persist-credentials: false
+      - name: Prepare the unit
+        id: prepare
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          MODEL: ${{ inputs.model }}
+          DOCS: ${{ toJSON(matrix.docs) }}
+        # The agent has no shell, so it reads the diff and log from files. A new folder outside the checkout, so no
+        # path the PR controls, such as a symlink, decides where they're written.
+        run: |
+          mv .pack-review "$RUNNER_TEMP/pack-review"
+          tool="$RUNNER_TEMP/pack-review"
+          if [ "$(git rev-parse HEAD)" != "$HEAD" ]; then
+            echo "::error::The PR's head, $HEAD, isn't checked out."
+            exit 1
+          fi
+          inputs=$(mktemp -d "$RUNNER_TEMP/inputs.XXXXXX")
+          git diff --no-ext-diff --no-textconv "$BASE...$HEAD" > "$inputs/diff.patch"
+          git log --no-decorate "$BASE..$HEAD" > "$inputs/log.txt"
+          echo "inputs=$inputs" >> "$GITHUB_OUTPUT"
+          printf '%s' "$DOCS" | python3 "$tool/review/prompt.py" unit --base "$BASE" --head "$HEAD" --inputs "$inputs" \
+            >> "$GITHUB_OUTPUT"
+          echo "claude-args=$(python3 "$tool/review/args.py" --answer unit --inputs "$inputs" --model "$MODEL")" \
+            >> "$GITHUB_OUTPUT"
+      - name: Check the unit
+        id: review
+        # v1.0.268, pinned by commit since a tag can move.
+        uses: anthropics/claude-code-action@c0949c50a78c1ec8ce2647db36629b870e715d0c
+        with:
+          # claude-code-action stops with an error when neither is set.
+          anthropic_api_key: ${{ secrets.anthropic-api-key }}
+          claude_code_oauth_token: ${{ secrets.claude-code-oauth-token }}
+          github_token: ${{ github.token }}
+          prompt: ${{ steps.prepare.outputs.prompt }}
+          claude_args: ${{ steps.prepare.outputs.claude-args }}
+      - name: Show what the agent did
+        if: always() && steps.review.outputs.execution_file != ''
+        env:
+          TRANSCRIPT: ${{ steps.review.outputs.execution_file }}
+        run: python3 "$RUNNER_TEMP/pack-review/review/transcript.py" --file "$TRANSCRIPT"
+      - name: Report which docs the agent read
+        env:
+          DOCS: ${{ toJSON(matrix.docs) }}
+          ANSWER: ${{ steps.review.outputs.structured_output }}
+          TRANSCRIPT: ${{ steps.review.outputs.execution_file }}
+        # The transcript stays here, since it holds file contents. Only the answer and the unread docs go on.
+        run: |
+          mkdir "$RUNNER_TEMP/unit"
+          printf '%s' "$ANSWER" > "$RUNNER_TEMP/unit/answer.json"
+          printf '%s' "$DOCS" | python3 "$RUNNER_TEMP/pack-review/review/reads.py" --transcript "$TRANSCRIPT" \
+            --unread "$RUNNER_TEMP/unit/unread.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unit-${{ matrix.unit }}
+          path: ${{ runner.temp }}/unit
+          retention-days: 1
+  merge:
+    needs: unit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/checkout@v6
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .pack-review
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: unit-*
+          path: ${{ runner.temp }}/units
+      - name: Prepare the merge
+        id: prepare
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          MODEL: ${{ inputs.model }}
+        run: |
+          mv .pack-review "$RUNNER_TEMP/pack-review"
+          tool="$RUNNER_TEMP/pack-review"
+          inputs=$(mktemp -d "$RUNNER_TEMP/inputs.XXXXXX")
+          git diff --no-ext-diff --no-textconv "$BASE...$HEAD" > "$inputs/diff.patch"
+          git log --no-decorate "$BASE..$HEAD" > "$inputs/log.txt"
+          jq -s '.' "$RUNNER_TEMP"/units/*/answer.json > "$inputs/ledgers.json"
+          python3 "$tool/review/prompt.py" merge --base "$BASE" --head "$HEAD" --inputs "$inputs" < /dev/null \
+            >> "$GITHUB_OUTPUT"
+          echo "claude-args=$(python3 "$tool/review/args.py" --answer merge --inputs "$inputs" --model "$MODEL")" \
+            >> "$GITHUB_OUTPUT"
+      - name: Merge the units
+        id: review
+        # v1.0.268, pinned by commit since a tag can move.
+        uses: anthropics/claude-code-action@c0949c50a78c1ec8ce2647db36629b870e715d0c
+        with:
+          anthropic_api_key: ${{ secrets.anthropic-api-key }}
+          claude_code_oauth_token: ${{ secrets.claude-code-oauth-token }}
+          github_token: ${{ github.token }}
+          prompt: ${{ steps.prepare.outputs.prompt }}
+          claude_args: ${{ steps.prepare.outputs.claude-args }}
+      - name: Show what the agent did
+        if: always() && steps.review.outputs.execution_file != ''
+        env:
+          TRANSCRIPT: ${{ steps.review.outputs.execution_file }}
+        run: python3 "$RUNNER_TEMP/pack-review/review/transcript.py" --file "$TRANSCRIPT"
+      - name: Post the summary
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FINDINGS: ${{ steps.review.outputs.structured_output }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          printf '%s' "$FINDINGS" > "$RUNNER_TEMP/merge.json"
+          python3 "$RUNNER_TEMP/pack-review/review/summary.py" --pr "$PR" --base "$BASE" --base-ref "$BASE_REF" \
+            --head "$HEAD" --units "$RUNNER_TEMP/units" --findings "$RUNNER_TEMP/merge.json"

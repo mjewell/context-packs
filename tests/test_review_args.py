@@ -9,11 +9,15 @@ from review_case import REVIEW
 INPUTS = '/runner/temp/pack-review.abc123'
 
 
-class ArgsTests(unittest.TestCase):
-    """The arguments the review action hands claude-code-action for the agent."""
+FINDING = json.loads((REVIEW / 'findings.schema.json').read_text())['properties']['findings']['items']
 
-    def args(self, *extra):
-        run = subprocess.run([sys.executable, str(REVIEW / 'args.py'), '--inputs', INPUTS, *extra],
+
+class ArgsTests(unittest.TestCase):
+    """The arguments the review workflow hands claude-code-action for each agent: one per unit of docs, and the one
+    that merges their answers."""
+
+    def args(self, *extra, answer='unit'):
+        run = subprocess.run([sys.executable, str(REVIEW / 'args.py'), '--answer', answer, '--inputs', INPUTS, *extra],
                              capture_output=True, text=True, check=True)
         self.assertEqual(run.stdout.count('\n'), 1)
         return shlex.split(run.stdout)
@@ -21,12 +25,30 @@ class ArgsTests(unittest.TestCase):
     def flag(self, args, name):
         return args[args.index(name) + 1]
 
-    def test_loads_the_skill_and_validates_the_answer_against_the_schema(self):
-        args = self.args()
+    def schema(self, answer):
+        return json.loads(self.flag(self.args(answer=answer), '--json-schema'))
 
-        self.assertEqual(self.flag(args, '--plugin-dir'), str(REVIEW.parent))
-        self.assertEqual(json.loads(self.flag(args, '--json-schema')),
-                         json.loads((REVIEW / 'findings.schema.json').read_text()))
+    def test_loads_the_skill_for_either_answer(self):
+        for answer in ('unit', 'merge'):
+            self.assertEqual(self.flag(self.args(answer=answer), '--plugin-dir'), str(REVIEW.parent))
+
+    def test_a_unit_answers_with_its_deviations_as_findings_and_the_rules_it_found_followed(self):
+        schema = self.schema('unit')
+
+        self.assertEqual(sorted(schema['required']), ['deviations', 'followed'])
+        deviation = schema['properties']['deviations']['items']
+        self.assertEqual(deviation['properties']['kind'], {'enum': ['deviates']})
+        self.assertEqual({**deviation['properties'], 'kind': FINDING['properties']['kind']}, FINDING['properties'])
+        followed = schema['properties']['followed']['items']
+        self.assertEqual(followed['properties']['rule'], FINDING['properties']['rules']['items'])
+        self.assertEqual(followed['properties']['spots'], FINDING['properties']['spots'])
+
+    def test_the_merge_answers_with_only_conflicts_and_uncovered_choices(self):
+        schema = self.schema('merge')
+
+        finding = schema['properties']['findings']['items']
+        self.assertEqual(finding['properties']['kind'], {'enum': ['conflicting', 'uncovered']})
+        self.assertEqual({**finding['properties'], 'kind': FINDING['properties']['kind']}, FINDING['properties'])
 
     def test_gives_the_agent_no_mcp_servers(self):
         args = self.args()
@@ -37,8 +59,8 @@ class ArgsTests(unittest.TestCase):
     def test_gives_the_agent_tools_that_only_read_the_checkout_and_the_diff(self):
         args = self.args()
 
-        self.assertEqual(self.flag(args, '--tools'), 'Read,Glob,Grep,Agent')
-        self.assertEqual(self.flag(args, '--allowedTools'), 'Read,Glob,Grep,Agent')
+        self.assertEqual(self.flag(args, '--tools'), 'Read,Glob,Grep')
+        self.assertEqual(self.flag(args, '--allowedTools'), 'Read,Glob,Grep')
         self.assertEqual(self.flag(args, '--add-dir'), INPUTS)
         self.assertEqual(self.flag(args, '--disallowedTools'), 'Read(./.git/**)')
         self.assertIn('--restricted', args)
@@ -48,7 +70,7 @@ class ArgsTests(unittest.TestCase):
         self.assertNotIn('--model', self.args('--model', ''))
 
     def test_quotes_each_value_whole_so_any_shell_style_parser_reads_it_the_same(self):
-        line = subprocess.run([sys.executable, str(REVIEW / 'args.py'), '--inputs', INPUTS],
+        line = subprocess.run([sys.executable, str(REVIEW / 'args.py'), '--answer', 'unit', '--inputs', INPUTS],
                               capture_output=True, text=True, check=True).stdout
         for value in shlex.split(line):
             quoted = shlex.quote(value)

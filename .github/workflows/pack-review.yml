@@ -4,24 +4,13 @@ on:
     types: [opened, reopened, ready_for_review, synchronize, edited]
 jobs:
   review:
-    # Drafts wait until they're ready. PRs from forks get no secrets, so they're skipped. An edit reviews again only
-    # when it changed the base branch, so the findings match the new diff.
-    if: >-
-      ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository
-      && (github.event.action != 'edited' || github.event.changes.base.ref.from) }}
-    runs-on: ubuntu-latest
     concurrency:
       group: pack-review-${{ github.event.pull_request.number }}
       cancel-in-progress: true
     permissions:
       contents: read
       pull-requests: write
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-      # The action from this checkout, unlike the reference's @main, so a PR that changes it reviews with its change.
-      - uses: ./review
-        with:
-          claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    # The workflow from this commit, unlike the reference's pinned one, so a PR that changes it reviews with its change.
+    uses: ./.github/workflows/review.yml
+    secrets:
+      claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

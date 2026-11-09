@@ -1,54 +1,53 @@
-from test_review_summary import SummaryCase, block
+import json
+
+from review_case import ReviewCase
 from test_review_transcript import call, result
 
-PACKS = [['context-packs/project/a.md', 'context-packs/project/b.md'], ['context-packs/gen/core/c.md']]
+DOCS = ['context-packs/project/a.md', 'context-packs/project/b.md']
+DOC = 'One.\nTwo.\nThree.\n'
 
 
-class ReadsTests(SummaryCase):
-    """Which docs the review agent and its subagents read in full, from the transcript claude-code-action saves: shown
-    in the run's log, and listed in the summary when any went unread."""
+class ReadsTests(ReviewCase):
+    """Which of a unit's docs its agent read in full, from the transcript claude-code-action saves: shown in the run's
+    log, and written down for the summary when any went unread."""
 
     def read(self, id, path, parent=None, error=False, **window):
         return [call(id, 'Read', {'file_path': str(self.root / path), **window}, parent=parent),
                 result(id, 'the doc', error=error, parent=parent)]
 
-    def unread(self, messages):
-        run = self.summarize([], docs=PACKS, messages=messages)
+    def report(self, messages, docs=DOCS):
+        for path in docs:
+            (self.root / path).parent.mkdir(parents=True, exist_ok=True)
+            (self.root / path).write_text(DOC)
+        (self.root / 'transcript.json').write_text(json.dumps(list(messages)))
+        run = self.script('reads', '--transcript', 'transcript.json', '--unread', 'unread.txt',
+                          input=json.dumps(docs))
         self.assertEqual(run.returncode, 0, run.stderr)
-        return block(self.body())[0]['unread'], run.stdout
+        return (self.root / 'unread.txt').read_text().splitlines(), run.stdout
 
-    def test_lists_the_docs_no_agent_read_and_logs_who_read_the_rest(self):
-        unread, log = self.unread([
-            *self.read('t1', 'context-packs/project/a.md'),
-            call('t2', 'Agent', {'description': 'Check the project pack'}),
-            *self.read('s1', 'context-packs/project/b.md', parent='t2'),
-            result('t2', 'ledger'),
-        ])
+    def test_lists_the_docs_the_agent_didnt_read_and_logs_who_read_the_rest(self):
+        unread, log = self.report([*self.read('t1', DOCS[0])])
 
-        self.assertEqual(unread, ['context-packs/gen/core/c.md'])
-        self.assertIn('read by the agent: context-packs/project/a.md', log)
-        self.assertIn('read by subagent 1: context-packs/project/b.md', log)
-        self.assertIn('not read: context-packs/gen/core/c.md', log)
+        self.assertEqual(unread, [DOCS[1]])
+        self.assertIn(f'read by the agent: {DOCS[0]}', log)
+        self.assertIn(f'not read: {DOCS[1]}', log)
 
     def test_lists_nothing_when_every_doc_was_read(self):
-        unread, _ = self.unread([*self.read('t1', 'context-packs/project/a.md'),
-                                 *self.read('t2', 'context-packs/project/b.md'),
-                                 *self.read('t3', 'context-packs/gen/core/c.md')])
+        unread, _ = self.report([*self.read('t1', DOCS[0]), *self.read('t2', DOCS[1])])
 
         self.assertEqual(unread, [])
 
     def test_doesnt_count_a_read_of_part_of_a_doc(self):
-        unread, _ = self.unread(self.read('t1', 'context-packs/project/a.md', limit=2))
+        unread, _ = self.report(self.read('t1', DOCS[0], limit=2))
 
-        self.assertIn('context-packs/project/a.md', unread)
+        self.assertIn(DOCS[0], unread)
 
     def test_counts_pages_that_together_cover_a_doc(self):
-        unread, _ = self.unread([*self.read('t1', 'context-packs/project/a.md', limit=2),
-                                 *self.read('t2', 'context-packs/project/a.md', offset=3, limit=2)])
+        unread, _ = self.report([*self.read('t1', DOCS[0], limit=2), *self.read('t2', DOCS[0], offset=3, limit=2)])
 
-        self.assertNotIn('context-packs/project/a.md', unread)
+        self.assertNotIn(DOCS[0], unread)
 
     def test_doesnt_count_a_read_that_failed(self):
-        unread, _ = self.unread(self.read('t1', 'context-packs/project/a.md', error=True))
+        unread, _ = self.report(self.read('t1', DOCS[0], error=True))
 
-        self.assertIn('context-packs/project/a.md', unread)
+        self.assertIn(DOCS[0], unread)

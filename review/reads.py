@@ -1,9 +1,14 @@
-"""Which docs the review agent and its subagents read in full, from the transcript claude-code-action saves. The
-summary runs it after the agent, so it can't change the answer: it shows whether the review skipped a doc. A doc counts
+#!/usr/bin/env python3
+"""Which of a unit's docs its agent read in full, from the transcript claude-code-action saves. Each unit job runs it
+after its agent, so it can't change the answer: it shows whether the review skipped a doc, in the log and in the
+summary. A doc counts
 as read once one agent was returned every line of it, by one Read or by several pages, judged by each Read's offset
 and limit."""
+import argparse
+import json
 import os
 from pathlib import Path
+import sys
 
 # How many lines Claude Code's Read returns when it's given no limit.
 PAGE = 2000
@@ -44,3 +49,19 @@ def readers(messages, docs, checkout):
         whole = set(range(1, len((Path(checkout) / doc).read_text(encoding='utf-8').splitlines()) + 1))
         found[doc] = [reader for reader, seen in lines.get(doc, {}).items() if whole <= seen]
     return found
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--transcript', type=Path, required=True, help="claude-code-action's claude-execution-output.json")
+    parser.add_argument('--unread', type=Path, required=True, help="where to list the docs the agent didn't read in full")
+    args = parser.parse_args()
+    docs = json.loads(sys.stdin.read())
+    found = readers(json.loads(args.transcript.read_text(encoding='utf-8')), docs, os.path.realpath('.'))
+    for doc, who in found.items():
+        print(f'read by {", ".join(who)}: {doc}' if who else f'not read: {doc}')
+    args.unread.write_text(''.join(f'{doc}\n' for doc, who in found.items() if not who), encoding='utf-8')
+
+
+if __name__ == '__main__':
+    main()

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Post or update pack-review's one summary comment on a PR, from the findings the review agent returned: counts for
-people, and every finding as JSON for the author's local run, with any docs the agent didn't read. It runs as a step
-after the agent, which can't write to the PR."""
+"""Post or update pack-review's one summary comment on a PR, from what the review's agents returned: each unit's
+deviations, then the merge agent's conflicts and uncovered choices. It shows counts for people, and every finding as
+JSON for the author's local run, with any docs a unit's agent didn't read. It runs as a step after the agents, which
+can't write to the PR."""
 import argparse
 import json
 import os
@@ -9,7 +10,6 @@ from pathlib import Path
 import sys
 
 import github
-import reads
 from sanitize import clean
 
 # GitHub's limit on a comment's length.
@@ -67,13 +67,20 @@ def findings_in(path):
     return cleaned(output['findings'])
 
 
-def unread_in(transcript, docs):
-    """The docs no agent read in full, after printing who read each one in the run's log."""
-    listed = [doc for doc in docs.read_text(encoding='utf-8').splitlines() if doc]
-    found = reads.readers(json.loads(transcript.read_text(encoding='utf-8')), listed, os.path.realpath('.'))
-    for doc, who in found.items():
-        print(f'read by {", ".join(who)}: {doc}' if who else f'not read: {doc}')
-    return cleaned([doc for doc, who in found.items() if not who])
+def units_in(folder):
+    """Each unit's deviations and the docs its agent didn't read, from the artifacts its job uploaded, in unit order."""
+    deviations, unread = [], []
+    for unit in sorted(folder.iterdir(), key=lambda unit: int(unit.name.rsplit('-', 1)[1])):
+        try:
+            answer = json.loads((unit / 'answer.json').read_text(encoding='utf-8'))
+        except ValueError:
+            answer = None
+        if not isinstance(answer, dict) or not isinstance(answer.get('deviations'), list):
+            sys.exit(f'pack-review: {unit.name} returned no answer: '
+                     f'{(unit / "answer.json").read_text(encoding="utf-8")[:500]!r}')
+        deviations += answer['deviations']
+        unread += (unit / 'unread.txt').read_text(encoding='utf-8').splitlines()
+    return cleaned(deviations), cleaned(unread)
 
 
 def main():
@@ -82,14 +89,12 @@ def main():
     parser.add_argument('--base', required=True, help='the commit the reviewed change starts from')
     parser.add_argument('--base-ref', required=True, help='the branch the PR was to merge into when it was reviewed')
     parser.add_argument('--head', required=True, help='the commit that was reviewed')
-    parser.add_argument('--findings', type=Path, required=True, help="the review agent's structured output")
-    parser.add_argument('--transcript', type=Path, required=True,
-                        help="claude-code-action's claude-execution-output.json, to tell which docs the agent read")
-    parser.add_argument('--docs', type=Path, required=True,
-                        help='the docs the agent should read, from the checkout, as `context-packs docs` prints them')
+    parser.add_argument('--units', type=Path, required=True,
+                        help="the folder holding each unit job's artifact: its answer.json and unread.txt")
+    parser.add_argument('--findings', type=Path, required=True, help="the merge agent's structured output")
     args = parser.parse_args()
-    findings = findings_in(args.findings)
-    unread = unread_in(args.transcript, args.docs)
+    deviations, unread = units_in(args.units)
+    findings = deviations + findings_in(args.findings)
     pr = github.pull_request(args.pr)
     if pr['headRefOid'] != args.head:
         print(f'pack-review: the PR moved on to {pr["headRefOid"]} since this review of {args.head}, so it posts '

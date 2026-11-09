@@ -1,35 +1,39 @@
 #!/usr/bin/env python3
-"""Print the prompt the review action hands claude-code-action, as a step output for $GITHUB_OUTPUT: the pack-findings
-skill with its arguments, then the units of docs for its subagents. stdin holds the docs' paths from the checkout as
-`context-packs docs` prints them, with a blank line between packs. A review asked to read every doc read only those
-whose `when` matched the diff, so the prompt says the tables' routing doesn't apply. It names the docs without their
-text: runs given the text skipped the docs, and runs given the units split them across subagents that read them."""
+"""Print the prompt the review workflow hands one of its agents, as a step output for $GITHUB_OUTPUT. `unit` runs the
+pack-findings skill on one unit of docs, whose paths from the checkout stdin holds as a JSON list. `merge` runs it on
+the units' answers. A review asked to read every doc read only those whose `when` matched the diff, so a unit's prompt
+says the tables' routing doesn't apply. It names the docs without their text: runs given the text skipped the docs."""
 import argparse
+import json
 import secrets
 import sys
 
 ROUTING = ("The tables' rule to read a doc only when its row matches the work doesn't apply to this review: check the "
            'diff against every doc, whatever its `when` says.')
-SPLIT = ("Check each of these units in its own subagent, even when there's only one. A subagent doesn't see this "
-         "prompt, so give it its unit's paths, and tell it to read each of its docs in full, whatever its `when` says.")
 
 
-def prompt(base, head, inputs, units):
-    listed = ["- Unit 1: the instruction file's own rules, and any doc it points at outside the context-packs block"]
-    listed += [f'- Unit {n}: ' + ', '.join(f'`{doc}`' for doc in unit) for n, unit in enumerate(units, 2)]
-    return '\n\n'.join([f'/context-packs:pack-findings ci {base}...{head} {inputs}', ROUTING, SPLIT, '\n'.join(listed)])
+def unit(base, head, inputs, docs):
+    listed = '\n'.join(f'- `{doc}`' for doc in docs)
+    return '\n\n'.join([f'/context-packs:pack-findings ci-unit {base}...{head} {inputs}', ROUTING,
+                        f'Your unit is these docs. Read each one in full:\n\n{listed}'])
+
+
+def merge(base, head, inputs):
+    return f'/context-packs:pack-findings ci-merge {base}...{head} {inputs}'
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('mode', choices=['unit', 'merge'])
     parser.add_argument('--base', required=True, help='the commit the PR merges into')
     parser.add_argument('--head', required=True, help='the commit under review, checked out here')
     parser.add_argument('--inputs', required=True, help='the folder holding the diff and log the agent reviews')
     args = parser.parse_args()
-    units = [unit.splitlines() for unit in sys.stdin.read().split('\n\n') if unit.strip()]
+    text = (unit(args.base, args.head, args.inputs, json.loads(sys.stdin.read())) if args.mode == 'unit'
+            else merge(args.base, args.head, args.inputs))
     # A delimiter no path can guess, so no line the PR's tables control ends the value and sets another output.
     delimiter = secrets.token_hex(16)
-    print(f'prompt<<{delimiter}\n{prompt(args.base, args.head, args.inputs, units)}\n{delimiter}')
+    print(f'prompt<<{delimiter}\n{text}\n{delimiter}')
 
 
 if __name__ == '__main__':

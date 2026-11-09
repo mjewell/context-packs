@@ -5,7 +5,6 @@ from fake_github import comment, ok, pull_request
 from review_case import HEAD, MARKER, ReviewCase, own
 
 BASE = 'b' * 40
-DOC = 'One.\nTwo.\nThree.\n'
 
 
 def finding(kind='deviates', headline='A game number in sim code', take='Move it to content.', spots=()):
@@ -24,24 +23,30 @@ def block(body):
 
 
 class SummaryCase(ReviewCase):
-    """A run about to post its summary: the agent's answer, the docs the tables point at, checked out here, and the
-    transcript of what the agent did."""
+    """A review about to post its summary: each unit's answer and the docs its agent didn't read, as the unit jobs
+    upload them, and the merge agent's answer."""
 
     def setUp(self):
         super().setUp()
         self.github.responses.update({'PullRequest': pull_request(), 'AddComment': ok({}), 'UpdateComment': ok({})})
 
-    def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', docs=(), messages=()):
-        """Post the summary of the agent's output, with docs as `context-packs docs` lists them, each pack a list."""
-        (self.root / 'output.json').write_text(
-            output if output is not None else json.dumps({'findings': list(findings)}))
-        for path in (path for pack in docs for path in pack):
-            (self.root / path).parent.mkdir(parents=True, exist_ok=True)
-            (self.root / path).write_text(DOC)
-        (self.root / 'docs.txt').write_text('\n'.join(''.join(f'{path}\n' for path in pack) for pack in docs))
-        (self.root / 'transcript.json').write_text(json.dumps(list(messages)))
+    def unit(self, n, deviations=(), unread=(), answer=None):
+        """A unit's job's artifact: its agent's answer, and the docs it didn't read."""
+        folder = self.root / 'units' / f'unit-{n}'
+        folder.mkdir(parents=True)
+        (folder / 'answer.json').write_text(
+            answer if answer is not None else json.dumps({'deviations': list(deviations), 'followed': []}))
+        (folder / 'unread.txt').write_text(''.join(f'{path}\n' for path in unread))
+
+    def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', unread=()):
+        """Post the summary of findings, split as the jobs split them: deviations from a unit, and the rest from the
+        merge agent. A test that sets up its own units with unit() passes no findings."""
+        if not (self.root / 'units').exists():
+            self.unit(1, [f for f in findings if f['kind'] == 'deviates'], unread)
+        (self.root / 'merge.json').write_text(output if output is not None else json.dumps(
+            {'findings': [f for f in findings if f['kind'] != 'deviates']}))
         return self.script('summary', '--pr', 7, '--base', BASE, '--base-ref', base_ref, '--head', head,
-                           '--findings', 'output.json', '--transcript', 'transcript.json', '--docs', 'docs.txt')
+                           '--units', 'units', '--findings', 'merge.json')
 
     def body(self):
         [sent] = self.sent('AddComment') or self.sent('UpdateComment')
@@ -82,7 +87,7 @@ class SummaryTests(SummaryCase):
     def test_says_a_review_that_skipped_docs_is_partial_and_lists_them_in_the_block(self):
         unread = ['context-packs/project/review.md', 'context-packs/gen/core/testing.md']
 
-        result = self.summarize([], docs=[unread])
+        result = self.summarize([], unread=unread)
 
         self.assertEqual(result.returncode, 0, result.stderr)
         body = self.body()
@@ -94,9 +99,37 @@ class SummaryTests(SummaryCase):
         self.assertGreater(body.index('review.md'), body.index('<details>'))
 
     def test_cleans_the_unread_paths_like_the_findings(self):
-        self.summarize([], docs=[['context-packs/a\u200b.md']])
+        self.summarize([], unread=['context-packs/a\u200b.md'])
 
         self.assertEqual(block(self.body())[0]['unread'], ['context-packs/a.md'])
+
+    def test_holds_every_units_deviations_in_unit_order_then_the_merge_agents_findings(self):
+        self.unit(2, [finding(headline='Second unit')])
+        self.unit(10, [finding(headline='Tenth unit')])
+        self.unit(1, [finding(headline='First unit')])
+
+        self.summarize(output=json.dumps({'findings': [finding('uncovered', headline='A new kind of file')]}))
+
+        self.assertEqual([f['headline'] for f in block(self.body())[0]['findings']],
+                         ['First unit', 'Second unit', 'Tenth unit', 'A new kind of file'])
+
+    def test_lists_the_docs_each_unit_skipped(self):
+        self.unit(1, unread=['AGENTS.md'])
+        self.unit(2)
+        self.unit(3, unread=['context-packs/gen/core/testing.md'])
+
+        self.summarize()
+
+        self.assertEqual(block(self.body())[0]['unread'], ['AGENTS.md', 'context-packs/gen/core/testing.md'])
+
+    def test_stops_when_a_unit_returned_no_answer(self):
+        self.unit(1, answer='{"result": "done"}')
+
+        result = self.summarize()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('unit-1 returned no answer', result.stderr)
+        self.assertEqual(self.github.requests, [])
 
     def test_shows_the_agents_text_only_inside_the_json_block(self):
         self.summarize([finding(headline='A second way to load content', take='Pick one.',
