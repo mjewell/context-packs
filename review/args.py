@@ -14,6 +14,9 @@ REVIEW = Path(__file__).resolve().parent
 # the folder the action wrote the diff and log to. It gets no shell, since an allowed git command such as
 # git log --output=<file> writes any file, and no MCP servers, so nothing it does reaches the PR.
 TOOLS = ['Read', 'Glob', 'Grep', 'Agent']
+# Subagents run in the background unless this is set, so the agent can answer before they've reported, and the answer
+# misses their findings.
+SETTINGS = {'env': {'CLAUDE_CODE_DISABLE_BACKGROUND_TASKS': '1'}}
 
 
 def compact(value):
@@ -29,6 +32,7 @@ def main():
     schema = json.loads((REVIEW / 'findings.schema.json').read_text(encoding='utf-8'))
     values = ['--plugin-dir', str(REVIEW.parent), '--json-schema', compact(schema), '--tools', ','.join(TOOLS),
               '--allowedTools', ','.join(TOOLS), '--add-dir', args.inputs, '--disallowedTools', 'Read(./.git/**)',
+              '--settings', compact(SETTINGS),
               *(['--model', args.model] if args.model else []), '--restricted', '--strict-mcp-config']
     quoted = [value for value in values if "'" in value]
     if quoted:
