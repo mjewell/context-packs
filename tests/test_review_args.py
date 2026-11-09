@@ -53,3 +53,15 @@ class ArgsTests(unittest.TestCase):
         for value in shlex.split(line):
             quoted = shlex.quote(value)
             self.assertTrue(quoted == value or (quoted.startswith("'") and quoted.count("'") == 2), value[:60])
+
+
+class SettingsTests(unittest.TestCase):
+    """The settings the review agent runs with."""
+
+    def test_runs_subagents_in_the_foreground_so_their_answers_arrive_before_the_agent_goes_on(self):
+        run = subprocess.run([sys.executable, str(REVIEW / 'args.py'), '--inputs', INPUTS], capture_output=True,
+                             text=True, check=True)
+        args = shlex.split(run.stdout)
+
+        settings = json.loads(args[args.index('--settings') + 1])
+        self.assertEqual(settings, {'env': {'CLAUDE_CODE_DISABLE_BACKGROUND_TASKS': '1'}})
