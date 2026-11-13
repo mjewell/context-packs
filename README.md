@@ -1,12 +1,15 @@
 # context-packs
 
-Write your agent docs as a set of files, and context-packs syncs them into your `AGENTS.md`. It saves context by keeping the always-on files short, and maintains an index for you: a table that points your agent at the right doc only when it needs it.
+Write your agent docs as a set of files, and context-packs syncs them into your `AGENTS.md` as an index: a table that points your agent at the right doc only when it needs it.
 
 You write:
 
 ```text
 context-packs/
-├── pack.md       Run `npm run lint` before saying a change is done.
+├── deploys.md    ---
+│                 when: Deploying, or changing the deploy pipeline
+│                 ---
+│                 Deploy with `make deploy`, never by hand.
 └── testing.md    ---
                   when: Writing or changing tests
                   ---
@@ -16,18 +19,17 @@ context-packs/
 You run `npx context-packs`, and `AGENTS.md` gets this, after a short header:
 
 ```markdown
-Run `npm run lint` before saying a change is done.
-
 ## Context
 
 | When | Read |
 |---|---|
+| Deploying, or changing the deploy pipeline | `context-packs/deploys.md` |
 | Writing or changing tests | `context-packs/testing.md` |
 ```
 
 ## Why use it
 
-Instead of loading every doc into every session, `AGENTS.md` holds only the rules every session needs, plus a table telling the agent which doc to read for which task. In the example above, every session reads the lint rule. Asked to write a test, the agent matches "Writing or changing tests" and reads `testing.md`. On any other task, it skips that file. This is the idea behind OpenAI's [Harness engineering](https://openai.com/index/harness-engineering/): keep `AGENTS.md` a short map that points to deeper docs. context-packs builds that map for you.
+Instead of loading every doc into every session, `AGENTS.md` holds only the rules every session needs, plus a table telling the agent which doc to read for which task. You write those rules in a `pack.md`, and the sync copies them into `AGENTS.md` unchanged. In the example above, asked to write a test, the agent matches "Writing or changing tests" and reads `testing.md`. On any other task, it skips that file. This is the idea behind OpenAI's [Harness engineering](https://openai.com/index/harness-engineering/): keep `AGENTS.md` a short map that points to deeper docs. context-packs builds that map for you.
 
 It also shares docs across repos. Once you use coding agents across several repos, the usual homes for your rules each break down:
 
@@ -44,7 +46,7 @@ You need `git`, Node 18+ and Python 3.9+. On macOS, the command line tools provi
 
 ### 1. Write your repo's docs
 
-Make a `context-packs/` folder like the one at the top. `pack.md` holds rules that go straight into `AGENTS.md`. Keep it short, since every session loads it. Every other `.md` file is a doc, and the `when` in its front matter becomes its row in the table.
+Make a `context-packs/` folder of docs like the ones at the top. Add a `pack.md` for rules that go straight into `AGENTS.md`. Keep it short, since every session loads it. Every other `.md` file is a doc, and the `when` in its front matter becomes its row in the table.
 
 ### 2. Sync it
 
@@ -52,7 +54,7 @@ Make a `context-packs/` folder like the one at the top. `pack.md` holds rules th
 npx context-packs
 ```
 
-That writes a block into `AGENTS.md` holding your rules, and a table with a row for `testing.md`. Commit it, and clones, CI and cloud sessions all see it. After changing `pack.md` or a `when:` line, resync.
+That writes a block into `AGENTS.md` holding your rules, and a table with a row for each doc. Commit it, and clones, CI and cloud sessions all see it. After changing `pack.md` or a `when:` line, resync.
 
 **Already have an `AGENTS.md` or `CLAUDE.md`?** Keep it. The first run prints two marker lines: paste them where the packs should go, and run it again. The sync only changes what's between them. With neither file, it creates `AGENTS.md` and links `CLAUDE.md` to it.
 
