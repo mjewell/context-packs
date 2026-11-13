@@ -1,6 +1,6 @@
 # context-packs
 
-Write your coding-agent docs once. context-packs puts them in each repo's `AGENTS.md` as a table, so the agent reads each doc only when its task matches. Docs can come from this repo or from any other git repo.
+Write your agent docs as a set of files, and context-packs syncs them into your `AGENTS.md`. It saves context by keeping the always-on files short, and maintains an index for you: a table that points your agent at the right doc only when it needs it.
 
 You write:
 
@@ -27,14 +27,14 @@ Run `npm run lint` before saying a change is done.
 
 ## Why use it
 
-Once you use coding agents across several repos, the usual homes for your rules each break down:
+Instead of loading every doc into every session, `AGENTS.md` holds only the rules every session needs, plus a table telling the agent which doc to read for which task. In the example above, every session reads the lint rule. Asked to write a test, the agent matches "Writing or changing tests" and reads `testing.md`. On any other task, it skips that file. This is the idea behind OpenAI's [Harness engineering](https://openai.com/index/harness-engineering/): keep `AGENTS.md` a short map that points to deeper docs. context-packs builds that map for you.
+
+It also shares docs across repos. Once you use coding agents across several repos, the usual homes for your rules each break down:
 
 - **A user-level file**, such as `~/.claude/CLAUDE.md`, isn't in any repo. Cloud sessions that check out only the repo never see it, and neither does anyone else working on it. It applies to every project, so you can't tailor it to one. Nothing versions it alongside the code it describes.
 - **A copy in each repo's `AGENTS.md`** drifts as each copy is edited on its own.
 
 With context-packs, you write rules and docs once, as a folder in any git repo: a *pack*. Each repo installs the packs it needs into its `context-packs/` folder, and the tool writes them into its `AGENTS.md`, committed with the code.
-
-It also keeps that file short. Instead of loading every doc into every session, `AGENTS.md` holds only the rules every session needs, plus a table telling the agent which doc to read for which task. In the example above, every session reads the lint rule. Asked to write a test, the agent matches "Writing or changing tests" and reads `testing.md`. On any other task, it skips that file. This is the idea behind OpenAI's [Harness engineering](https://openai.com/index/harness-engineering/): keep `AGENTS.md` a short map that points to deeper docs. context-packs builds that map for you, and shares it across repos.
 
 It works with any agent that reads `AGENTS.md` or `CLAUDE.md`. [The full example](docs/example.md) walks through the packs, the commands, and every file they generate.
 
