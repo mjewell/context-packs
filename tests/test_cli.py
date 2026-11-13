@@ -14,8 +14,11 @@ START = '<!-- context-packs:start -->\n'
 # The end marker with its hash masked, as SyncCase.agents() reads it.
 END = '<!-- context-packs:end sha256:x -->\n'
 EMPTY = START + '<!-- context-packs:end sha256:e3b0c44298fc -->\n'
-# What the header says in a repo, where the tables' paths aren't absolute.
-CLAUSE = 'The paths in these tables start from the repo root. '
+# What the header says in a repo about where paths start, since the tables' paths aren't absolute.
+CLAUSE = ('The paths in these tables start from the repo root. '
+          "Look for a path a doc names in the doc's folder first, then from the repo root. ")
+# What it says instead in a folder in no repo, where the tables' paths are absolute.
+OUTSIDE_CLAUSE = "Look for a path a doc names in the doc's folder first, then from the folder the session started in. "
 HEADER = ('## Context Packs\n\n'
           'Context packs bring shared rules and docs in from elsewhere. Each pack has its rules and a table of its '
           'context docs here, and a doc may hold a table of its own. Before starting work that a row in any of these '
@@ -213,7 +216,7 @@ class SyncTests(SyncCase):
         result = self.sync()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.agents(), block().replace(CLAUSE, ''))
+        self.assertEqual(self.agents(), block().replace(CLAUSE, OUTSIDE_CLAUSE))
         self.assertEqual(os.readlink(self.repo / 'CLAUDE.md'), 'AGENTS.md')
 
     def test_block_repeated_stops_the_sync_untouched(self):
