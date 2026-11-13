@@ -122,7 +122,7 @@ Four more skills help write and apply the rules themselves, and the command abov
 
 A doc with a `when` looks like a skill with a description. Skills suit procedures: steps to follow, scripts to run, a command to invoke. For what an agent should know before it starts, a table in `AGENTS.md` works better:
 
-- **It gets read.** An agent reads `AGENTS.md` in every session, and is told to read a doc when its row matches. Whether a skill runs is the agent's call: in [Vercel's evals](https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals), skills went unused in over half the cases, and an index of docs in `AGENTS.md` beat them.
+- **It gets read.** An agent reads `AGENTS.md` in every session, and is told to read every doc whose row matches. A task that touches two docs is told to read both. Whether a skill runs is the agent's call: in [Vercel's evals](https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals), skills went unused in over half the cases, and an index of docs in `AGENTS.md` beat them.
 - **It nests.** Every skill's description sits in every session. A nested pack puts a whole subtree behind one row.
 - **Rules and docs live together.** Rules every session needs are inlined beside the table, from the same pack.
 
