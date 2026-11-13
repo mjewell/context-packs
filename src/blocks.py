@@ -16,12 +16,16 @@ OLD_MARKER = re.compile(r'^<!-- context-packs:start (?!-->)', re.MULTILINE)
 
 
 def header(base):
-    """The block's header, saying where the tables' paths start from unless they're absolute."""
+    """The block's header, saying where the tables' paths start from unless they're absolute, and where a doc's own
+    paths start: its folder first, then where its rows start."""
+    outside = base.is_absolute()
     return ('## Context Packs\n\n'
             'Context packs bring shared rules and docs in from elsewhere. Each pack has its rules and a table of its '
             'context docs here, and a doc may hold a table of its own. Before starting work that a row in any of these '
             'tables matches, read its doc. '
-            + 'The paths in these tables start from the repo root. ' * (not base.is_absolute())
+            + 'The paths in these tables start from the repo root. ' * (not outside)
+            + "Look for a path a doc names in the doc's folder first, then from "
+            + ('the folder the session started in. ' if outside else 'the repo root. ')
             + f'The packs here, and everything under `{GEN.as_posix()}/`, are generated from `{ROOT.as_posix()}/`: '
             'change them there, never here.\n')
 
