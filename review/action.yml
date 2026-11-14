@@ -32,16 +32,15 @@ runs:
         BASE: ${{ github.event.pull_request.base.sha }}
         HEAD: ${{ github.event.pull_request.head.sha }}
         MODEL: ${{ inputs.model }}
-      # The agent has no shell, so it reads the diff and log from files. A new folder outside the checkout, so no path
-      # the PR controls, such as a symlink, decides where they're written. docs.txt lists every doc the tables point at,
-      # by pack, for the skill to give each pack's docs to its own subagent.
+      # The agent reads the change through the git server, which args.py sets up for the base and head. docs.txt lists
+      # every doc the tables point at, by pack, for the skill to give each pack's docs to its own subagent. It's in a
+      # new folder outside the checkout, so no path the PR controls, such as a symlink, decides where it's written.
       run: |
         inputs=$(mktemp -d "$RUNNER_TEMP/pack-review.XXXXXX")
-        git diff --no-ext-diff --no-textconv "$BASE...$HEAD" > "$inputs/diff.patch"
-        git log --no-decorate "$BASE..$HEAD" > "$inputs/log.txt"
         echo "inputs=$inputs" >> "$GITHUB_OUTPUT"
         python3 "$GITHUB_ACTION_PATH/../src/cli.py" docs > "$inputs/docs.txt"
-        echo "claude-args=$(python3 "$GITHUB_ACTION_PATH/args.py" --inputs "$inputs" --model "$MODEL")" >> "$GITHUB_OUTPUT"
+        echo "claude-args=$(python3 "$GITHUB_ACTION_PATH/args.py" --inputs "$inputs" --base "$BASE" --head "$HEAD" \
+          --model "$MODEL")" >> "$GITHUB_OUTPUT"
     - name: Review
       id: review
       # v1.0.268, pinned by commit since a tag can move.
