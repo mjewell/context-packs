@@ -31,8 +31,9 @@ class SummaryCase(ReviewCase):
         super().setUp()
         self.github.responses.update({'PullRequest': pull_request(), 'AddComment': ok({}), 'UpdateComment': ok({})})
 
-    def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', docs=(), messages=()):
-        """Post the summary of the agent's output, with docs as `context-packs docs` lists them, each pack a list."""
+    def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', docs=(), messages=(), changed=()):
+        """Post the summary of the agent's output, with docs as `context-packs docs` lists them, each pack a list, and
+        changed as the git server's changed tool lists the paths, each a (lines, path) pair."""
         (self.root / 'output.json').write_text(
             output if output is not None else json.dumps({'findings': list(findings)}))
         for path in (path for pack in docs for path in pack):
@@ -40,8 +41,10 @@ class SummaryCase(ReviewCase):
             (self.root / path).write_text(DOC)
         (self.root / 'docs.txt').write_text('\n'.join(''.join(f'{path}\n' for path in pack) for pack in docs))
         (self.root / 'transcript.json').write_text(json.dumps(list(messages)))
+        (self.root / 'changed.txt').write_text(''.join(f'{lines}\t{path}\n' for lines, path in changed))
         return self.script('summary', '--pr', 7, '--base', BASE, '--base-ref', base_ref, '--head', head,
-                           '--findings', 'output.json', '--transcript', 'transcript.json', '--docs', 'docs.txt')
+                           '--findings', 'output.json', '--transcript', 'transcript.json', '--docs', 'docs.txt',
+                           '--changed', 'changed.txt')
 
     def body(self):
         [sent] = self.sent('AddComment') or self.sent('UpdateComment')
@@ -68,7 +71,7 @@ class SummaryTests(SummaryCase):
                       '1 conflict, 3 uncovered choices.', body)
         self.assertIn('run `/pack-review o/r#7` in Claude Code', body)
         self.assertEqual(block(body)[0], {'base': BASE, 'base_ref': 'main', 'head': HEAD, 'findings': findings,
-                                          'unread': []})
+                                          'unread': [], 'unread_diffs': []})
         self.assertNotIn('skipped', body)
 
     def test_says_when_it_found_nothing(self):

@@ -33,12 +33,15 @@ runs:
         HEAD: ${{ github.event.pull_request.head.sha }}
         MODEL: ${{ inputs.model }}
       # The agent reads the change through the git server, which args.py sets up for the base and head. docs.txt lists
-      # every doc the tables point at, by pack, for the skill to give each pack's docs to its own subagent. It's in a
-      # new folder outside the checkout, so no path the PR controls, such as a symlink, decides where it's written.
+      # every doc the tables point at, by pack, for the skill to give each pack's docs to its own subagent. changed.txt
+      # lists the changed paths as the server's changed tool does, for the summary to tell which diffs no agent read.
+      # Both are in a new folder outside the checkout, so no path the PR controls, such as a symlink, decides where
+      # they're written.
       run: |
         inputs=$(mktemp -d "$RUNNER_TEMP/pack-review.XXXXXX")
         echo "inputs=$inputs" >> "$GITHUB_OUTPUT"
         python3 "$GITHUB_ACTION_PATH/../src/cli.py" docs > "$inputs/docs.txt"
+        python3 "$GITHUB_ACTION_PATH/git_server.py" --base "$BASE" --head "$HEAD" changed > "$inputs/changed.txt"
         echo "claude-args=$(python3 "$GITHUB_ACTION_PATH/args.py" --inputs "$inputs" --base "$BASE" --head "$HEAD" \
           --model "$MODEL")" >> "$GITHUB_OUTPUT"
     - name: Review
@@ -70,8 +73,9 @@ runs:
         INPUTS: ${{ steps.prepare.outputs.inputs }}
         TRANSCRIPT: ${{ steps.review.outputs.execution_file }}
       # The summary lists the docs no agent read in full, from the transcript, so a review that skipped one is posted
-      # as partial.
+      # as partial. It also lists the changed paths whose diff no agent read, which doesn't make it partial.
       run: |
         printf '%s' "$FINDINGS" > "$RUNNER_TEMP/pack-review-findings.json"
         python3 "$GITHUB_ACTION_PATH/summary.py" --pr "$PR" --base "$BASE" --base-ref "$BASE_REF" --head "$HEAD" \
-          --findings "$RUNNER_TEMP/pack-review-findings.json" --transcript "$TRANSCRIPT" --docs "$INPUTS/docs.txt"
+          --findings "$RUNNER_TEMP/pack-review-findings.json" --transcript "$TRANSCRIPT" --docs "$INPUTS/docs.txt" \
+          --changed "$INPUTS/changed.txt"

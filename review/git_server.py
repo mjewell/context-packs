@@ -74,14 +74,14 @@ class Change:
         return paged(path, self.lines(path), page)
 
 
-def pages(lines):
-    """How many pages the lines take."""
-    return max(-(-len(lines) // LINES), 1)
+def pages(count):
+    """How many pages a tool's output of count lines takes."""
+    return max(-(-count // LINES), 1)
 
 
 def paged(name, lines, page):
     """One page of the lines, with a line after it that says where it is when there's more than one."""
-    count = pages(lines)
+    count = pages(len(lines))
     if page > count:
         raise Refused(f'{name} has {count} pages.')
     text = ''.join(f'{line}\n' for line in lines[(page - 1) * LINES:page * LINES])
@@ -207,8 +207,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base', required=True, help='the commit the reviewed change starts from')
     parser.add_argument('--head', required=True, help='the commit that is reviewed')
+    parser.add_argument('command', nargs='?', choices=['changed'],
+                        help="print what the changed tool returns and stop, for the summary to tell which paths' "
+                             'diffs no agent read')
     args = parser.parse_args()
     change = Change(args.base, args.head)
+    if args.command:
+        print(change.changed(), end='')
+        return
     for line in sys.stdin:
         message = json.loads(line)
         # A notification has no id and gets no response.

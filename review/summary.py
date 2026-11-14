@@ -37,7 +37,7 @@ def counted(findings):
     return ', '.join(f'{n} {NAMES[kind][n != 1]}' for kind, n in counts.items() if n)
 
 
-def summary(repo, number, base, base_ref, head, findings, unread):
+def summary(repo, number, base, base_ref, head, findings, unread, unread_diffs):
     """The counts for people, and every finding and unread doc as JSON. The agent's text and the docs' paths appear
     only in the JSON, where nothing renders, so nothing they hold can show people something other than what the
     author's local run reads."""
@@ -50,8 +50,8 @@ def summary(repo, number, base, base_ref, head, findings, unread):
         text += (f"\n\nTo go through them, run `/pack-review {repo}#{number}` in Claude Code with this PR's branch "
                  'checked out.')
     # Backticks only occur inside JSON strings, where \u0060 means the same, so nothing can close the fence.
-    data = json.dumps({'base': base, 'base_ref': base_ref, 'head': head, 'findings': findings, 'unread': unread},
-                      indent=2, ensure_ascii=False)
+    data = json.dumps({'base': base, 'base_ref': base_ref, 'head': head, 'findings': findings, 'unread': unread,
+                       'unread_diffs': unread_diffs}, indent=2, ensure_ascii=False)
     data = data.replace('`', '\\u0060')
     return github.signed(f'{text}\n\n<details><summary>Findings for the local review</summary>\n\n```json\n{data}\n'
                          '```\n\n</details>')
@@ -76,6 +76,19 @@ def unread_in(transcript, docs):
     return cleaned([doc for doc, who in found.items() if not who])
 
 
+def unread_diffs_in(transcript, changed):
+    """The changed paths whose diff no agent read in full, after printing who read each one in the run's log. Skipping
+    a lock file is often right, so these don't make the review partial."""
+    pairs = []
+    for line in changed.read_text(encoding='utf-8').splitlines():
+        lines, path = line.split('\t', 1)
+        pairs.append((int(lines), path))
+    found = reads.diff_readers(json.loads(transcript.read_text(encoding='utf-8')), pairs)
+    for path, who in found.items():
+        print(f'diff read by {", ".join(who)}: {path}' if who else f'diff not read: {path}')
+    return cleaned([path for path, who in found.items() if not who])
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pr', type=int, required=True, help='the PR number')
@@ -87,9 +100,12 @@ def main():
                         help="claude-code-action's claude-execution-output.json, to tell which docs the agent read")
     parser.add_argument('--docs', type=Path, required=True,
                         help='the docs the agent should read, from the checkout, as `context-packs docs` prints them')
+    parser.add_argument('--changed', type=Path, required=True,
+                        help="the paths the change touches, as the git server's changed tool lists them")
     args = parser.parse_args()
     findings = findings_in(args.findings)
     unread = unread_in(args.transcript, args.docs)
+    unread_diffs = unread_diffs_in(args.transcript, args.changed)
     pr = github.pull_request(args.pr)
     if pr['headRefOid'] != args.head:
         print(f'pack-review: the PR moved on to {pr["headRefOid"]} since this review of {args.head}, so it posts '
@@ -99,7 +115,8 @@ def main():
         print(f'pack-review: the PR moved from {args.base_ref} to {pr["baseRefName"]} since this review, so it posts '
               'no summary. The run for the new base will.')
         return
-    body = summary(os.environ['GITHUB_REPOSITORY'], args.pr, args.base, args.base_ref, args.head, findings, unread)
+    body = summary(os.environ['GITHUB_REPOSITORY'], args.pr, args.base, args.base_ref, args.head, findings, unread,
+                   unread_diffs)
     if len(body) > LIMIT:
         sys.exit(f'pack-review: the summary is {len(body)} characters, and GitHub allows {LIMIT} in a comment.')
     summaries = [c['id'] for c in pr['comments'] if github.own(c)]
