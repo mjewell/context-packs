@@ -1,5 +1,5 @@
-name: pack-review
-description: Review a PR against the repo's context packs with claude-code-action, and post a summary of what it finds for the author to go through locally.
+name: pack-review find
+description: Review a PR against the repo's context packs with claude-code-action, and save what it finds as the artifact pack-review-report, for the post action to post. Run it in a job with only contents read.
 inputs:
   anthropic-api-key:
     description: An Anthropic API key for the review agent. Pass this or claude-code-oauth-token.
@@ -40,9 +40,9 @@ runs:
       run: |
         inputs=$(mktemp -d "$RUNNER_TEMP/pack-review.XXXXXX")
         echo "inputs=$inputs" >> "$GITHUB_OUTPUT"
-        python3 "$GITHUB_ACTION_PATH/../src/cli.py" docs > "$inputs/docs.txt"
-        python3 "$GITHUB_ACTION_PATH/git_server.py" --base "$BASE" --head "$HEAD" changed > "$inputs/changed.txt"
-        echo "claude-args=$(python3 "$GITHUB_ACTION_PATH/args.py" --inputs "$inputs" --base "$BASE" --head "$HEAD" \
+        python3 "$GITHUB_ACTION_PATH/../../src/cli.py" docs > "$inputs/docs.txt"
+        python3 "$GITHUB_ACTION_PATH/../git_server.py" --base "$BASE" --head "$HEAD" changed > "$inputs/changed.txt"
+        echo "claude-args=$(python3 "$GITHUB_ACTION_PATH/../args.py" --inputs "$inputs" --base "$BASE" --head "$HEAD" \
           --model "$MODEL")" >> "$GITHUB_OUTPUT"
     - name: Review
       id: review
@@ -60,22 +60,30 @@ runs:
       shell: bash
       env:
         TRANSCRIPT: ${{ steps.review.outputs.execution_file }}
-      run: python3 "$GITHUB_ACTION_PATH/transcript.py" --file "$TRANSCRIPT"
-    - name: Post the summary
+      run: python3 "$GITHUB_ACTION_PATH/../transcript.py" --file "$TRANSCRIPT"
+    - name: Write the report
       shell: bash
       env:
-        GITHUB_TOKEN: ${{ github.token }}
         FINDINGS: ${{ steps.review.outputs.structured_output }}
-        PR: ${{ github.event.pull_request.number }}
         BASE: ${{ github.event.pull_request.base.sha }}
         BASE_REF: ${{ github.event.pull_request.base.ref }}
         HEAD: ${{ github.event.pull_request.head.sha }}
         INPUTS: ${{ steps.prepare.outputs.inputs }}
         TRANSCRIPT: ${{ steps.review.outputs.execution_file }}
-      # The summary lists the docs no agent read in full, from the transcript, so a review that skipped one is posted
-      # as partial. It also lists the changed paths whose diff no agent read, which doesn't make it partial.
+      # The report lists the docs no agent read in full, from the transcript, so a review that skipped one is posted
+      # as partial. It also lists the changed paths whose diff no agent read, which doesn't make it partial. The
+      # transcript can hold file contents, so it stays in this job, and only the report goes on.
       run: |
         printf '%s' "$FINDINGS" > "$RUNNER_TEMP/pack-review-findings.json"
-        python3 "$GITHUB_ACTION_PATH/summary.py" --pr "$PR" --base "$BASE" --base-ref "$BASE_REF" --head "$HEAD" \
+        mkdir "$RUNNER_TEMP/pack-review-report"
+        python3 "$GITHUB_ACTION_PATH/../report.py" --base "$BASE" --base-ref "$BASE_REF" --head "$HEAD" \
           --findings "$RUNNER_TEMP/pack-review-findings.json" --transcript "$TRANSCRIPT" --docs "$INPUTS/docs.txt" \
-          --changed "$INPUTS/changed.txt"
+          --changed "$INPUTS/changed.txt" --out "$RUNNER_TEMP/pack-review-report/report.json"
+    - name: Save the report
+      # v7.0.2, pinned by commit since a tag can move.
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      with:
+        name: pack-review-report
+        path: ${{ runner.temp }}/pack-review-report/report.json
+        if-no-files-found: error
+        retention-days: 1

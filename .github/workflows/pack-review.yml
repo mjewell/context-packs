@@ -3,7 +3,7 @@ on:
   pull_request:
     types: [opened, reopened, ready_for_review, synchronize, edited]
 jobs:
-  review:
+  find:
     # Drafts wait until they're ready. PRs from forks get no secrets, so they're skipped. An edit reviews again only
     # when it changed the base branch, so the findings match the new diff.
     if: >-
@@ -11,8 +11,27 @@ jobs:
       && (github.event.action != 'edited' || github.event.changes.base.ref.from) }}
     runs-on: ubuntu-latest
     concurrency:
-      group: pack-review-${{ github.event.pull_request.number }}
+      group: pack-review-find-${{ github.event.pull_request.number }}
       cancel-in-progress: true
+    # The agent's job reads the repo and nothing else, so GitHub, not its tool list, keeps it from writing.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      # The action from this checkout, unlike the reference's @main, so a PR that changes it reviews with its change.
+      - uses: ./review/find
+        with:
+          claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+  post:
+    needs: find
+    runs-on: ubuntu-latest
+    # Two posts at once could each find no summary and add one, so they wait their turn.
+    concurrency:
+      group: pack-review-post-${{ github.event.pull_request.number }}
+    # contents: read is only for the checkout, which this repo needs to post with the PR's own post action.
     permissions:
       contents: read
       pull-requests: write
@@ -20,8 +39,4 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-      # The action from this checkout, unlike the reference's @main, so a PR that changes it reviews with its change.
-      - uses: ./review
-        with:
-          claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      - uses: ./review/post

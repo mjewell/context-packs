@@ -42,9 +42,18 @@ class SummaryCase(ReviewCase):
         (self.root / 'docs.txt').write_text('\n'.join(''.join(f'{path}\n' for path in pack) for pack in docs))
         (self.root / 'transcript.json').write_text(json.dumps(list(messages)))
         (self.root / 'changed.txt').write_text(''.join(f'{lines}\t{path}\n' for lines, path in changed))
-        return self.script('summary', '--pr', 7, '--base', BASE, '--base-ref', base_ref, '--head', head,
-                           '--findings', 'output.json', '--transcript', 'transcript.json', '--docs', 'docs.txt',
-                           '--changed', 'changed.txt')
+        report = self.report(base_ref, head)
+        if report.returncode:
+            return report
+        post = self.script('summary', '--pr', 7, '--report', 'report.json')
+        post.stdout = report.stdout + post.stdout
+        return post
+
+    def report(self, base_ref='main', head=HEAD):
+        """The find job's report on the agent's output, written to report.json for the post job."""
+        return self.script('report', '--base', BASE, '--base-ref', base_ref, '--head', head, '--findings',
+                           'output.json', '--transcript', 'transcript.json', '--docs', 'docs.txt', '--changed',
+                           'changed.txt', '--out', 'report.json')
 
     def body(self):
         [sent] = self.sent('AddComment') or self.sent('UpdateComment')
@@ -163,6 +172,19 @@ class SummaryTests(SummaryCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('moved from release to main', result.stdout)
         self.assertEqual(self.github.writes(), [])
+
+    def test_writes_the_report_in_the_find_job_without_reaching_github(self):
+        result = self.summarize([finding()])
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads((self.root / 'report.json').read_text())
+        self.assertEqual(report, {'base': BASE, 'base_ref': 'main', 'head': HEAD, 'findings': [finding()],
+                                  'unread': [], 'unread_diffs': []})
+        self.github.requests.clear()
+        self.env.pop('GITHUB_TOKEN')
+
+        self.assertEqual(self.report().returncode, 0)
+        self.assertEqual(self.github.requests, [])
 
     def test_stops_when_the_review_returned_no_findings(self):
         for output in ('', 'null', '{"result": "done"}'):
