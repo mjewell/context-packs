@@ -1,118 +1,91 @@
 # Plan: review in phases, with thread replies
 
-The review action becomes four jobs. Only one of them reads PR comments, and nothing it reads can change a finding or a thread's status. Agents read the change and the PR through two small MCP servers that enforce what they may see. A script posts everything, as one GitHub review that replies in pack-review's own open threads and starts new ones.
+The review action becomes three jobs: find, match and post. Agents read the change through a git server that runs fixed git commands. Findings are paired with pack-review's earlier threads by their text alone, so no comment can change what the review finds or which thread a finding lands in. A script posts everything as one GitHub review: new threads for new findings, and replies only where there's something to say.
 
-This file holds the decisions and the build order while the work lands. Each step adds its reasons to [review.md](../../context-packs/project/review.md) as it lands, and this file is deleted after step 5.
+This file holds the decisions and the build order while the work lands. Each step adds its reasons to [review.md](../../context-packs/project/review.md) as it lands, and this file is deleted after the last step.
 
 ## Goal
 
-- Comments can't change what the review finds, or whether a thread reads as resolved.
+- Comments can't change what the review finds, or which thread a finding is paired with.
 - Agents ask for what they need through tools, instead of getting files written up front.
-- The author hears whether each open pack-review thread is still flagged or looks resolved, instead of getting new threads on every push.
+- Each finding has one thread. Running the review again doesn't repeat it, so a re-run stays quiet unless something changed.
+
+The review doesn't say whether a thread is resolved. A thread that gets no finding on a later run is most likely fixed, and the author decides that and resolves it.
 
 ## Jobs
 
 | Job | Reads comments | Token | Agent | Output |
 |---|---|---|---|---|
-| 1. find | no | `contents: read` | yes | findings, and the changed paths each unit didn't read |
-| 2. match | no | `pull-requests: read`, for its script only | yes, with no tools | pairs of a finding and a pack-review thread |
-| 3. discuss | yes, through the GitHub server | `pull-requests: read` | yes | a verdict and note per pack-review thread, notes on findings |
-| 4. post | no | `pull-requests: write` | no | one review, and the summary comment |
+| 1. find | no | `contents: read` | yes | findings, and the changed paths no agent read |
+| 2. match | in its second call only, filtered | `pull-requests: read` | two calls, both with no tools | pairs of a finding and a pack-review thread, and optional commentary per finding |
+| 3. post | no | `pull-requests: write` | no | one review, and the summary comment |
 
-Each job's `permissions` are set in the workflow, so GitHub enforces them, not our `claude_args`. Results pass between jobs as artifacts. Jobs 1 and 3 can run at the same time. Job 3 runs only when pack-review has open threads.
+Each job's `permissions` are set in the workflow, so GitHub enforces them, not the agent's tools. Results pass between jobs as artifacts.
 
 ### 1. find
 
-The same `pack-findings` run as today, with the same tools, plus the git server. It never sees a comment. `diff.patch` and `log.txt` go away: the agent reads the diff path by path, so it can skip a lock file. The transcript shows which paths each unit read, and the summary's JSON lists the ones it skipped. A skipped path doesn't make the review partial, since skipping a lock file is often right.
+The `pack-findings` skill, as today. Its subagents each check one unit of the packs, and it merges their answers into findings. The agent reads the change through the git server and never sees a comment.
 
 ### 2. match
 
-A script fetches the findings that pack-review's open threads were opened for, from those threads' first comments. pack-review wrote them, and the script reads no other comment. An agent pairs them with job 1's findings. A finding may continue several threads, and a thread may take several findings. It never sees a comment, so a comment can't make it leave out a match.
+A script reads pack-review's threads on the PR through `trust.py`, open and resolved. Each thread's first comment is pack-review's, and holds the finding it was opened for as JSON.
 
-### 3. discuss
+Then two agent calls, each with no tools:
 
-An agent with the GitHub server and the checkout. For each open pack-review thread, it reads the thread and the code at head, and answers `resolved` or `unresolved` with a note. For findings, it answers notes as `{finding, comment, quote, relation}`, where `relation` is one of a fixed set, such as `explains`, `disputes` or `says-fixed`. The post script rejects a quote that isn't word for word in that comment's text as the server served it.
+1. **Pair.** It gets this run's findings and the findings the threads were opened for, and nothing else. It answers which new finding continues which thread. A finding continues at most one thread. A thread with no finding gets nothing. No comment reaches this call, so none can bias the pairing.
+2. **Comment.** For each paired finding, it gets the thread's comments as `trust.py` filters them: the text of people with write access and of pack-review, and only an id for anyone else. It answers commentary for a finding only when there's something to say about it, such as a teammate saying the deviation is deliberate. It sees pack-review's earlier replies, so it doesn't repeat them.
 
-### 4. post
+### 3. post
 
-A script, with no agent. It checks that every finding from job 1 is unchanged, and that every thread id in the plan is a pack-review thread on this PR. Then it posts one review:
+A script, with no agent. It checks that every finding is the one job 1 returned, that each pairing names a pack-review thread on this PR, and that each finding is paired at most once. Then it posts one review:
 
-- A thread job 2 matched gets a reply with a fixed status line, and job 3's note under it.
-- A finding job 2 matched to no thread starts a new thread on its first spot. A finding whose spots are all outside the diff goes only in the summary, since a review comment needs a line in the diff.
-- The summary comment keeps every finding as JSON, as today, for the local `pack-review`.
-
-A thread's status comes from both signals:
-
-| Job 3 says | Job 2 matched a finding | Status line |
+| Finding | Thread | Posts |
 |---|---|---|
-| resolved | no | Looks resolved at `abc1234` |
-| resolved | yes | Still flagged at `abc1234`: the review found it again |
-| unresolved | no | Still open at `abc1234` |
-| unresolved | yes | Still open at `abc1234` |
+| not paired | – | a new thread on its first spot in the diff, holding the finding as JSON |
+| not paired, no spot in the diff | – | nothing on the diff, since a review comment needs a line in it |
+| paired, with commentary | open or resolved | a reply with the commentary |
+| paired, no commentary | open | nothing |
+| paired, no commentary | resolved | a reply saying it's still found at `def5678` |
+| – | thread with no finding | nothing |
 
-"Looks resolved" needs job 2, which never saw a comment. A comment that pushes job 3 toward `unresolved` only keeps a thread open. The workflow's token can't resolve threads, so the author does that.
+The summary comment keeps every finding as JSON, as today, with each one's thread and commentary, for the local `pack-review`.
 
-## The git server
+The workflow's token can't resolve threads, and most likely can't unresolve them, so a reply is how a resolved thread hears it's still found.
 
-A Python stdio MCP server using only the standard library, for job 1.
+## trust.py
 
-| Tool | Returns |
-|---|---|
-| `changed()` | every changed path, with its size in lines |
-| `diff(path)` | the diff of one path, from the merge base to head, paged |
-| `log(path, limit)` | commits that touched a path, with their messages |
-| `show(commit)` | one commit's message and diff |
-| `blame(path, start, end)` | the commit behind each line at head |
-| `file(rev, path)` | a file at a revision, paged |
-
-The agent's text never reaches git as an option. That's why this is safe when an allowed shell `git` wasn't: `git log --output=<file>` wrote any file, and git takes any unique prefix of `--output`.
-
-- Each tool runs one fixed `argv`, with no shell.
-- Revisions are checked with `git rev-parse --verify --end-of-options <rev>^{commit}`, and only the resolved hash is passed on.
-- Paths go after `--`, must be relative, and can't contain `..`.
-- Every call adds `--no-ext-diff --no-textconv`. No tool reads `.git/config`, where claude-code-action keeps its token.
-- Output is paged, with a cap on lines.
-
-## The GitHub server
-
-A Python stdio MCP server using only the standard library, for job 3. It's tied to one PR, read from the job's environment when it starts, and no tool takes a repo or number. It has no write tools.
-
-| Tool | Returns |
-|---|---|
-| `pr()` | title, description, author, head, base |
-| `threads()` | every review thread: id, path, line, whether pack-review opened it, open or resolved |
-| `thread(id)` | that thread's comments |
-| `comments()` | PR-level comments |
-| `reviews()` | review bodies |
+A module, used by job 2's script, that reads one PR's threads and applies who may be read.
 
 - A comment comes back as `{id, author, at, text}` only when its author has write, maintain or admin access now, from GitHub's permission API, cached for the run. pack-review's own comments count: the token's identity wrote them, and they end with the marker.
-- Other comments come back as `{id, hidden: "author lacks write access"}`, without the login, which is text the author chose. Other bots' comments, and comments a maintainer minimized, are hidden the same way.
+- Other comments come back as `{id, hidden: <reason>}`, without the login, which is text the author chose. Other bots' comments, and comments a maintainer minimized, are hidden the same way.
 - `text` is GitHub's `bodyText`, so GitHub's renderer decides what's hidden, such as HTML comments. Then `sanitize.py` removes invisible characters and redacts secrets.
 - It reads every page.
 
-Job 2's script uses the same module to fetch pack-review's threads, so the trust rule has one home. GitHub's lockdown mode doesn't fit: it does nothing on private repos, filters only `issue_read` comments, doesn't strip hidden content, and GitHub calls it best effort.
+GitHub's lockdown mode doesn't fit: it does nothing on private repos, filters only `issue_read` comments, doesn't strip hidden content, and GitHub calls it best effort.
 
 ## Decisions this changes in review.md
 
-- **"CI posts a summary, and no comments on the diff."** Threads come back. The reasons it gave are now covered: the GitHub server filters whose comments are read, and the post script checks which threads are written to. Resolving is still out of reach, so pack-review replies and the author resolves.
-- **"claude-code-action runs the agent, and the agent has no way to the PR."** Still true for jobs 1 and 2. Job 3 reads the PR, through the GitHub server only.
+- **"CI posts a summary, and no comments on the diff."** Threads come back. The reasons it gave are now covered: `trust.py` filters whose comments are read, and the post script checks which threads are written to. Resolving is still out of reach, so the author resolves.
+- **"claude-code-action runs the agent, and the agent has no way to the PR."** Still true. Job 2's agents get the threads from its script and have no tools.
 - **The diff and log as files.** Replaced by the git server, so the agent picks what to read.
 
 ## Steps
 
 Each step leaves a working review, is written test-first, and adds its reasons to `review.md`.
 
-- [ ] 1. The git server, wired into today's single job through `args.py`. `diff.patch` and `log.txt` are dropped, and the summary lists skipped paths.
-- [ ] 2. Split the workflow into jobs, starting with find and then post, with the findings passed as an artifact.
-- [ ] 3. The GitHub server and its trust module, with tests on recorded API answers.
-- [ ] 4. The discuss job, with its notes on findings going into the summary only.
-- [ ] 5. The match job, and posting the review: thread replies, new threads and the status table.
+- [ ] 1. The git server, wired into today's single job through `args.py`. `diff.patch` and `log.txt` are dropped, and the summary lists the diffs no agent read.
+- [ ] 2. Split the workflow into find and post jobs, with the findings passed as an artifact.
+- [ ] 3. `trust.py`, with tests on GitHub-shaped API answers.
+- [ ] 4. The match job's pairing, with each finding's thread going into the summary only.
+- [ ] 5. The match job's commentary, going into the summary only.
+- [ ] 6. Posting the review: new threads, and replies as the table above says.
 
 ## Out of scope
 
+- Saying whether a thread is resolved.
 - Replying in threads people opened. Only pack-review's own threads get replies.
-- The local `pack-review` keeps its fixed `gh` command. A local session has other GitHub tools, so this server couldn't stop it reading around the filter.
+- The local `pack-review` keeps its fixed `gh` command.
 
 ## Open questions
 
-- How job 3's note is shown under the status line. A code block shows every character, and a link, image or `@mention` in it does nothing. A quote block reads better, but renders Markdown, so a note could mention people or hide text.
+- How commentary is shown in a reply. A code block shows every character, and a link, image or `@mention` in it does nothing. A quote block reads better, but renders Markdown, so commentary could mention people or hide text.
