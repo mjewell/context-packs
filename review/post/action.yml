@@ -1,5 +1,5 @@
 name: pack-review post
-description: Post or update pack-review's summary comment on a PR, from the report the find action and the pairs the match action saved in earlier jobs of the same run. It runs no agent. Run it in a job with pull-requests write.
+description: Post pack-review's review threads and its summary comment on a PR, from the report the find action and the pairs the match action saved in earlier jobs of the same run. It runs no agent. Run it in a job with pull-requests write.
 runs:
   using: composite
   steps:
@@ -15,6 +15,14 @@ runs:
       with:
         name: pack-review-match
         path: ${{ runner.temp }}/pack-review-match
+    - name: Post the threads
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        PR: ${{ github.event.pull_request.number }}
+        REPORT: ${{ runner.temp }}/pack-review-report/report.json
+        MATCH: ${{ runner.temp }}/pack-review-match/match.json
+      run: python3 "$GITHUB_ACTION_PATH/../post.py" --pr "$PR" --report "$REPORT" --match "$MATCH"
     - name: Post the summary
       shell: bash
       env:

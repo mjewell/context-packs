@@ -1,3 +1,4 @@
+import json
 import re
 import subprocess
 import sys
@@ -43,6 +44,17 @@ class ChangedTests(GitCase):
                               'changed'], cwd=self.repo, capture_output=True, text=True, check=True)
 
         self.assertEqual(run.stdout, '7\ta.txt\n')
+
+    def test_prints_the_head_lines_each_diff_shows_for_comments_on_them(self):
+        self.commit('Add', {'a.txt': TWELVE, 'gone.txt': 'x\n'})
+        self.base = self.git('rev-parse', 'HEAD')
+        self.commit('Change line 10 and delete a file', {'a.txt': TWELVE.replace('l10\n', 'ten\n')},
+                    removed=['gone.txt'])
+
+        run = subprocess.run([sys.executable, str(REVIEW / 'git_server.py'), '--base', self.base, '--head', 'HEAD',
+                              'shown'], cwd=self.repo, capture_output=True, text=True, check=True)
+
+        self.assertEqual(json.loads(run.stdout), {'a.txt': [7, 8, 9, 10, 11, 12], 'gone.txt': []})
 
     def test_lists_a_rename_as_a_deleted_path_and_an_added_one(self):
         self.commit('Add', {'old.txt': 'x\n'})
