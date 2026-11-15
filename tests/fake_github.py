@@ -54,7 +54,9 @@ class FakeGitHub:
         return [request['operationName'] for request in self.requests if 'operationName' in request]
 
     def writes(self):
-        return [name for name in self.operations() if name != 'PullRequest']
+        """The GraphQL mutations it was sent, by name."""
+        return [request['operationName'] for request in self.requests
+                if request.get('query', '').lstrip().startswith('mutation')]
 
 
 def ok(data):

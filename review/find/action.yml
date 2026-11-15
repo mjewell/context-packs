@@ -35,6 +35,7 @@ runs:
       # The agent reads the change through the git server, which args.py sets up for the base and head. docs.txt lists
       # every doc the tables point at, by pack, for the skill to give each pack's docs to its own subagent. changed.txt
       # lists the changed paths as the server's changed tool does, for the summary to tell which diffs no agent read.
+      # The lines each diff shows go outside the agent's folder, for the report to pick where each new thread opens.
       # Both are in a new folder outside the checkout, so no path the PR controls, such as a symlink, decides where
       # they're written.
       run: |
@@ -42,6 +43,7 @@ runs:
         echo "inputs=$inputs" >> "$GITHUB_OUTPUT"
         python3 "$GITHUB_ACTION_PATH/../../src/cli.py" docs > "$inputs/docs.txt"
         python3 "$GITHUB_ACTION_PATH/../git_server.py" --base "$BASE" --head "$HEAD" changed > "$inputs/changed.txt"
+        python3 "$GITHUB_ACTION_PATH/../git_server.py" --base "$BASE" --head "$HEAD" shown > "$RUNNER_TEMP/pack-review-shown.json"
         echo "claude-args=$(python3 "$GITHUB_ACTION_PATH/../args.py" --inputs "$inputs" --base "$BASE" --head "$HEAD" \
           --model "$MODEL")" >> "$GITHUB_OUTPUT"
     - name: Review
@@ -78,7 +80,8 @@ runs:
         mkdir "$RUNNER_TEMP/pack-review-report"
         python3 "$GITHUB_ACTION_PATH/../report.py" --base "$BASE" --base-ref "$BASE_REF" --head "$HEAD" \
           --findings "$RUNNER_TEMP/pack-review-findings.json" --transcript "$TRANSCRIPT" --docs "$INPUTS/docs.txt" \
-          --changed "$INPUTS/changed.txt" --out "$RUNNER_TEMP/pack-review-report/report.json"
+          --changed "$INPUTS/changed.txt" --shown "$RUNNER_TEMP/pack-review-shown.json" \
+          --out "$RUNNER_TEMP/pack-review-report/report.json"
     - name: Save the report
       # v7.0.2, pinned by commit since a tag can move.
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9

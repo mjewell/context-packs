@@ -32,7 +32,7 @@ class SummaryCase(ReviewCase):
         self.github.responses.update({'PullRequest': pull_request(), 'AddComment': ok({}), 'UpdateComment': ok({})})
 
     def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', docs=(), messages=(), changed=(),
-                  pairs=(), commentary=()):
+                  pairs=(), commentary=(), shown=None):
         """Post the summary of the agent's output, with docs as `context-packs docs` lists them, each pack a list,
         changed as the git server's changed tool lists the paths, each a (lines, path) pair, and pairs as the match job
         checked them."""
@@ -44,6 +44,7 @@ class SummaryCase(ReviewCase):
         (self.root / 'docs.txt').write_text('\n'.join(''.join(f'{path}\n' for path in pack) for pack in docs))
         (self.root / 'transcript.json').write_text(json.dumps(list(messages)))
         (self.root / 'changed.txt').write_text(''.join(f'{lines}\t{path}\n' for lines, path in changed))
+        (self.root / 'shown.json').write_text(json.dumps(shown or {}))
         report = self.report(base_ref, head)
         if report.returncode:
             return report
@@ -56,7 +57,7 @@ class SummaryCase(ReviewCase):
         """The find job's report on the agent's output, written to report.json for the post job."""
         return self.script('report', '--base', BASE, '--base-ref', base_ref, '--head', head, '--findings',
                            'output.json', '--transcript', 'transcript.json', '--docs', 'docs.txt', '--changed',
-                           'changed.txt', '--out', 'report.json')
+                           'changed.txt', '--shown', 'shown.json', '--out', 'report.json')
 
     def body(self):
         [sent] = self.sent('AddComment') or self.sent('UpdateComment')
@@ -196,12 +197,22 @@ class SummaryTests(SummaryCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         report = json.loads((self.root / 'report.json').read_text())
         self.assertEqual(report, {'base': BASE, 'base_ref': 'main', 'head': HEAD, 'findings': [finding()],
-                                  'unread': [], 'unread_diffs': []})
+                                  'anchors': [None], 'unread': [], 'unread_diffs': []})
         self.github.requests.clear()
         self.env.pop('GITHUB_TOKEN')
 
         self.assertEqual(self.report().returncode, 0)
         self.assertEqual(self.github.requests, [])
+
+    def test_anchors_each_finding_on_its_first_deviating_spot_the_diff_shows(self):
+        findings = [finding(spots=[spot('a.ts', 3, follows=True), spot('a.ts', 9), spot('b.ts', 4)]),
+                    finding(spots=[spot('a.ts', 3, follows=True), spot('c.ts', 1)]),
+                    finding(spots=[spot('c.ts', 1)])]
+
+        self.summarize(findings, shown={'a.ts': [1, 2, 3, 4], 'b.ts': [4]})
+
+        report = json.loads((self.root / 'report.json').read_text())
+        self.assertEqual(report['anchors'], [{'path': 'b.ts', 'line': 4}, {'path': 'a.ts', 'line': 3}, None])
 
     def test_stops_when_the_review_returned_no_findings(self):
         for output in ('', 'null', '{"result": "done"}'):

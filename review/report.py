@@ -55,6 +55,17 @@ def unread_diffs_in(transcript, changed):
     return cleaned([path for path, who in found.items() if not who])
 
 
+def anchors(findings, shown):
+    """The spot each finding's thread can open on: its first spot that deviates and the diff shows, or else its first
+    spot the diff shows, or None when the diff shows none, since a review comment needs a line in the diff."""
+    found = []
+    for finding in findings:
+        spots = [spot for spot in finding['spots'] if spot['line'] in shown.get(spot['path'], [])]
+        spots.sort(key=lambda spot: spot['follows'])
+        found.append({'path': spots[0]['path'], 'line': spots[0]['line']} if spots else None)
+    return found
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base', required=True, help='the commit the reviewed change starts from')
@@ -67,9 +78,13 @@ def main():
                         help='the docs the agent should read, from the checkout, as `context-packs docs` prints them')
     parser.add_argument('--changed', type=Path, required=True,
                         help="the paths the change touches, as the git server's changed tool lists them")
+    parser.add_argument('--shown', type=Path, required=True,
+                        help='the head lines each diff shows, as `git_server.py shown` prints them')
     parser.add_argument('--out', type=Path, required=True, help='where to write the report')
     args = parser.parse_args()
-    report = {'base': args.base, 'base_ref': args.base_ref, 'head': args.head, 'findings': findings_in(args.findings),
+    findings = findings_in(args.findings)
+    report = {'base': args.base, 'base_ref': args.base_ref, 'head': args.head, 'findings': findings,
+              'anchors': anchors(findings, json.loads(args.shown.read_text(encoding='utf-8'))),
               'unread': unread_in(args.transcript, args.docs),
               'unread_diffs': unread_diffs_in(args.transcript, args.changed)}
     args.out.write_text(json.dumps(report, ensure_ascii=False), encoding='utf-8')

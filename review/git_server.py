@@ -38,10 +38,16 @@ class Change:
         out = git('diff', '--name-only', '-z', '--no-renames', self.range)
         return [path for path in out.split('\0') if path]
 
+    def raw(self, path):
+        return git('diff', '--no-ext-diff', '--no-textconv', '--no-renames', self.range, '--', path).splitlines()
+
+    def shown(self):
+        """The head lines each path's diff shows, which a review comment can be left on."""
+        return {path: [n for n, _ in marked(self.raw(path)) if n] for path in self.paths()}
+
     def lines(self, path):
         """The path's diff, each line numbered as numbered() says."""
-        return numbered(git('diff', '--no-ext-diff', '--no-textconv', '--no-renames', self.range, '--',
-                            path).splitlines())
+        return numbered(self.raw(path))
 
     def changed(self):
         return ''.join(f'{len(self.lines(path))}\t{path}\n' for path in self.paths())
@@ -122,29 +128,36 @@ def allowed(name, arguments):
     return arguments
 
 
-def numbered(diff):
-    """A diff's lines, with each line in a hunk that the head has led by its line number there, and every other line
-    in a hunk led by blanks, so the agent copies a line number instead of counting. The header and hunk lines stay
-    as git wrote them."""
-    marked, number = [], None
+def marked(diff):
+    """Each line of a diff with the head's line number for it: a number for a line in a hunk that the head has, '' for
+    another line in a hunk, and None for a header or hunk line."""
+    marks, number = [], None
     for line in diff:
         found = HUNK.match(line)
         if found:
             number = int(found.group(1))
-            marked.append((None, line))
+            marks.append((None, line))
         elif line[:1] not in (' ', '+', '-', '\\'):
             # Every line in a hunk starts with one of those, so this one starts the next file's header.
             number = None
-            marked.append((None, line))
+            marks.append((None, line))
         elif number is None:
-            marked.append((None, line))
+            marks.append((None, line))
         elif line[:1] in (' ', '+'):
-            marked.append((number, line))
+            marks.append((number, line))
             number += 1
         else:
-            marked.append(('', line))
-    width = max((len(str(n)) for n, _ in marked if n), default=0)
-    return [line if n is None else f'{n:>{width}} {line}' for n, line in marked]
+            marks.append(('', line))
+    return marks
+
+
+def numbered(diff):
+    """A diff's lines, with each line in a hunk that the head has led by its line number there, and every other line
+    in a hunk led by blanks, so the agent copies a line number instead of counting. The header and hunk lines stay
+    as git wrote them."""
+    marks = marked(diff)
+    width = max((len(str(n)) for n, _ in marks if n), default=0)
+    return [line if n is None else f'{n:>{width}} {line}' for n, line in marks]
 
 
 def git(*args):
@@ -207,13 +220,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base', required=True, help='the commit the reviewed change starts from')
     parser.add_argument('--head', required=True, help='the commit that is reviewed')
-    parser.add_argument('command', nargs='?', choices=['changed'],
-                        help="print what the changed tool returns and stop, for the summary to tell which paths' "
-                             'diffs no agent read')
+    parser.add_argument('command', nargs='?', choices=['changed', 'shown'],
+                        help="print what the changed tool returns, for the report to tell which paths' diffs no "
+                             'agent read, or as JSON the head lines each diff shows, for new threads to be left on, '
+                             'and stop')
     args = parser.parse_args()
     change = Change(args.base, args.head)
-    if args.command:
+    if args.command == 'changed':
         print(change.changed(), end='')
+        return
+    if args.command == 'shown':
+        print(json.dumps(change.shown()))
         return
     for line in sys.stdin:
         message = json.loads(line)
