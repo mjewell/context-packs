@@ -49,11 +49,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pr', type=int, required=True, help='the PR number')
     parser.add_argument('--report', type=Path, required=True, help="the find job's report, from report.py")
-    parser.add_argument('--match', type=Path, required=True, help="the match job's pairs, from pairing.py check")
+    parser.add_argument('--match', type=Path, required=True, help="the match job's pairs and commentary, from pairing.py")
     args = parser.parse_args()
     report = json.loads(args.report.read_text(encoding='utf-8'))
-    threads = {pair['finding']: pair['thread'] for pair in json.loads(args.match.read_text(encoding='utf-8'))['pairs']}
-    report['findings'] = [{**finding, 'thread': threads.get(n)} for n, finding in enumerate(report['findings'])]
+    matched = json.loads(args.match.read_text(encoding='utf-8'))
+    threads = {pair['finding']: pair['thread'] for pair in matched['pairs']}
+    commentary = {item['finding']: item['text'] for item in matched['commentary']}
+    report['findings'] = [{**finding, 'thread': threads.get(n), 'commentary': commentary.get(n)}
+                          for n, finding in enumerate(report['findings'])]
     pr = github.pull_request(args.pr)
     if pr['headRefOid'] != report['head']:
         print(f'pack-review: the PR moved on to {pr["headRefOid"]} since this review of {report["head"]}, so it posts '
