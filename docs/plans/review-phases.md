@@ -75,7 +75,7 @@ Each step leaves a working review, is written test-first, and adds its reasons t
 
 - [x] 1. The git server, wired into today's single job through `args.py`. `diff.patch` and `log.txt` are dropped, and the summary lists the diffs no agent read.
 - [x] 2. Split the workflow into find and post jobs, with the findings passed as an artifact.
-- [ ] 3. `trust.py`, with tests on GitHub-shaped API answers.
+- [x] 3. `trust.py`, with tests on GitHub-shaped API answers.
 - [ ] 4. The match job's pairing, with each finding's thread going into the summary only.
 - [ ] 5. The match job's commentary, going into the summary only.
 - [ ] 6. Posting the review: new threads, and replies as the table above says.
