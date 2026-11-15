@@ -29,6 +29,15 @@ def compact(value):
     return json.dumps(value, separators=(',', ':')).replace("'", '\\u0027')
 
 
+def line(values):
+    """The values as one claude_args line, each quoted whole. A value holding a single quote stops the run, since
+    claude-code-action may split it."""
+    quoted = [value for value in values if "'" in value]
+    if quoted:
+        sys.exit(f'pack-review: these arguments hold a single quote, which claude-code-action may split: {quoted}')
+    return ' '.join(shlex.quote(value) for value in values)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--inputs', required=True, help='the folder holding docs.txt')
@@ -44,10 +53,7 @@ def main():
               '--disallowedTools', 'Read(./.git/**)', '--settings', compact(SETTINGS),
               *(['--model', args.model] if args.model else []), '--mcp-config', compact(servers), '--restricted',
               '--strict-mcp-config']
-    quoted = [value for value in values if "'" in value]
-    if quoted:
-        sys.exit(f'pack-review: these arguments hold a single quote, which claude-code-action may split: {quoted}')
-    print(' '.join(shlex.quote(value) for value in values))
+    print(line(values))
 
 
 if __name__ == '__main__':

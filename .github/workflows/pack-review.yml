@@ -25,8 +25,23 @@ jobs:
       - uses: ./review/find
         with:
           claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-  post:
+  match:
     needs: find
+    runs-on: ubuntu-latest
+    # The pairing agent's job reads pack-review's threads and can't write. contents: read is only for the checkout,
+    # which this repo needs to pair with the PR's own match action.
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: ./review/match
+        with:
+          claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+  post:
+    needs: [find, match]
     runs-on: ubuntu-latest
     # Two posts at once could each find no summary and add one, so they wait their turn.
     concurrency:

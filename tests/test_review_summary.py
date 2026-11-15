@@ -31,9 +31,11 @@ class SummaryCase(ReviewCase):
         super().setUp()
         self.github.responses.update({'PullRequest': pull_request(), 'AddComment': ok({}), 'UpdateComment': ok({})})
 
-    def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', docs=(), messages=(), changed=()):
-        """Post the summary of the agent's output, with docs as `context-packs docs` lists them, each pack a list, and
-        changed as the git server's changed tool lists the paths, each a (lines, path) pair."""
+    def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', docs=(), messages=(), changed=(),
+                  pairs=()):
+        """Post the summary of the agent's output, with docs as `context-packs docs` lists them, each pack a list,
+        changed as the git server's changed tool lists the paths, each a (lines, path) pair, and pairs as the match job
+        checked them."""
         (self.root / 'output.json').write_text(
             output if output is not None else json.dumps({'findings': list(findings)}))
         for path in (path for pack in docs for path in pack):
@@ -45,7 +47,8 @@ class SummaryCase(ReviewCase):
         report = self.report(base_ref, head)
         if report.returncode:
             return report
-        post = self.script('summary', '--pr', 7, '--report', 'report.json')
+        (self.root / 'match.json').write_text(json.dumps({'pairs': list(pairs)}))
+        post = self.script('summary', '--pr', 7, '--report', 'report.json', '--match', 'match.json')
         post.stdout = report.stdout + post.stdout
         return post
 
@@ -79,9 +82,16 @@ class SummaryTests(SummaryCase):
         self.assertIn("pack-review checked `hhhhhhh` against this repo's context packs and found 2 deviations, "
                       '1 conflict, 3 uncovered choices.', body)
         self.assertIn('run `/pack-review o/r#7` in Claude Code', body)
-        self.assertEqual(block(body)[0], {'base': BASE, 'base_ref': 'main', 'head': HEAD, 'findings': findings,
+        self.assertEqual(block(body)[0], {'base': BASE, 'base_ref': 'main', 'head': HEAD,
+                                          'findings': [{**f, 'thread': None} for f in findings],
                                           'unread': [], 'unread_diffs': []})
         self.assertNotIn('skipped', body)
+
+    def test_names_the_thread_each_paired_finding_continues(self):
+        self.summarize([finding(headline='One'), finding(headline='Two')], pairs=[{'finding': 1, 'thread': 'T_1'}])
+
+        found, _ = block(self.body())
+        self.assertEqual([(f['headline'], f['thread']) for f in found['findings']], [('One', None), ('Two', 'T_1')])
 
     def test_says_when_it_found_nothing(self):
         self.summarize([])

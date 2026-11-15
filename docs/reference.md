@@ -172,8 +172,17 @@ jobs:
       - uses: mjewell/context-packs/review/find@main
         with:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
-  post:
+  match:
     needs: find
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: mjewell/context-packs/review/match@main
+        with:
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+  post:
+    needs: [find, match]
     runs-on: ubuntu-latest
     concurrency:
       group: pack-review-post-${{ github.event.pull_request.number }}
@@ -183,11 +192,11 @@ jobs:
       - uses: mjewell/context-packs/review/post@main
 ```
 
-The agent runs in the `find` job, whose token can only read the repo. The `post` job runs no agent, and only it can write to the PR. Keep each job's `permissions` as shown: GitHub enforces them, whatever the agent's tools allow. The `find` job hands its findings to `post` as the artifact `pack-review-report`, kept for a day.
+The review agent runs in the `find` job, whose token can only read the repo. The `match` job pairs each finding with the thread pack-review opened for it on an earlier run, if any. Its agent gets only the findings' text, so no comment can change which thread a finding lands in. The `post` job runs no agent, and only it can write to the PR. Keep each job's `permissions` as shown: GitHub enforces them, whatever the agents' tools allow. The jobs hand their results on as the artifacts `pack-review-report` and `pack-review-match`, kept for a day.
 
 With a Pro or Max subscription instead of an API key, run `claude setup-token` locally, add what it prints as the secret `CLAUDE_CODE_OAUTH_TOKEN`, and pass `claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}` in place of `anthropic-api-key`. Reviews then count against the subscription's usage limits.
 
-It reviews a PR when it's opened or marked ready, again on each push, and again when its base branch changes. A newer push cancels a review still running. Pin `@main` to a release tag once you've tried it. Pass `model` to `review/find` to review with a model other than Claude Code's default.
+It reviews a PR when it's opened or marked ready, again on each push, and again when its base branch changes. A newer push cancels a review still running. Pin `@main` to a release tag once you've tried it. Pass `model` to `review/find` or `review/match` to use a model other than Claude Code's default.
 
 Each review posts **one summary comment**, edited on each run. It counts the findings, and ends with every finding as JSON in a `<details>` block for the local run. A step after the agent writes it from the agent's answer. A run that fails posts nothing and leaves the last summary, which names the commit and base branch it reviewed. If no agent read some doc the tables point at in full, the summary lists it, as a partial review. It comments nothing on the diff.
 
