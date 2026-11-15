@@ -32,7 +32,7 @@ class SummaryCase(ReviewCase):
         self.github.responses.update({'PullRequest': pull_request(), 'AddComment': ok({}), 'UpdateComment': ok({})})
 
     def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', docs=(), messages=(), changed=(),
-                  pairs=()):
+                  pairs=(), commentary=()):
         """Post the summary of the agent's output, with docs as `context-packs docs` lists them, each pack a list,
         changed as the git server's changed tool lists the paths, each a (lines, path) pair, and pairs as the match job
         checked them."""
@@ -47,7 +47,7 @@ class SummaryCase(ReviewCase):
         report = self.report(base_ref, head)
         if report.returncode:
             return report
-        (self.root / 'match.json').write_text(json.dumps({'pairs': list(pairs)}))
+        (self.root / 'match.json').write_text(json.dumps({'pairs': list(pairs), 'commentary': list(commentary)}))
         post = self.script('summary', '--pr', 7, '--report', 'report.json', '--match', 'match.json')
         post.stdout = report.stdout + post.stdout
         return post
@@ -83,7 +83,7 @@ class SummaryTests(SummaryCase):
                       '1 conflict, 3 uncovered choices.', body)
         self.assertIn('run `/pack-review o/r#7` in Claude Code', body)
         self.assertEqual(block(body)[0], {'base': BASE, 'base_ref': 'main', 'head': HEAD,
-                                          'findings': [{**f, 'thread': None} for f in findings],
+                                          'findings': [{**f, 'thread': None, 'commentary': None} for f in findings],
                                           'unread': [], 'unread_diffs': []})
         self.assertNotIn('skipped', body)
 
@@ -92,6 +92,13 @@ class SummaryTests(SummaryCase):
 
         found, _ = block(self.body())
         self.assertEqual([(f['headline'], f['thread']) for f in found['findings']], [('One', None), ('Two', 'T_1')])
+
+    def test_gives_each_finding_its_commentary(self):
+        self.summarize([finding(headline='One'), finding(headline='Two')], pairs=[{'finding': 1, 'thread': 'T_1'}],
+                       commentary=[{'finding': 1, 'text': 'Alice says it is deliberate.'}])
+
+        found, _ = block(self.body())
+        self.assertEqual([f['commentary'] for f in found['findings']], [None, 'Alice says it is deliberate.'])
 
     def test_says_when_it_found_nothing(self):
         self.summarize([])
