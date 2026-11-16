@@ -21,11 +21,22 @@ SUBMIT_REVIEW = '''mutation SubmitReview($input: SubmitPullRequestReviewInput!) 
   submitPullRequestReview(input: $input) { pullRequestReview { id } } }'''
 
 
+STILL_FOUND = 'still found'
+
+
+def told(thread):
+    """Whether pack-review's last word in the thread is already that its finding is still found. Its bodyText drops the
+    code spans, so it reads "🤖 still found <sha>"."""
+    last = thread['comments'][-1]
+    return bool(last.get('ours')) and last['text'].startswith(f'🤖 {STILL_FOUND}')
+
+
 def reply(head, resolved, commentary):
-    """The reply in a thread whose finding the review still finds, or None when it has nothing to say."""
+    """The reply in a thread whose finding the review still finds, or None when it has nothing to say. It leads with
+    the commit as a tag, and `still found` before it when the thread was resolved."""
+    lead = f'`{STILL_FOUND}` `{head[:7]}`' if resolved else f'`{head[:7]}`'
     if commentary is None:
-        return github.signed(f'The review still finds this at `{head[:7]}`.') if resolved else None
-    lead = f'The review still finds this at `{head[:7]}`.' if resolved else f'At `{head[:7]}`:'
+        return github.signed(lead) if resolved else None
     return github.signed(f'{lead}\n\n{finding_comment.quoted(commentary)}')
 
 
@@ -46,7 +57,9 @@ def planned(report, matched, threads):
                             'body': finding_comment.body(finding, head)})
             continue
         thread = pairs[n]
-        body = reply(head, threads[thread]['resolved'], commentary.get(n))
+        # A resolved thread hears its finding is still found once, until someone comments after that.
+        resolved = threads[thread]['resolved'] and not told(threads[thread])
+        body = reply(head, resolved, commentary.get(n))
         if body is not None:
             replies[thread] = body
     return new, replies

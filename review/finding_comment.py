@@ -5,7 +5,8 @@ import re
 
 import github
 
-NAMES = {'deviates': 'a deviation', 'conflicting': 'a conflict', 'uncovered': 'an uncovered choice'}
+# Each kind's label, set in code like the commit's, so both read as tags at the start of the comment.
+LABELS = {'deviates': 'deviation', 'conflicting': 'conflict', 'uncovered': 'uncovered choice'}
 # A GitHub mention: a login, or an org's team, after an @ that doesn't end a word, as in an email address.
 MENTION = re.compile(r'(?<![\w`])@[A-Za-z0-9][A-Za-z0-9-]*(?:/[A-Za-z0-9_.-]+)?')
 
@@ -23,8 +24,7 @@ def quoted(text):
 
 def body(finding, head):
     """The comment that opens a thread for the finding: what it is, the rules it quotes, and the take."""
-    parts = [f"pack-review found {NAMES[finding['kind']]} here at `{head[:7]}`: "
-             f"**{defused(finding['headline'])}**"]
+    parts = [f"`{LABELS[finding['kind']]}` `{head[:7]}` **{defused(finding['headline'])}**"]
     parts += [f"From `{defused(rule['file'])}`:\n\n{quoted(rule['quote'])}" for rule in finding['rules']]
     parts.append(defused(finding['take']))
     return github.signed('\n\n'.join(parts))

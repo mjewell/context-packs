@@ -1,5 +1,6 @@
 import json
 import re
+import subprocess
 
 from review_case import ReviewCase
 
@@ -9,18 +10,20 @@ def finding(headline, path='src/sim.ts', line=42, kind='deviates'):
             'deliberate': [], 'exemplars': [], 'take': 'Move it to content.'}
 
 
-def opened(id, found, replies=(), resolved=False):
+def opened(id, found, replies=(), resolved=False, commit='c' * 40):
     """A pack-review thread as threads.py prints it: its first comment's text is GitHub's bodyText of the comment
-    that opened it, which says what the finding is."""
+    that opened it, which says what the finding is, and commit is the one it was made at."""
     first = {'id': f'{id}_c', 'author': 'github-actions', 'at': '2026-11-01T10:00:00Z',
-             'text': f"pack-review found a deviation here at abc1234: {found['headline']}\n{found['take']}"}
+             'text': f"pack-review found a deviation here at abc1234: {found['headline']}\n{found['take']}",
+             'ours': True, 'commit': commit}
     return {'id': id, 'path': found['spots'][0]['path'], 'line': found['spots'][0]['line'], 'resolved': resolved,
             'comments': [first, *replies]}
 
 
 F1 = finding('A game number in sim code')
 F3 = finding('A second RNG', path='src/rng.ts', line=17)
-ALICE = {'id': 'RC_2', 'author': 'alice', 'at': '2026-11-02T10:00:00Z', 'text': 'Kept on purpose: the balance spec.'}
+ALICE = {'id': 'RC_2', 'author': 'alice', 'at': '2026-11-02T10:00:00Z', 'text': 'Kept on purpose: the balance spec.',
+         'ours': False, 'commit': 'c' * 40}
 
 
 class MatchCase(ReviewCase):
@@ -33,8 +36,8 @@ class MatchCase(ReviewCase):
         self.output.write_text('')
         self.env['GITHUB_OUTPUT'] = str(self.output)
 
-    def given(self, findings, threads):
-        (self.root / 'report.json').write_text(json.dumps({'base': 'b' * 40, 'base_ref': 'main', 'head': 'h' * 40,
+    def given(self, findings, threads, head='h' * 40):
+        (self.root / 'report.json').write_text(json.dumps({'base': 'b' * 40, 'base_ref': 'main', 'head': head,
                                                            'findings': findings, 'unread': [],
                                                            'unread_diffs': []}))
         (self.root / 'threads.json').write_text(json.dumps(threads))
@@ -136,17 +139,39 @@ class CheckTests(MatchCase):
 
 
 BOB = {'id': 'RC_3', 'hidden': 'author lacks write access'}
-EARLIER = {'id': 'RC_4', 'author': 'github-actions', 'at': '2026-11-03T10:00:00Z',
-           'text': 'Alice says this is deliberate, per the balance spec.'}
+SIM = ''.join(f'l{n}\n' for n in range(1, 51))
 
 
 class CommentCase(MatchCase):
-    """The match job after pairing: F1 continues T1, where Alice explained it and Bob, who can't write, replied."""
+    """The match job after pairing, in a checkout: F1, on src/sim.ts:42, continues T1, which pack-review opened at
+    one commit. The head is a later commit."""
 
     def setUp(self):
         super().setUp()
-        self.given([F1, F3], [opened('T_1', F1, replies=[ALICE, BOB]), opened('T_2', finding('Old'), resolved=True)])
+        for args in (['init', '-q', '-b', 'main'], ['config', 'user.name', 'Test'],
+                     ['config', 'user.email', 'test@example.com']):
+            self.git(*args)
+        (self.root / 'src').mkdir()
+        self.opened_at = self.commit({'src/sim.ts': SIM})
+        self.thread([ALICE, BOB])
         (self.root / 'match.json').write_text(json.dumps({'pairs': [{'finding': 0, 'thread': 'T_1'}]}))
+
+    def git(self, *args):
+        return subprocess.run(['git', *args], cwd=self.root, capture_output=True, text=True, check=True).stdout.strip()
+
+    def commit(self, files):
+        for path, text in files.items():
+            (self.root / path).write_text(text)
+            self.git('add', '--', path)
+        self.git('commit', '-q', '-m', 'Change')
+        return self.git('rev-parse', 'HEAD')
+
+    def thread(self, replies, head=None, commit=None):
+        """T1, with replies after pack-review's first comment, and F1 reviewed at head: by default, a later commit that
+        changes another file."""
+        head = head or self.commit({'other.txt': f'{len(replies)} {commit}\n'})
+        self.given([F1, F3], [opened('T_1', F1, replies=replies, commit=commit or self.opened_at),
+                              opened('T_2', finding('Old'), resolved=True)], head=head)
 
     def comment_prompt(self):
         run = self.script('pairing', 'comment-prompt', '--report', 'report.json', '--threads', 'threads.json',
@@ -164,24 +189,52 @@ class CommentCase(MatchCase):
 
 
 class CommentPromptTests(CommentCase):
-    """The commentary agent gets each paired finding with its thread's replies as trust.py filters them."""
+    """The commentary agent gets a paired finding only when something is new in its thread since pack-review last
+    commented there, so a re-run with nothing new stays quiet whatever the agent would say."""
 
-    def test_gives_each_paired_finding_with_its_threads_replies(self):
+    def test_gives_a_paired_finding_whose_thread_has_a_new_reply_and_says_why(self):
         prompt = self.comment_prompt()['prompt']
 
         self.assertIn('A game number in sim code', prompt)
         self.assertIn('Kept on purpose: the balance spec.', prompt)
-        self.assertIn('alice', prompt)
         self.assertIn('author lacks write access', prompt)
+        self.assertIn('What is new: a reply from alice.', prompt)
         self.assertNotIn('A second RNG', prompt)
         self.assertNotIn('Old', prompt)
 
-    def test_gives_pack_reviews_earlier_replies_so_it_doesnt_repeat_them(self):
-        threads = json.loads((self.root / 'threads.json').read_text())
-        threads[0]['comments'].append(EARLIER)
-        (self.root / 'threads.json').write_text(json.dumps(threads))
+    def test_stays_quiet_when_pack_review_answered_every_reply_and_nothing_changed(self):
+        answered = {'id': 'RC_4', 'author': 'github-actions', 'at': '2026-11-03T10:00:00Z',
+                    'text': 'Alice says this is deliberate.', 'ours': True, 'commit': self.opened_at}
+        self.thread([ALICE, BOB, answered])
 
-        self.assertIn('Alice says this is deliberate', self.comment_prompt()['prompt'])
+        self.assertEqual(self.comment_prompt()['needed'], 'false')
+
+    def test_doesnt_count_a_reply_it_cant_read(self):
+        self.thread([BOB])
+
+        self.assertEqual(self.comment_prompt()['needed'], 'false')
+
+    def test_gives_a_paired_finding_whose_lines_changed_since_pack_reviews_last_comment(self):
+        head = self.commit({'src/sim.ts': SIM.replace('l42\n', 'forty-two\n')})
+        self.thread([], head=head)
+
+        prompt = self.comment_prompt()['prompt']
+
+        self.assertIn(f'What is new: src/sim.ts:42 changed since {self.opened_at[:7]}.', prompt)
+
+    def test_stays_quiet_when_only_other_lines_of_the_file_changed(self):
+        head = self.commit({'src/sim.ts': SIM.replace('l5\n', 'five\n')})
+        self.thread([], head=head)
+
+        self.assertEqual(self.comment_prompt()['needed'], 'false')
+
+    def test_gives_a_paired_finding_when_pack_reviews_last_commit_is_gone_from_the_history(self):
+        self.thread([], commit='f' * 40)
+
+        prompt = self.comment_prompt()['prompt']
+
+        self.assertIn(f"What is new: pack-review last commented at {'f' * 7}, which is no longer in the history.",
+                      prompt)
 
     def test_runs_the_agent_with_only_the_tool_that_returns_its_answer_and_the_commentary_schema(self):
         args = self.comment_prompt()['claude-args']

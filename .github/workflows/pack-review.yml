@@ -60,8 +60,8 @@ jobs:
   match:
     needs: merge
     runs-on: ubuntu-latest
-    # The pairing agent's job reads pack-review's threads and can't write. contents: read is only for the checkout,
-    # which this repo needs to pair with the PR's own match action.
+    # The match job's agents read pack-review's threads and can't write. The checkout, with its history, tells which
+    # of a finding's lines changed since pack-review last commented on it.
     permissions:
       contents: read
       pull-requests: read
@@ -69,6 +69,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
       - uses: ./review/match
         with:
           claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

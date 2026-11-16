@@ -80,12 +80,13 @@ def pull_request(comments=(), more=False, head='h' * 40, base_ref='main'):
 
 
 def said(text, author='alice', id='C_1', body=None, mine=False, minimized=False, bot=False,
-         at='2026-11-01T10:00:00Z'):
-    """A comment or review as GitHub's GraphQL API returns one: text is its bodyText, and body its Markdown, the same
-    unless given. author None is a deleted account, which GitHub returns as no author."""
+         at='2026-11-01T10:00:00Z', commit='c' * 40):
+    """A review comment as GitHub's GraphQL API returns one: text is its bodyText, and body its Markdown, the same
+    unless given. author None is a deleted account, which GitHub returns as no author. commit is the one it was made
+    at."""
     return {'id': id, 'author': None if author is None else {'login': author, '__typename': 'Bot' if bot else 'User'},
             'createdAt': at, 'body': text if body is None else body, 'bodyText': text, 'viewerDidAuthor': mine,
-            'isMinimized': minimized}
+            'isMinimized': minimized, 'originalCommit': {'oid': commit}}
 
 
 def thread(id, comments, path='src/a.py', line=3, resolved=False, more=False, end=None):

@@ -12,10 +12,10 @@ def pr(head=HEAD, base_ref='main'):
     return ok({'repository': {'pullRequest': {'id': 'PR_1', 'headRefOid': head, 'baseRefName': base_ref}}})
 
 
-def thread(id, resolved=False):
-    """A pack-review thread as GitHub's GraphQL API returns it."""
+def thread(id, resolved=False, replies=()):
+    """A pack-review thread as GitHub's GraphQL API returns it: the comment pack-review opened it with, then replies."""
     return {'id': id, 'path': 'src/sim.ts', 'line': 42, 'isResolved': resolved,
-            'comments': connection([ours(id=f'{id}_c')])}
+            'comments': connection([ours(id=f'{id}_c'), *replies])}
 
 
 class PostCase(ReviewCase):
@@ -76,7 +76,7 @@ class NewThreadTests(PostCase):
 
         added, _ = self.review()
         self.assertEqual(added['threads'][0]['body'],
-                         '🤖 pack-review found a deviation here at `hhhhhhh`: **A game number in sim code**\n\n'
+                         '🤖 `deviation` `hhhhhhh` **A game number in sim code**\n\n'
                          'From `AGENTS.md`:\n\n> Game numbers live in content.\n\n'
                          'Move it to content.\n\n' + MARKER)
 
@@ -118,8 +118,16 @@ class PairedTests(PostCase):
         added, replies = self.review()
         self.assertEqual(added['threads'], [])
         body = replies['T_1']['body']
-        self.assertTrue(body.startswith('🤖 The review still finds this at `hhhhhhh`.'), body)
+        self.assertEqual(body, f'🤖 `still found` `hhhhhhh`\n\n{MARKER}')
         self.assertTrue(body.endswith(MARKER))
+
+    def test_says_still_found_once_while_the_thread_stays_resolved(self):
+        self.threads(thread('T_1', resolved=True, replies=[ours('🤖 still found 1234567', id='RC_8')]))
+
+        result = self.post([F1], [None], pairs=[{'finding': 0, 'thread': 'T_1'}])
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.github.writes(), [])
 
     def test_stops_on_a_pair_with_a_thread_that_isnt_pack_reviews_on_this_pr(self):
         self.threads(thread('T_1'))
@@ -158,11 +166,11 @@ class CommentaryTests(PostCase):
 
     def test_replies_with_the_commentary_on_an_open_thread(self):
         self.assertEqual(self.reply('Alice says this is deliberate, per the balance spec.'),
-                         f'🤖 At `hhhhhhh`:\n\n> Alice says this is deliberate, per the balance spec.\n\n{MARKER}')
+                         f'🤖 `hhhhhhh`\n\n> Alice says this is deliberate, per the balance spec.\n\n{MARKER}')
 
     def test_says_a_resolved_thread_is_still_found_before_the_commentary(self):
         self.assertEqual(self.reply('Alice said it was fixed in abc1234.', resolved=True),
-                         '🤖 The review still finds this at `hhhhhhh`.\n\n> Alice said it was fixed in abc1234.'
+                         '🤖 `still found` `hhhhhhh`\n\n> Alice said it was fixed in abc1234.'
                          f'\n\n{MARKER}')
 
     def test_quotes_every_line(self):
