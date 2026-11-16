@@ -21,7 +21,7 @@ CLAUSE = ('The paths in these tables start from the repo root. '
 OUTSIDE_CLAUSE = "Look for a path a doc names in the doc's folder first, then from the folder the session started in. "
 HEADER = ('## Context Packs\n\n'
           'Context packs bring shared rules and docs in from elsewhere. Each pack has its pack rules and a table of its '
-          'context docs here, and a doc may hold a table of its own. Before starting work that a row in any of these '
+          'pack docs here, and a doc may hold a table of its own. Before starting work that a row in any of these '
           f'tables matches, read its doc. {CLAUSE}The packs here, and everything under `context-packs/gen/`, are '
           'generated from `context-packs/`: change them there, never here.\n')
 
