@@ -1,8 +1,11 @@
 name: pack-review find
-description: Review a PR against the repo's context packs with claude-code-action, and save what it finds as the artifact pack-review-report, for the post action to post. Run it in a job with only contents read.
+description: Check a PR against one unit of the repo's context packs with claude-code-action, and save the finder's answer and what it read as the artifact pack-review-unit-<unit>, for the merge action. Run it in a job with only contents read, once per unit the units action lists.
 inputs:
+  unit:
+    description: The unit's number, from the units action.
+    required: true
   anthropic-api-key:
-    description: An Anthropic API key for the review agent. Pass this or claude-code-oauth-token.
+    description: An Anthropic API key for the finder. Pass this or claude-code-oauth-token.
     required: false
     default: ''
   claude-code-oauth-token:
@@ -10,7 +13,7 @@ inputs:
     required: false
     default: ''
   model:
-    description: The model to review with, if not Claude Code's default.
+    description: The model to check with, if not Claude Code's default.
     required: false
     default: ''
 runs:
@@ -25,28 +28,25 @@ runs:
           echo "::error::The PR's head, $HEAD, isn't checked out. Check out with ref: \${{ github.event.pull_request.head.sha }}."
           exit 1
         fi
-    - name: Prepare the review
+    - name: Prepare the finder
       id: prepare
       shell: bash
       env:
         BASE: ${{ github.event.pull_request.base.sha }}
         HEAD: ${{ github.event.pull_request.head.sha }}
         MODEL: ${{ inputs.model }}
-      # The agent reads the change through the git server, which args.py sets up for the base and head. docs.txt lists
-      # every doc the tables point at, by pack, for the skill to give each pack's docs to its own subagent. changed.txt
-      # lists the changed paths as the server's changed tool does, for the summary to tell which diffs no agent read.
-      # The lines each diff shows go outside the agent's folder, for the report to pick where each new thread opens.
-      # Both are in a new folder outside the checkout, so no path the PR controls, such as a symlink, decides where
-      # they're written.
+        UNIT: ${{ inputs.unit }}
+      # The finder's prompt holds its unit's docs, and it reads the change through the git server. docs.txt and
+      # changed.txt are for the record of what it read. They go in a new folder outside the checkout, so no path the PR
+      # controls, such as a symlink, decides where they're written.
       run: |
         inputs=$(mktemp -d "$RUNNER_TEMP/pack-review.XXXXXX")
         echo "inputs=$inputs" >> "$GITHUB_OUTPUT"
         python3 "$GITHUB_ACTION_PATH/../../src/cli.py" docs > "$inputs/docs.txt"
         python3 "$GITHUB_ACTION_PATH/../git_server.py" --base "$BASE" --head "$HEAD" changed > "$inputs/changed.txt"
-        python3 "$GITHUB_ACTION_PATH/../git_server.py" --base "$BASE" --head "$HEAD" shown > "$RUNNER_TEMP/pack-review-shown.json"
-        echo "claude-args=$(python3 "$GITHUB_ACTION_PATH/../args.py" --inputs "$inputs" --base "$BASE" --head "$HEAD" \
-          --model "$MODEL")" >> "$GITHUB_OUTPUT"
-    - name: Review
+        python3 "$GITHUB_ACTION_PATH/../units.py" prompt --docs "$inputs/docs.txt" --unit "$UNIT" --base "$BASE" \
+          --head "$HEAD" --model "$MODEL"
+    - name: Check the unit
       id: review
       # v1.0.268, pinned by commit since a tag can move.
       uses: anthropics/claude-code-action@c0949c50a78c1ec8ce2647db36629b870e715d0c
@@ -55,38 +55,33 @@ runs:
         anthropic_api_key: ${{ inputs.anthropic-api-key }}
         claude_code_oauth_token: ${{ inputs.claude-code-oauth-token }}
         github_token: ${{ github.token }}
-        prompt: /context-packs:pack-findings ci ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} ${{ steps.prepare.outputs.inputs }}
+        prompt: ${{ steps.prepare.outputs.prompt }}
         claude_args: ${{ steps.prepare.outputs.claude-args }}
-    - name: Show what the agent did
+    - name: Show what the finder did
       if: always() && steps.review.outputs.execution_file != ''
       shell: bash
       env:
         TRANSCRIPT: ${{ steps.review.outputs.execution_file }}
       run: python3 "$GITHUB_ACTION_PATH/../transcript.py" --file "$TRANSCRIPT"
-    - name: Write the report
+    - name: Write the record
       shell: bash
       env:
         FINDINGS: ${{ steps.review.outputs.structured_output }}
-        BASE: ${{ github.event.pull_request.base.sha }}
-        BASE_REF: ${{ github.event.pull_request.base.ref }}
-        HEAD: ${{ github.event.pull_request.head.sha }}
         INPUTS: ${{ steps.prepare.outputs.inputs }}
         TRANSCRIPT: ${{ steps.review.outputs.execution_file }}
-      # The report lists the docs no agent read in full, from the transcript, so a review that skipped one is posted
-      # as partial. It also lists the changed paths whose diff no agent read, which doesn't make it partial. The
-      # transcript can hold file contents, so it stays in this job, and only the report goes on.
+        UNIT: ${{ inputs.unit }}
+      # The transcript can hold file contents, so it stays in this job, and only the record goes on.
       run: |
         printf '%s' "$FINDINGS" > "$RUNNER_TEMP/pack-review-findings.json"
-        mkdir "$RUNNER_TEMP/pack-review-report"
-        python3 "$GITHUB_ACTION_PATH/../report.py" --base "$BASE" --base-ref "$BASE_REF" --head "$HEAD" \
-          --findings "$RUNNER_TEMP/pack-review-findings.json" --transcript "$TRANSCRIPT" --docs "$INPUTS/docs.txt" \
-          --changed "$INPUTS/changed.txt" --shown "$RUNNER_TEMP/pack-review-shown.json" \
-          --out "$RUNNER_TEMP/pack-review-report/report.json"
-    - name: Save the report
+        mkdir "$RUNNER_TEMP/pack-review-unit"
+        python3 "$GITHUB_ACTION_PATH/../unit_report.py" --unit "$UNIT" --docs "$INPUTS/docs.txt" \
+          --findings "$RUNNER_TEMP/pack-review-findings.json" --transcript "$TRANSCRIPT" \
+          --changed "$INPUTS/changed.txt" --out "$RUNNER_TEMP/pack-review-unit/unit-$UNIT.json"
+    - name: Save the record
       # v7.0.2, pinned by commit since a tag can move.
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:
-        name: pack-review-report
-        path: ${{ runner.temp }}/pack-review-report/report.json
+        name: pack-review-unit-${{ inputs.unit }}
+        path: ${{ runner.temp }}/pack-review-unit/unit-${{ inputs.unit }}.json
         if-no-files-found: error
         retention-days: 1

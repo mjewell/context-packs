@@ -3,17 +3,36 @@ on:
   pull_request:
     types: [opened, reopened, ready_for_review, synchronize, edited]
 jobs:
-  find:
+  units:
     # Drafts wait until they're ready. PRs from forks get no secrets, so they're skipped. An edit reviews again only
     # when it changed the base branch, so the findings match the new diff.
     if: >-
       ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository
       && (github.event.action != 'edited' || github.event.changes.base.ref.from) }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      units: ${{ steps.units.outputs.units }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      # The actions from this checkout, unlike the reference's @main, so a PR that changes them reviews with its change.
+      - id: units
+        uses: ./review/units
+  find:
+    needs: units
+    runs-on: ubuntu-latest
+    # One finder per unit, started by the workflow, so no agent decides whether a unit is worth checking. A newer push
+    # cancels the same unit's finder still running, and with it the merge that waits on it.
+    strategy:
+      matrix:
+        unit: ${{ fromJSON(needs.units.outputs.units) }}
     concurrency:
-      group: pack-review-find-${{ github.event.pull_request.number }}
+      group: pack-review-find-${{ github.event.pull_request.number }}-${{ matrix.unit }}
       cancel-in-progress: true
-    # The agent's job reads the repo and nothing else, so GitHub, not its tool list, keeps it from writing.
+    # The finders read the repo and nothing else, so GitHub, not their tool lists, keeps them from writing.
     permissions:
       contents: read
     steps:
@@ -21,12 +40,25 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      # The action from this checkout, unlike the reference's @main, so a PR that changes it reviews with its change.
       - uses: ./review/find
+        with:
+          unit: ${{ matrix.unit }}
+          claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+  merge:
+    needs: find
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: ./review/merge
         with:
           claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
   match:
-    needs: find
+    needs: merge
     runs-on: ubuntu-latest
     # The pairing agent's job reads pack-review's threads and can't write. contents: read is only for the checkout,
     # which this repo needs to pair with the PR's own match action.
@@ -41,7 +73,7 @@ jobs:
         with:
           claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
   post:
-    needs: [find, match]
+    needs: [merge, match]
     runs-on: ubuntu-latest
     # Two posts at once could each find no summary and add one, so they wait their turn.
     concurrency:

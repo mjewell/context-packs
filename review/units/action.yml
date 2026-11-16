@@ -1,0 +1,15 @@
+name: pack-review units
+description: List the review's units, the instruction file and then each pack's docs, as the output units, a JSON list of their numbers for a matrix that starts one finder each. Run it in a job with only contents read.
+outputs:
+  units:
+    description: The units' numbers, as a JSON list.
+    value: ${{ steps.list.outputs.units }}
+runs:
+  using: composite
+  steps:
+    - name: List the units
+      id: list
+      shell: bash
+      run: |
+        python3 "$GITHUB_ACTION_PATH/../../src/cli.py" docs > "$RUNNER_TEMP/pack-review-docs.txt"
+        python3 "$GITHUB_ACTION_PATH/../units.py" list --docs "$RUNNER_TEMP/pack-review-docs.txt"

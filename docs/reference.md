@@ -144,7 +144,7 @@ Prompts close to a row's `when` that shouldn't match it, or that match only thro
 
 ## Reviewing PRs in CI
 
-The `review/find` action runs the `pack-findings` skill on a PR with [claude-code-action](https://github.com/anthropics/claude-code-action), and the `review/post` action posts what it finds. The author then goes through the findings in a local session. Add a workflow such as `.github/workflows/pack-review.yml`:
+The review runs as five jobs, each a composite action under `review/`. One finder per unit of your packs checks the PR, an agent merges what they found, the merged findings are paired with pack-review's threads from earlier runs, and a script posts the review. The author then goes through the findings in a local session. Add a workflow such as `.github/workflows/pack-review.yml`:
 
 ```yaml
 name: pack-review
@@ -152,15 +152,31 @@ on:
   pull_request:
     types: [opened, reopened, ready_for_review, synchronize, edited]
 jobs:
-  find:
+  units:
     # Drafts wait until they're ready. PRs from forks get no secrets, so they're skipped. An edit reviews again only
     # when it changed the base branch, so the findings match the new diff.
     if: >-
       ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository
       && (github.event.action != 'edited' || github.event.changes.base.ref.from) }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      units: ${{ steps.units.outputs.units }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - id: units
+        uses: mjewell/context-packs/review/units@main
+  find:
+    needs: units
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        unit: ${{ fromJSON(needs.units.outputs.units) }}
     concurrency:
-      group: pack-review-find-${{ github.event.pull_request.number }}
+      group: pack-review-find-${{ github.event.pull_request.number }}-${{ matrix.unit }}
       cancel-in-progress: true
     permissions:
       contents: read
@@ -171,9 +187,23 @@ jobs:
           fetch-depth: 0
       - uses: mjewell/context-packs/review/find@main
         with:
+          unit: ${{ matrix.unit }}
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+  merge:
+    needs: find
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: mjewell/context-packs/review/merge@main
+        with:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
   match:
-    needs: find
+    needs: merge
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
@@ -182,7 +212,7 @@ jobs:
         with:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
   post:
-    needs: [find, match]
+    needs: [merge, match]
     runs-on: ubuntu-latest
     concurrency:
       group: pack-review-post-${{ github.event.pull_request.number }}
@@ -192,11 +222,11 @@ jobs:
       - uses: mjewell/context-packs/review/post@main
 ```
 
-The review agent runs in the `find` job, whose token can only read the repo. The `match` job pairs each finding with the thread pack-review opened for it on an earlier run, if any. Its agent gets only the findings' text, so no comment can change which thread a finding lands in. The `post` job runs no agent, and only it can write to the PR. Keep each job's `permissions` as shown: GitHub enforces them, whatever the agents' tools allow. The jobs hand their results on as the artifacts `pack-review-report` and `pack-review-match`, kept for a day.
+The units are your instruction file, then each pack's docs. The workflow starts a finder for each, so every unit is checked: no agent can decide one isn't worth it. The finders and the merging agent run in jobs whose token can only read the repo. The `match` job's agents get only text pack-review wrote, and the replies of people who can write. The `post` job runs no agent, and only it can write to the PR. Keep each job's `permissions` as shown: GitHub enforces them, whatever the agents' tools allow. The jobs hand their results on as artifacts, kept for a day.
 
 With a Pro or Max subscription instead of an API key, run `claude setup-token` locally, add what it prints as the secret `CLAUDE_CODE_OAUTH_TOKEN`, and pass `claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}` in place of `anthropic-api-key`. Reviews then count against the subscription's usage limits.
 
-It reviews a PR when it's opened or marked ready, again on each push, and again when its base branch changes. A newer push cancels a review still running. Pin `@main` to a release tag once you've tried it. Pass `model` to `review/find` or `review/match` to use a model other than Claude Code's default.
+It reviews a PR when it's opened or marked ready, again on each push, and again when its base branch changes. A newer push cancels a review still running. Pin `@main` to a release tag once you've tried it. Pass `model` to `review/find`, `review/merge` or `review/match` to use a model other than Claude Code's default.
 
 Each review posts **one summary comment**, edited on each run. It counts the findings, and ends with every finding as JSON in a `<details>` block for the local run. A step after the agent writes it from the agent's answer. A run that fails posts nothing and leaves the last summary, which names the commit and base branch it reviewed. If no agent read some doc the tables point at in full, the summary lists it, as a partial review.
 
