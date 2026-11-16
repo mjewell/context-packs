@@ -10,7 +10,7 @@ Done when:
 
 - every doc the repo puts in front of an agent was read in full against the diff;
 - every deviation from a rule quotes the rule and the line that deviates from it, says whether the rule's doc was routed to the work, and gives any signs the deviation is deliberate;
-- the diff was walked for choices no rule covers, and each uncovered choice says how the existing code makes it;
+- the diff was read for choices no rule covers, and each uncovered choice says how the existing code makes it;
 - every finding was handed over in the shape [findings.schema.json](https://github.com/mjewell/context-packs/blob/main/review/findings.schema.json) sets, to whoever ran this skill, as described in [Where it runs](#where-it-runs).
 
 This checks the change only against what the repo's packs and instruction file say. Bugs, and whether the change does what it set out to do, are for other reviews. Deciding what to do about each finding is for `pack-review`.
@@ -57,7 +57,7 @@ Each choice that deviates is one deviates finding, with every spot the subagents
 
 ## 5. Look for uncovered choices
 
-Then read the diff and walk it for kinds of decision that will come up again, where another way would be reasonable, that no rule the subagents reported covers: where a kind of logic lives, how a kind of file is shaped, which library or style it uses, how errors travel, how a kind of thing is named. Leave out choices with no real alternative, what a linter, formatter or type check enforces, and one-off logic.
+Then read the diff, looking for kinds of decision that will come up again, where another way would be reasonable, that no rule the subagents reported covers: where a kind of logic lives, how a kind of file is shaped, which library or style it uses, how errors travel, how a kind of thing is named. Leave out choices with no real alternative, what a linter, formatter or type check enforces, and one-off logic.
 
 For each choice, find how the existing code makes it, with two or three **exemplars** of each way:
 
@@ -67,7 +67,7 @@ For each choice, find how the existing code makes it, with two or three **exempl
 
 Before reporting a choice, search the docs for a rule that settles it, by meaning as well as by keyword. If one does, leave it out: that rule's unit already checked it.
 
-The walk isn't exhaustive. A missed choice turns up in a later review or a `pack-backfill` run, while each weak candidate costs the user a turn. Report the strongest few, and give every finding your take on what to do about it, for the user to accept or overrule.
+This search isn't exhaustive. A missed choice turns up in a later review or a `pack-backfill` run, while each weak candidate costs the user a turn. Report the strongest few, and give every finding your take on what to do about it, for the user to accept or overrule.
 
 ## In CI
 
