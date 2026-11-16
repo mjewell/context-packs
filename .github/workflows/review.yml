@@ -1,0 +1,133 @@
+name: pack-review
+# Reviews a PR against the repo's context packs. Call it from a workflow on pull_request, as docs/reference.md shows.
+# The caller grants contents: read and pull-requests: write, and each job here narrows that: only post can write.
+on:
+  workflow_call:
+    inputs:
+      model:
+        description: The model the agents use, if not Claude Code's default.
+        type: string
+        required: false
+        default: ''
+    secrets:
+      claude_code_oauth_token:
+        description: A Claude Code OAuth token, from `claude setup-token`. Pass this or anthropic_api_key.
+        required: false
+      anthropic_api_key:
+        description: An Anthropic API key. Pass this or claude_code_oauth_token.
+        required: false
+# Every job checks out this repo at the commit the caller pinned, job.workflow_sha, into .pack-review, and runs its
+# actions from there, so the actions and this workflow always match. The PR's own checkout comes first where a job
+# needs one, since checking it out cleans the workspace.
+jobs:
+  units:
+    # Drafts wait until they're ready. PRs from forks get no secrets, so they're skipped. An edit reviews again only
+    # when it changed the base branch, so the findings match the new diff.
+    if: >-
+      ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      units: ${{ steps.units.outputs.units }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/checkout@v6
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .pack-review
+          persist-credentials: false
+      - id: units
+        uses: ./.pack-review/review/units
+  find:
+    needs: units
+    runs-on: ubuntu-latest
+    # One finder per unit, started by the workflow, so no agent decides whether a unit is worth checking. A newer push
+    # cancels the same unit's finder still running, and with it the merge that waits on it.
+    strategy:
+      matrix:
+        unit: ${{ fromJSON(needs.units.outputs.units) }}
+    concurrency:
+      group: pack-review-find-${{ github.event.pull_request.number }}-${{ matrix.unit }}
+      cancel-in-progress: true
+    # The finders read the repo and nothing else, so GitHub, not their tool lists, keeps them from writing.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/checkout@v6
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .pack-review
+          persist-credentials: false
+      - uses: ./.pack-review/review/find
+        with:
+          unit: ${{ matrix.unit }}
+          model: ${{ inputs.model }}
+          claude-code-oauth-token: ${{ secrets.claude_code_oauth_token }}
+          anthropic-api-key: ${{ secrets.anthropic_api_key }}
+  merge:
+    needs: find
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/checkout@v6
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .pack-review
+          persist-credentials: false
+      - uses: ./.pack-review/review/merge
+        with:
+          model: ${{ inputs.model }}
+          claude-code-oauth-token: ${{ secrets.claude_code_oauth_token }}
+          anthropic-api-key: ${{ secrets.anthropic_api_key }}
+  match:
+    needs: merge
+    runs-on: ubuntu-latest
+    # The match job's agents read pack-review's threads and can't write.
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .pack-review
+          persist-credentials: false
+      - uses: ./.pack-review/review/match
+        with:
+          model: ${{ inputs.model }}
+          claude-code-oauth-token: ${{ secrets.claude_code_oauth_token }}
+          anthropic-api-key: ${{ secrets.anthropic_api_key }}
+  post:
+    needs: [merge, match]
+    runs-on: ubuntu-latest
+    # Two posts at once could each find no summary and add one, so they wait their turn.
+    concurrency:
+      group: pack-review-post-${{ github.event.pull_request.number }}
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .pack-review
+          persist-credentials: false
+      - uses: ./.pack-review/review/post
