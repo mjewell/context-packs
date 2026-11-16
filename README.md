@@ -84,7 +84,7 @@ Rather not type commands? [Let your agent run them](#let-your-agent-run-it).
 | Rules and docs shared across repos | [Push the pack to a git repo](#3-share-packs-across-repos), and `add` it in each repo |
 | A pack held at a tag or commit | `add … --ref <tag or commit>` |
 | CI to fail when the packs need a resync | Run `npx context-packs check`, as in [Checking in CI](docs/reference.md#checking-in-ci) |
-| Every PR reviewed against the packs, with the findings posted to it | Add the `review` action, as in [Reviewing PRs in CI](docs/reference.md#reviewing-prs-in-ci) |
+| Every PR reviewed against the packs, with the findings posted to it (experimental) | Add the `review` actions, as in [Reviewing PRs in CI](docs/reference.md#reviewing-prs-in-ci) |
 | To check an agent reads each doc when it should | Write prompts in its pack's `.evals/<doc>.md`, and run `npx context-packs eval`, as in [Testing when each doc gets read](docs/reference.md#testing-when-each-doc-gets-read) |
 | A shared pack loaded differently than its author set up | See [How packs load](docs/loading.md#choosing-when-a-pack-loads) |
 
@@ -116,7 +116,7 @@ Four more skills help write and apply the rules themselves, and the command abov
 - **`pack-findings`** checks a PR or branch against the repo's packs.
 - **`pack-review`** goes through those findings with you, to decide whether the change or the rule needs fixing.
 
-[Skills that grow your packs](docs/skills.md) covers how to run each one, and the `review` action that runs `pack-findings` on each PR in CI.
+[Skills that grow your packs](docs/skills.md) covers how to run each one, and the `review` actions that run `pack-findings` on each PR in CI, which are experimental.
 
 ## Why not skills?
 

@@ -144,7 +144,9 @@ Prompts close to a row's `when` that shouldn't match it, or that match only thro
 
 ## Reviewing PRs in CI
 
-The `review` action runs the `pack-findings` skill on a PR with [claude-code-action](https://github.com/anthropics/claude-code-action), and posts what it finds. The author then goes through the findings in a local session. Add a workflow such as `.github/workflows/pack-review.yml`:
+**Experimental.** The review action is still changing: its jobs, their inputs, and what it posts on a PR can change in any release. Pin it to a commit, not `@main`, and expect to update your workflow when you move the pin.
+
+The review runs as five jobs, each a composite action under `review/`. One finder per unit of your packs checks the PR, an agent merges what they found, the merged findings are paired with pack-review's threads from earlier runs, and a script posts the review. The author then goes through the findings in a local session. Add a workflow such as `.github/workflows/pack-review.yml`:
 
 ```yaml
 name: pack-review
@@ -152,38 +154,89 @@ on:
   pull_request:
     types: [opened, reopened, ready_for_review, synchronize, edited]
 jobs:
-  review:
+  units:
     # Drafts wait until they're ready. PRs from forks get no secrets, so they're skipped. An edit reviews again only
     # when it changed the base branch, so the findings match the new diff.
     if: >-
       ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository
       && (github.event.action != 'edited' || github.event.changes.base.ref.from) }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      units: ${{ steps.units.outputs.units }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - id: units
+        uses: mjewell/context-packs/review/units@main
+  find:
+    needs: units
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        unit: ${{ fromJSON(needs.units.outputs.units) }}
     concurrency:
-      group: pack-review-${{ github.event.pull_request.number }}
+      group: pack-review-find-${{ github.event.pull_request.number }}-${{ matrix.unit }}
       cancel-in-progress: true
     permissions:
       contents: read
-      pull-requests: write
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - uses: mjewell/context-packs/review@main
+      - uses: mjewell/context-packs/review/find@main
+        with:
+          unit: ${{ matrix.unit }}
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+  merge:
+    needs: find
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: mjewell/context-packs/review/merge@main
         with:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+  match:
+    needs: merge
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: mjewell/context-packs/review/match@main
+        with:
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+  post:
+    needs: [merge, match]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pack-review-post-${{ github.event.pull_request.number }}
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: mjewell/context-packs/review/post@main
 ```
+
+The units are your instruction file, then each pack's docs. The workflow starts a finder for each, so every unit is checked: no agent can decide one isn't worth it. The finders and the merging agent run in jobs whose token can only read the repo. The `match` job's agents get only text pack-review wrote, and the replies of people who can write. The `post` job runs no agent, and only it can write to the PR. Keep each job's `permissions` as shown: GitHub enforces them, whatever the agents' tools allow. The jobs hand their results on as artifacts, kept for a day.
 
 With a Pro or Max subscription instead of an API key, run `claude setup-token` locally, add what it prints as the secret `CLAUDE_CODE_OAUTH_TOKEN`, and pass `claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}` in place of `anthropic-api-key`. Reviews then count against the subscription's usage limits.
 
-It reviews a PR when it's opened or marked ready, again on each push, and again when its base branch changes. A newer push cancels a review still running. Pin `@main` to a release tag once you've tried it. Pass `model` to review with a model other than Claude Code's default.
+It reviews a PR when it's opened or marked ready, again on each push, and again when its base branch changes. A newer push cancels a review still running. Pin `@main` to a commit once you've tried it. Pass `model` to `review/find`, `review/merge` or `review/match` to use a model other than Claude Code's default.
 
-Each review posts **one summary comment**, edited on each run. It counts the findings, and ends with every finding as JSON in a `<details>` block for the local run. A step after the agent writes it from the agent's answer. A run that fails posts nothing and leaves the last summary, which names the commit and base branch it reviewed. If no agent read some doc the tables point at in full, the summary lists it, as a partial review. It comments nothing on the diff.
+Each review posts **one summary comment**, edited on each run. It counts the findings, and ends with every finding as JSON in a `<details>` block for the local run. A step after the agent writes it from the agent's answer. A run that fails posts nothing and leaves the last summary, which names the commit and base branch it reviewed. If no agent read some doc the tables point at in full, the summary lists it, as a partial review.
+
+Each new finding also gets **a thread on the diff**, on a line where it applies. The thread says what was found, the rule it breaks and what to do. A later review reads that comment to tell when it finds the same issue again: then it posts nothing new, unless the thread was resolved, when it replies that the finding is still there. When a teammate's reply in a thread, or the review finding it again, gives the author a reason to act that the review hasn't already given there, the review sums that up in a reply. Most runs add none. Only replies from people who can write to the repo are read. A thread whose finding a later review doesn't find gets nothing. The review never resolves a thread: that's the author's call.
 
 To go through the findings, the author runs `/pack-review <owner>/<repo>#<number>` in Claude Code with the PR's branch checked out, as the summary says. Naming the repo lets it work from a session in a folder above the repos; inside the repo, the number alone does. `pack-review` reads the summary's JSON rather than finding them again, goes through each finding with the author, and runs `pack-rule` for each one they want recorded. Neither run commits or pushes.
 
-The diff and the repo's files can hold text written to steer the agent, so the agent can't reach the PR, and its tools only read the checkout and the diff and log the action writes for it. It has no shell. Its findings appear only in the summary's JSON block, where everything shows as written, with invisible characters removed and anything that looks like an Anthropic key or GitHub token redacted. claude-code-action runs it only when whoever triggered the run has write access. A PR with more than 100 comments can't get a summary, since one that missed its earlier summary would post a second.
+The diff and the repo's files can hold text written to steer the agent, so the agent can't reach the PR, and its tools only read the checkout and the change, through a git server that runs fixed git commands. It has no shell. Its findings appear only in the summary's JSON block, where everything shows as written, with invisible characters removed and anything that looks like an Anthropic key or GitHub token redacted. claude-code-action runs it only when whoever triggered the run has write access. A PR with more than 100 comments can't get a summary, since one that missed its earlier summary would post a second.
 
 Each run costs about what a review in chat does.
 

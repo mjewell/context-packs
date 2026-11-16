@@ -3,6 +3,7 @@ import re
 
 from fake_github import comment, ok, pull_request
 from review_case import HEAD, MARKER, ReviewCase, own
+from test_review_transcript import call, result
 
 BASE = 'b' * 40
 DOC = 'One.\nTwo.\nThree.\n'
@@ -23,25 +24,64 @@ def block(body):
     return json.loads(found.group(1)), found.group(1)
 
 
+def reads(root, paths):
+    """A finder's transcript that reads each of the paths in full, in one Read each."""
+    return [part for n, path in enumerate(paths)
+            for part in (call(f'r{n}', 'Read', {'file_path': str(root / path)}), result(f'r{n}', 'the doc'))]
+
+
 class SummaryCase(ReviewCase):
-    """A run about to post its summary: the agent's answer, the docs the tables point at, checked out here, and the
-    transcript of what the agent did."""
+    """A run about to post its summary: the merging agent's answer, an instruction file and the docs the tables point
+    at, checked out here, each finder's record of what it read, and the transcript of what the merging agent did."""
 
     def setUp(self):
         super().setUp()
         self.github.responses.update({'PullRequest': pull_request(), 'AddComment': ok({}), 'UpdateComment': ok({})})
 
-    def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', docs=(), messages=()):
-        """Post the summary of the agent's output, with docs as `context-packs docs` lists them, each pack a list."""
+    def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', docs=(), messages=(), changed=(),
+                  pairs=(), commentary=(), shown=None, finders=None):
+        """Post the summary of the merging agent's output, with docs as `context-packs docs` lists them, each pack a
+        list, changed as the git server's changed tool lists the paths, each a (lines, path) pair, and pairs as the
+        match job checked them. finders is each unit's finder's transcript, in unit order: by default, each reads its
+        whole unit."""
         (self.root / 'output.json').write_text(
             output if output is not None else json.dumps({'findings': list(findings)}))
+        (self.root / 'AGENTS.md').write_text(f'<!-- context-packs:start -->\n{DOC}<!-- context-packs:end -->\n')
         for path in (path for pack in docs for path in pack):
             (self.root / path).parent.mkdir(parents=True, exist_ok=True)
             (self.root / path).write_text(DOC)
         (self.root / 'docs.txt').write_text('\n'.join(''.join(f'{path}\n' for path in pack) for pack in docs))
         (self.root / 'transcript.json').write_text(json.dumps(list(messages)))
-        return self.script('summary', '--pr', 7, '--base', BASE, '--base-ref', base_ref, '--head', head,
-                           '--findings', 'output.json', '--transcript', 'transcript.json', '--docs', 'docs.txt')
+        (self.root / 'changed.txt').write_text(''.join(f'{lines}\t{path}\n' for lines, path in changed))
+        (self.root / 'shown.json').write_text(json.dumps(shown or {}))
+        units = [['AGENTS.md'], *docs]
+        if finders is None:
+            finders = [reads(self.root, unit) for unit in units]
+        (self.root / 'units').mkdir(exist_ok=True)
+        log = ''
+        for n, transcript in enumerate(finders):
+            (self.root / f'finder-{n}.json').write_text(json.dumps(list(transcript)))
+            (self.root / 'finder-output.json').write_text(json.dumps({'findings': []}))
+            run = self.script('unit_report', '--unit', n, '--docs', 'docs.txt', '--findings', 'finder-output.json',
+                              '--transcript', f'finder-{n}.json', '--changed', 'changed.txt', '--out',
+                              f'units/unit-{n}.json')
+            self.assertEqual(run.returncode, 0, run.stderr)
+            log += run.stdout
+        report = self.report(base_ref, head)
+        report.stdout = log + report.stdout
+        if report.returncode:
+            return report
+        (self.root / 'match.json').write_text(json.dumps({'pairs': list(pairs), 'commentary': list(commentary)}))
+        post = self.script('summary', '--pr', 7, '--report', 'report.json', '--match', 'match.json')
+        post.stdout = report.stdout + post.stdout
+        return post
+
+    def report(self, base_ref='main', head=HEAD):
+        """The merge job's report on the merging agent's output and the finders' records, written to report.json for
+        the post job."""
+        return self.script('report', '--base', BASE, '--base-ref', base_ref, '--head', head, '--findings',
+                           'output.json', '--transcript', 'transcript.json', '--docs', 'docs.txt', '--changed',
+                           'changed.txt', '--shown', 'shown.json', '--units', 'units', '--out', 'report.json')
 
     def body(self):
         [sent] = self.sent('AddComment') or self.sent('UpdateComment')
@@ -66,10 +106,24 @@ class SummaryTests(SummaryCase):
         self.assertTrue(body.endswith(MARKER))
         self.assertIn("pack-review checked `hhhhhhh` against this repo's context packs and found 2 deviations, "
                       '1 conflict, 3 uncovered choices.', body)
-        self.assertIn('run `/pack-review o/r#7` in Claude Code', body)
-        self.assertEqual(block(body)[0], {'base': BASE, 'base_ref': 'main', 'head': HEAD, 'findings': findings,
-                                          'unread': []})
+        self.assertIn('\n\nTo go through them, run `/pack-review o/r#7`.\n\n', body)
+        self.assertEqual(block(body)[0], {'base': BASE, 'base_ref': 'main', 'head': HEAD,
+                                          'findings': [{**f, 'thread': None, 'commentary': None} for f in findings],
+                                          'unread': [], 'unread_diffs': []})
         self.assertNotIn('skipped', body)
+
+    def test_names_the_thread_each_paired_finding_continues(self):
+        self.summarize([finding(headline='One'), finding(headline='Two')], pairs=[{'finding': 1, 'thread': 'T_1'}])
+
+        found, _ = block(self.body())
+        self.assertEqual([(f['headline'], f['thread']) for f in found['findings']], [('One', None), ('Two', 'T_1')])
+
+    def test_gives_each_finding_its_commentary(self):
+        self.summarize([finding(headline='One'), finding(headline='Two')], pairs=[{'finding': 1, 'thread': 'T_1'}],
+                       commentary=[{'finding': 1, 'text': 'Alice says it is deliberate.'}])
+
+        found, _ = block(self.body())
+        self.assertEqual([f['commentary'] for f in found['findings']], [None, 'Alice says it is deliberate.'])
 
     def test_says_when_it_found_nothing(self):
         self.summarize([])
@@ -82,19 +136,19 @@ class SummaryTests(SummaryCase):
     def test_says_a_review_that_skipped_docs_is_partial_and_lists_them_in_the_block(self):
         unread = ['context-packs/project/review.md', 'context-packs/gen/core/testing.md']
 
-        result = self.summarize([], docs=[unread])
+        result = self.summarize([], docs=[unread], finders=[reads(self.root, ['AGENTS.md']), []])
 
         self.assertEqual(result.returncode, 0, result.stderr)
         body = self.body()
         self.assertIn('The review should read every doc the tables point at, and it skipped 2. That\'s most likely a '
                       'problem in the review action, not in your docs.', body)
-        self.assertIn('run `/pack-review o/r#7` in Claude Code', body)
+        self.assertIn('\n\nTo go through them, run `/pack-review o/r#7`.\n\n', body)
         self.assertEqual(block(body)[0]['unread'], unread)
         self.assertEqual(body.count('review.md'), 1)
         self.assertGreater(body.index('review.md'), body.index('<details>'))
 
     def test_cleans_the_unread_paths_like_the_findings(self):
-        self.summarize([], docs=[['context-packs/a\u200b.md']])
+        self.summarize([], docs=[['context-packs/a\u200b.md']], finders=[reads(self.root, ['AGENTS.md']), []])
 
         self.assertEqual(block(self.body())[0]['unread'], ['context-packs/a.md'])
 
@@ -160,6 +214,29 @@ class SummaryTests(SummaryCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('moved from release to main', result.stdout)
         self.assertEqual(self.github.writes(), [])
+
+    def test_writes_the_report_in_the_find_job_without_reaching_github(self):
+        result = self.summarize([finding()])
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads((self.root / 'report.json').read_text())
+        self.assertEqual(report, {'base': BASE, 'base_ref': 'main', 'head': HEAD, 'findings': [finding()],
+                                  'anchors': [None], 'unread': [], 'unread_diffs': []})
+        self.github.requests.clear()
+        self.env.pop('GITHUB_TOKEN')
+
+        self.assertEqual(self.report().returncode, 0)
+        self.assertEqual(self.github.requests, [])
+
+    def test_anchors_each_finding_on_its_first_deviating_spot_the_diff_shows(self):
+        findings = [finding(spots=[spot('a.ts', 3, follows=True), spot('a.ts', 9), spot('b.ts', 4)]),
+                    finding(spots=[spot('a.ts', 3, follows=True), spot('c.ts', 1)]),
+                    finding(spots=[spot('c.ts', 1)])]
+
+        self.summarize(findings, shown={'a.ts': [1, 2, 3, 4], 'b.ts': [4]})
+
+        report = json.loads((self.root / 'report.json').read_text())
+        self.assertEqual(report['anchors'], [{'path': 'b.ts', 'line': 4}, {'path': 'a.ts', 'line': 3}, None])
 
     def test_stops_when_the_review_returned_no_findings(self):
         for output in ('', 'null', '{"result": "done"}'):

@@ -21,7 +21,11 @@ query PullRequest($owner: String!, $name: String!, $number: Int!) {{
 
 
 class GitHubError(Exception):
-    """GitHub refused a request, or answered with more than pack-review reads."""
+    """GitHub refused a request, or answered with more than pack-review reads. code is the HTTP status, if any."""
+
+    def __init__(self, message, code=None):
+        super().__init__(message)
+        self.code = code
 
 
 def repository():
@@ -29,7 +33,9 @@ def repository():
 
 
 def send(url, body, what):
-    request = urllib.request.Request(url, data=json.dumps(body).encode(), headers={
+    """GitHub's answer: to a POST of body, or to a GET when body is None."""
+    data = None if body is None else json.dumps(body).encode()
+    request = urllib.request.Request(url, data=data, headers={
         'Authorization': f'bearer {os.environ["GITHUB_TOKEN"]}', 'Content-Type': 'application/json',
         'Accept': 'application/vnd.github+json'})
     try:
@@ -43,7 +49,7 @@ def send(url, body, what):
                                                             for e in found.get('errors', [])])
         except ValueError:
             pass
-        raise GitHubError(f'GitHub refused {what} with HTTP {error.code}: {answer}') from None
+        raise GitHubError(f'GitHub refused {what} with HTTP {error.code}: {answer}', error.code) from None
 
 
 def graphql(operation, query, variables):
@@ -53,6 +59,11 @@ def graphql(operation, query, variables):
     if answer.get('errors'):
         raise GitHubError(f'GitHub refused {operation}: ' + '; '.join(e['message'] for e in answer['errors']))
     return answer['data']
+
+
+def rest(path):
+    """What GitHub's REST API answers a GET of path with."""
+    return send(os.environ.get('GITHUB_API_URL', 'https://api.github.com') + path, None, path)
 
 
 def nodes(connection, listing):

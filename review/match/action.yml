@@ -1,0 +1,110 @@
+name: pack-review match
+description: Pair the findings the find action saved with pack-review's threads on the PR, from the findings' text alone, write commentary on each paired finding from its thread's replies, and save both as the artifact pack-review-match for the post action. Run it in a job with pull-requests read.
+inputs:
+  anthropic-api-key:
+    description: An Anthropic API key for the pairing and commentary agents. Pass this or claude-code-oauth-token.
+    required: false
+    default: ''
+  claude-code-oauth-token:
+    description: A Claude Code OAuth token, from `claude setup-token`. Pass this or anthropic-api-key.
+    required: false
+    default: ''
+  model:
+    description: The model to pair and comment with, if not Claude Code's default.
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Get the report
+      # v8.0.2, pinned by commit since a tag can move.
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      with:
+        name: pack-review-report
+        path: ${{ runner.temp }}/pack-review-report
+    - name: Read pack-review's threads
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        PR: ${{ github.event.pull_request.number }}
+      run: |
+        mkdir "$RUNNER_TEMP/pack-review-match"
+        python3 "$GITHUB_ACTION_PATH/../threads.py" --pr "$PR" > "$RUNNER_TEMP/pack-review-match/threads.json"
+    - name: Prepare the pairing
+      id: prepare
+      shell: bash
+      env:
+        MODEL: ${{ inputs.model }}
+      # The prompt holds the findings and the findings the threads were opened for, and no one's comments.
+      run: |
+        python3 "$GITHUB_ACTION_PATH/../pairing.py" pair-prompt --report "$RUNNER_TEMP/pack-review-report/report.json" \
+          --threads "$RUNNER_TEMP/pack-review-match/threads.json" --model "$MODEL"
+    - name: Pair
+      id: pair
+      if: steps.prepare.outputs.needed == 'true'
+      # v1.0.268, pinned by commit since a tag can move.
+      uses: anthropics/claude-code-action@c0949c50a78c1ec8ce2647db36629b870e715d0c
+      with:
+        anthropic_api_key: ${{ inputs.anthropic-api-key }}
+        claude_code_oauth_token: ${{ inputs.claude-code-oauth-token }}
+        github_token: ${{ github.token }}
+        prompt: ${{ steps.prepare.outputs.prompt }}
+        claude_args: ${{ steps.prepare.outputs.claude-args }}
+    - name: Check the pairs
+      shell: bash
+      env:
+        NEEDED: ${{ steps.prepare.outputs.needed }}
+        PAIRS: ${{ steps.pair.outputs.structured_output }}
+      run: |
+        dir="$RUNNER_TEMP/pack-review-match"
+        pairs=()
+        if [ "$NEEDED" = true ]; then
+          printf '%s' "$PAIRS" > "$dir/pairs.json"
+          pairs=(--pairs "$dir/pairs.json")
+        fi
+        python3 "$GITHUB_ACTION_PATH/../pairing.py" pair-check --report "$RUNNER_TEMP/pack-review-report/report.json" \
+          --threads "$dir/threads.json" "${pairs[@]}" --out "$dir/match.json"
+    - name: Prepare the commentary
+      id: prepare-comment
+      shell: bash
+      env:
+        MODEL: ${{ inputs.model }}
+      # This prompt holds each paired finding and its thread's replies, filtered by trust.py. The pairs are already
+      # fixed, so nothing in a reply can change them.
+      run: |
+        dir="$RUNNER_TEMP/pack-review-match"
+        python3 "$GITHUB_ACTION_PATH/../pairing.py" comment-prompt \
+          --report "$RUNNER_TEMP/pack-review-report/report.json" --threads "$dir/threads.json" \
+          --match "$dir/match.json" --model "$MODEL"
+    - name: Comment
+      id: comment
+      if: steps.prepare-comment.outputs.needed == 'true'
+      # v1.0.268, pinned by commit since a tag can move.
+      uses: anthropics/claude-code-action@c0949c50a78c1ec8ce2647db36629b870e715d0c
+      with:
+        anthropic_api_key: ${{ inputs.anthropic-api-key }}
+        claude_code_oauth_token: ${{ inputs.claude-code-oauth-token }}
+        github_token: ${{ github.token }}
+        prompt: ${{ steps.prepare-comment.outputs.prompt }}
+        claude_args: ${{ steps.prepare-comment.outputs.claude-args }}
+    - name: Check the commentary
+      shell: bash
+      env:
+        NEEDED: ${{ steps.prepare-comment.outputs.needed }}
+        COMMENTARY: ${{ steps.comment.outputs.structured_output }}
+      run: |
+        dir="$RUNNER_TEMP/pack-review-match"
+        commentary=()
+        if [ "$NEEDED" = true ]; then
+          printf '%s' "$COMMENTARY" > "$dir/commentary.json"
+          commentary=(--commentary "$dir/commentary.json")
+        fi
+        python3 "$GITHUB_ACTION_PATH/../pairing.py" comment-check --match "$dir/match.json" "${commentary[@]}"
+    - name: Save the pairs
+      # v7.0.2, pinned by commit since a tag can move.
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      with:
+        name: pack-review-match
+        path: ${{ runner.temp }}/pack-review-match/match.json
+        if-no-files-found: error
+        retention-days: 1
