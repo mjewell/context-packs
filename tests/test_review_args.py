@@ -12,7 +12,7 @@ COMMAND = [sys.executable, str(REVIEW / 'args.py'), '--inputs', INPUTS, '--base'
 
 
 class ArgsTests(unittest.TestCase):
-    """The arguments the review action hands claude-code-action for the agent."""
+    """The arguments the merge action hands claude-code-action for the agent that merges the finders' answers."""
 
     def args(self, *extra):
         run = subprocess.run([*COMMAND, *extra], capture_output=True, text=True, check=True)
@@ -38,13 +38,13 @@ class ArgsTests(unittest.TestCase):
         self.assertEqual(args.count('--mcp-config'), 1)
         self.assertIn('--strict-mcp-config', args)
 
-    def test_gives_the_agent_tools_that_only_read_the_checkout_and_the_change(self):
+    def test_gives_the_agent_tools_that_only_read_the_checkout_and_the_change_and_no_subagents(self):
         args = self.args()
 
-        self.assertEqual(self.flag(args, '--tools'), 'Read,Glob,Grep,Agent')
+        self.assertEqual(self.flag(args, '--tools'), 'Read,Glob,Grep')
         # mcp__git allows every tool on the git server. It must not start with mcp__github, or claude-code-action adds
         # its own GitHub servers.
-        self.assertEqual(self.flag(args, '--allowedTools'), 'Read,Glob,Grep,Agent,mcp__git')
+        self.assertEqual(self.flag(args, '--allowedTools'), 'Read,Glob,Grep,mcp__git')
         self.assertEqual(self.flag(args, '--add-dir'), INPUTS)
         self.assertEqual(self.flag(args, '--disallowedTools'), 'Read(./.git/**)')
         self.assertIn('--restricted', args)
@@ -59,13 +59,3 @@ class ArgsTests(unittest.TestCase):
             quoted = shlex.quote(value)
             self.assertTrue(quoted == value or (quoted.startswith("'") and quoted.count("'") == 2), value[:60])
 
-
-class SettingsTests(unittest.TestCase):
-    """The settings the review agent runs with."""
-
-    def test_runs_subagents_in_the_foreground_so_their_answers_arrive_before_the_agent_goes_on(self):
-        run = subprocess.run(COMMAND, capture_output=True, text=True, check=True)
-        args = shlex.split(run.stdout)
-
-        settings = json.loads(args[args.index('--settings') + 1])
-        self.assertEqual(settings, {'env': {'CLAUDE_CODE_DISABLE_BACKGROUND_TASKS': '1'}})
