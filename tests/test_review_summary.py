@@ -82,7 +82,7 @@ class SummaryTests(SummaryCase):
         self.assertTrue(body.endswith(MARKER))
         self.assertIn("pack-review checked `hhhhhhh` against this repo's context packs and found 2 deviations, "
                       '1 conflict, 3 uncovered choices.', body)
-        self.assertIn('run `/pack-review o/r#7` in Claude Code', body)
+        self.assertIn('\n\nTo go through them, run `/pack-review o/r#7`.\n\n', body)
         self.assertEqual(block(body)[0], {'base': BASE, 'base_ref': 'main', 'head': HEAD,
                                           'findings': [{**f, 'thread': None, 'commentary': None} for f in findings],
                                           'unread': [], 'unread_diffs': []})
@@ -118,7 +118,7 @@ class SummaryTests(SummaryCase):
         body = self.body()
         self.assertIn('The review should read every doc the tables point at, and it skipped 2. That\'s most likely a '
                       'problem in the review action, not in your docs.', body)
-        self.assertIn('run `/pack-review o/r#7` in Claude Code', body)
+        self.assertIn('\n\nTo go through them, run `/pack-review o/r#7`.\n\n', body)
         self.assertEqual(block(body)[0]['unread'], unread)
         self.assertEqual(body.count('review.md'), 1)
         self.assertGreater(body.index('review.md'), body.index('<details>'))

@@ -35,8 +35,7 @@ def summary(repo, number, report):
         text += (f' The review should read every doc the tables point at, and it skipped {len(unread)}. That\'s most '
                  'likely a problem in the review action, not in your docs. The JSON lists them.')
     if findings or unread:
-        text += (f"\n\nTo go through them, run `/pack-review {repo}#{number}` in Claude Code with this PR's branch "
-                 'checked out.')
+        text += f"\n\nTo go through them, run `/pack-review {repo}#{number}`."
     # Backticks only occur inside JSON strings, where \u0060 means the same, so nothing can close the fence.
     data = json.dumps({key: report[key] for key in ('base', 'base_ref', 'head', 'findings', 'unread', 'unread_diffs')},
                       indent=2, ensure_ascii=False)

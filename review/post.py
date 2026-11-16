@@ -4,7 +4,6 @@ in a pack-review thread only when there's something to say. It runs in the post 
 pack-review's threads afresh through trust.py, so it writes only to threads pack-review opened on this PR."""
 import argparse
 import json
-import os
 from pathlib import Path
 import sys
 
@@ -30,7 +29,7 @@ def reply(head, resolved, commentary):
     return github.signed(f'{lead}\n\n{finding_comment.quoted(commentary)}')
 
 
-def planned(report, matched, threads, repo, number):
+def planned(report, matched, threads):
     """The new threads and the replies, by thread id, that the review posts."""
     head, findings = report['head'], report['findings']
     pairs = {pair['finding']: pair['thread'] for pair in matched['pairs']}
@@ -44,7 +43,7 @@ def planned(report, matched, threads, repo, number):
         if n not in pairs:
             if anchor is not None:
                 new.append({'path': anchor['path'], 'line': anchor['line'], 'side': 'RIGHT',
-                            'body': finding_comment.body(finding, head, repo, number)})
+                            'body': finding_comment.body(finding, head)})
             continue
         thread = pairs[n]
         body = reply(head, threads[thread]['resolved'], commentary.get(n))
@@ -73,7 +72,7 @@ def main():
               'posts no threads. The run for the new base will.')
         return
     threads = {thread['id']: thread for thread in trust.threads(args.pr)}
-    new, replies = planned(report, matched, threads, os.environ['GITHUB_REPOSITORY'], args.pr)
+    new, replies = planned(report, matched, threads)
     if not new and not replies:
         print('pack-review: nothing to post in threads.')
         return

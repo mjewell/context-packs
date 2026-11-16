@@ -78,8 +78,7 @@ class NewThreadTests(PostCase):
         self.assertEqual(added['threads'][0]['body'],
                          '🤖 pack-review found a deviation here at `hhhhhhh`: **A game number in sim code**\n\n'
                          'From `AGENTS.md`:\n\n> Game numbers live in content.\n\n'
-                         'Move it to content.\n\n'
-                         'To go through it, run `/pack-review o/r#7` in Claude Code.\n\n' + MARKER)
+                         'Move it to content.\n\n' + MARKER)
 
     def test_keeps_the_findings_text_from_notifying_anyone_or_hiding_text(self):
         found = {**F1, 'headline': 'Ask @alice <!-- or not -->', 'take': 'See <b>this</b>.'}

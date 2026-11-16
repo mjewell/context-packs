@@ -21,10 +21,10 @@ def quoted(text):
     return '\n'.join(f'> {line}' if line else '>' for line in defused(text).split('\n'))
 
 
-def body(finding, head, repo, number):
+def body(finding, head):
     """The comment that opens a thread for the finding: what it is, the rules it quotes, and the take."""
     parts = [f"pack-review found {NAMES[finding['kind']]} here at `{head[:7]}`: "
              f"**{defused(finding['headline'])}**"]
     parts += [f"From `{defused(rule['file'])}`:\n\n{quoted(rule['quote'])}" for rule in finding['rules']]
-    parts += [defused(finding['take']), f'To go through it, run `/pack-review {repo}#{number}` in Claude Code.']
+    parts.append(defused(finding['take']))
     return github.signed('\n\n'.join(parts))
