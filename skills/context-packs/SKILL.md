@@ -23,7 +23,7 @@ Done when the target repo's packs are what the user asked for and synced, any wo
    - **Group packs, or move one:** move its folder within `context-packs/` and resync; it renders where it now sits, and its id becomes its new folder. To put several packs behind one row of the user's, move their folders into a folder whose `pack.md` has a `when`.
    - **Remove a pack:** `remove <id>`.
    - **Take the latest:** `update`, or `update <id>…` for some packs. A pack pinned to a commit moves to the default branch's tip, and one pinned to a tag stays where it is. `update <id> --ref <tag or commit>` pins one pack somewhere specific.
-   - **Add or drop one of the repo's own context docs:** add or delete the doc in `context-packs/`, give a new one a `when:` line in its front matter, and resync with no command.
+   - **Add or drop one of the repo's own docs:** add or delete the doc in `context-packs/`, give a new one a `when:` line in its front matter, and resync with no command.
    - **Resync without changing anything:** no command.
    - **Check whether a resync is needed, writing nothing:** `check`. It exits 1 and names what's stale.
 5. If the repo's `AGENTS.md` or `CLAUDE.md` exists without a context-packs block, the tool stops, names the file, and prints two lines. When it names both files, ask the user which should hold the packs. Paste the lines into that file, after its intro and before its project-specific sections, then run the command again. If it says the file has blocks from an older version, follow the steps it prints, which `docs/reference.md` in mjewell/context-packs also lists under "Upgrading from 0.6", and show the user the result before going on.

@@ -125,4 +125,4 @@ Edit only files I own. Plugins, synced skills, and installed dependencies belong
 - The skills in `skills/` are for anyone using the tool, so they rely on nothing from any one person's packs.
 - Run the tests with `python3 -m unittest discover tests`.
 - `GLOSSARY.md` holds the terms for the packs and the review. Use them in code, docs and skills. When a name settles, add or update its entry there.
-- This repo's own context docs are in `context-packs/project/`, and its shared rules come from agent-config through the import pack `context-packs/core/`. After adding a doc or changing its `when:` line, run `node bin/context-packs.js` and commit the result.
+- This repo's own docs are in `context-packs/project/`, and its shared rules come from agent-config through the import pack `context-packs/core/`. After adding a doc or changing its `when:` line, run `node bin/context-packs.js` and commit the result.
