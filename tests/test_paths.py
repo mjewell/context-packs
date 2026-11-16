@@ -1,6 +1,6 @@
 import unittest
 
-from test_cli import CLAUSE, SyncCase, doc
+from test_cli import CLAUSE, OUTSIDE_CLAUSE, SyncCase, doc
 
 
 def rows(*pairs):
@@ -22,11 +22,12 @@ class OutsideRepoTests(SyncCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(rows(('Writing tests', f'{self.repo}/context-packs/testing.md')), self.agents())
 
-    def test_header_doesnt_say_where_paths_start(self):
+    def test_header_says_doc_paths_start_from_the_docs_folder_then_where_the_session_started(self):
         result = self.sync()
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn(CLAUSE, self.agents())
+        self.assertIn(f'read its doc. {OUTSIDE_CLAUSE}The packs here', self.agents())
 
     def test_a_nested_packs_index_has_absolute_rows(self):
         self.write('context-packs/web/pack.md', doc('Editing `web/**`'))
