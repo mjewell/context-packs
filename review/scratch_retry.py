@@ -1,4 +1,4 @@
-"""Retry a GitHub request up to three times, a second apart. A scratch file for testing the review action."""
+"""Retry a GitHub request up to three times, one second apart. A scratch file for testing the review action."""
 import time
 
 import requests
