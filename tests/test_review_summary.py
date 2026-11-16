@@ -3,6 +3,7 @@ import re
 
 from fake_github import comment, ok, pull_request
 from review_case import HEAD, MARKER, ReviewCase, own
+from test_review_transcript import call, result
 
 BASE = 'b' * 40
 DOC = 'One.\nTwo.\nThree.\n'
@@ -23,21 +24,29 @@ def block(body):
     return json.loads(found.group(1)), found.group(1)
 
 
+def reads(root, paths):
+    """A finder's transcript that reads each of the paths in full, in one Read each."""
+    return [part for n, path in enumerate(paths)
+            for part in (call(f'r{n}', 'Read', {'file_path': str(root / path)}), result(f'r{n}', 'the doc'))]
+
+
 class SummaryCase(ReviewCase):
-    """A run about to post its summary: the agent's answer, the docs the tables point at, checked out here, and the
-    transcript of what the agent did."""
+    """A run about to post its summary: the merging agent's answer, an instruction file and the docs the tables point
+    at, checked out here, each finder's record of what it read, and the transcript of what the merging agent did."""
 
     def setUp(self):
         super().setUp()
         self.github.responses.update({'PullRequest': pull_request(), 'AddComment': ok({}), 'UpdateComment': ok({})})
 
     def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', docs=(), messages=(), changed=(),
-                  pairs=(), commentary=(), shown=None):
-        """Post the summary of the agent's output, with docs as `context-packs docs` lists them, each pack a list,
-        changed as the git server's changed tool lists the paths, each a (lines, path) pair, and pairs as the match job
-        checked them."""
+                  pairs=(), commentary=(), shown=None, finders=None):
+        """Post the summary of the merging agent's output, with docs as `context-packs docs` lists them, each pack a
+        list, changed as the git server's changed tool lists the paths, each a (lines, path) pair, and pairs as the
+        match job checked them. finders is each unit's finder's transcript, in unit order: by default, each reads its
+        whole unit."""
         (self.root / 'output.json').write_text(
             output if output is not None else json.dumps({'findings': list(findings)}))
+        (self.root / 'AGENTS.md').write_text(f'<!-- context-packs:start -->\n{DOC}<!-- context-packs:end -->\n')
         for path in (path for pack in docs for path in pack):
             (self.root / path).parent.mkdir(parents=True, exist_ok=True)
             (self.root / path).write_text(DOC)
@@ -45,7 +54,21 @@ class SummaryCase(ReviewCase):
         (self.root / 'transcript.json').write_text(json.dumps(list(messages)))
         (self.root / 'changed.txt').write_text(''.join(f'{lines}\t{path}\n' for lines, path in changed))
         (self.root / 'shown.json').write_text(json.dumps(shown or {}))
+        units = [['AGENTS.md'], *docs]
+        if finders is None:
+            finders = [reads(self.root, unit) for unit in units]
+        (self.root / 'units').mkdir(exist_ok=True)
+        log = ''
+        for n, transcript in enumerate(finders):
+            (self.root / f'finder-{n}.json').write_text(json.dumps(list(transcript)))
+            (self.root / 'finder-output.json').write_text(json.dumps({'findings': []}))
+            run = self.script('unit_report', '--unit', n, '--docs', 'docs.txt', '--findings', 'finder-output.json',
+                              '--transcript', f'finder-{n}.json', '--changed', 'changed.txt', '--out',
+                              f'units/unit-{n}.json')
+            self.assertEqual(run.returncode, 0, run.stderr)
+            log += run.stdout
         report = self.report(base_ref, head)
+        report.stdout = log + report.stdout
         if report.returncode:
             return report
         (self.root / 'match.json').write_text(json.dumps({'pairs': list(pairs), 'commentary': list(commentary)}))
@@ -54,10 +77,11 @@ class SummaryCase(ReviewCase):
         return post
 
     def report(self, base_ref='main', head=HEAD):
-        """The find job's report on the agent's output, written to report.json for the post job."""
+        """The merge job's report on the merging agent's output and the finders' records, written to report.json for
+        the post job."""
         return self.script('report', '--base', BASE, '--base-ref', base_ref, '--head', head, '--findings',
                            'output.json', '--transcript', 'transcript.json', '--docs', 'docs.txt', '--changed',
-                           'changed.txt', '--shown', 'shown.json', '--out', 'report.json')
+                           'changed.txt', '--shown', 'shown.json', '--units', 'units', '--out', 'report.json')
 
     def body(self):
         [sent] = self.sent('AddComment') or self.sent('UpdateComment')
@@ -112,7 +136,7 @@ class SummaryTests(SummaryCase):
     def test_says_a_review_that_skipped_docs_is_partial_and_lists_them_in_the_block(self):
         unread = ['context-packs/project/review.md', 'context-packs/gen/core/testing.md']
 
-        result = self.summarize([], docs=[unread])
+        result = self.summarize([], docs=[unread], finders=[reads(self.root, ['AGENTS.md']), []])
 
         self.assertEqual(result.returncode, 0, result.stderr)
         body = self.body()
@@ -124,7 +148,7 @@ class SummaryTests(SummaryCase):
         self.assertGreater(body.index('review.md'), body.index('<details>'))
 
     def test_cleans_the_unread_paths_like_the_findings(self):
-        self.summarize([], docs=[['context-packs/a\u200b.md']])
+        self.summarize([], docs=[['context-packs/a\u200b.md']], finders=[reads(self.root, ['AGENTS.md']), []])
 
         self.assertEqual(block(self.body())[0]['unread'], ['context-packs/a.md'])
 

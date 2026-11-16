@@ -1,4 +1,4 @@
-from test_review_summary import SummaryCase, block
+from test_review_summary import SummaryCase, block, reads
 from test_review_transcript import call, result
 
 # Three paths, as the git server's changed tool lists them: long.txt's diff takes three pages.
@@ -13,22 +13,21 @@ class UnreadDiffsTests(SummaryCase):
         return [call(id, 'mcp__git__diff', {'path': path, **page}, parent=parent),
                 result(id, 'the diff', error=error, parent=parent)]
 
-    def unread(self, messages, findings=()):
-        run = self.summarize(findings, messages=messages, changed=CHANGED)
+    def unread(self, messages, findings=(), finder=()):
+        """The diffs no one read, when the merging agent's transcript is messages, and the one finder's, for the
+        instruction file, also reads it and then finder."""
+        run = self.summarize(findings, messages=messages, changed=CHANGED,
+                             finders=[[*reads(self.root, ['AGENTS.md']), *finder]])
         self.assertEqual(run.returncode, 0, run.stderr)
         return block(self.body())[0]['unread_diffs'], run.stdout
 
     def test_lists_the_paths_no_agent_read_and_logs_who_read_the_rest(self):
-        unread, log = self.unread([
-            *self.diff('t1', 'a.txt'),
-            call('t2', 'Agent', {'description': 'Check the project pack'}),
-            *[part for page in (1, 2, 3) for part in self.diff(f's{page}', 'long.txt', parent='t2', page=page)],
-            result('t2', 'ledger'),
-        ])
+        unread, log = self.unread([part for page in (1, 2, 3) for part in self.diff(f's{page}', 'long.txt', page=page)],
+                                  finder=self.diff('t1', 'a.txt'))
 
         self.assertEqual(unread, ['package-lock.json'])
-        self.assertIn('diff read by the agent: a.txt', log)
-        self.assertIn('diff read by subagent 1: long.txt', log)
+        self.assertIn("diff read by unit 0's finder: a.txt", log)
+        self.assertIn('diff read by the merging agent: long.txt', log)
         self.assertIn('diff not read: package-lock.json', log)
 
     def test_doesnt_count_a_diff_one_agent_read_only_part_of(self):

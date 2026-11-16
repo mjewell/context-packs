@@ -12,15 +12,15 @@ from git_server import pages
 PAGE = 2000
 
 
-def succeeded(messages, tool):
-    """Who made each of the tool's calls that didn't fail, and its input: the agent, or a subagent numbered in the
-    order it started."""
+def succeeded(messages, tool, name):
+    """Who made each of the tool's calls that didn't fail, and its input: name for the agent whose transcript it is, or
+    a subagent numbered in the order it started."""
     calls, failed, agents = {}, set(), {}
     for message in messages:
         if message.get('type') not in ('assistant', 'user'):
             continue
         parent = message.get('parent_tool_use_id')
-        reader = 'the agent' if parent is None else agents.setdefault(parent, f'subagent {len(agents) + 1}')
+        reader = name if parent is None else agents.setdefault(parent, f'subagent {len(agents) + 1}')
         for part in message['message']['content']:
             if isinstance(part, str):
                 continue
@@ -31,11 +31,11 @@ def succeeded(messages, tool):
     return [call for id, call in calls.items() if id not in failed]
 
 
-def covered(messages, checkout):
+def covered(messages, checkout, name):
     """The lines of each file in the checkout, by its path from there, that each agent's successful Reads returned,
     keyed by who read them."""
     lines = {}
-    for reader, input in succeeded(messages, 'Read'):
+    for reader, input in succeeded(messages, 'Read', name):
         path = os.path.relpath(os.path.realpath(input['file_path']), checkout)
         if path.startswith('..'):
             continue
@@ -45,9 +45,9 @@ def covered(messages, checkout):
     return lines
 
 
-def readers(messages, docs, checkout):
+def readers(messages, docs, checkout, name):
     """Who read each doc in the checkout, by its path from there, in full: none for a doc no agent read."""
-    lines = covered(messages, checkout)
+    lines = covered(messages, checkout, name)
     found = {}
     for doc in docs:
         whole = set(range(1, len((Path(checkout) / doc).read_text(encoding='utf-8').splitlines()) + 1))
@@ -55,11 +55,11 @@ def readers(messages, docs, checkout):
     return found
 
 
-def diff_readers(messages, changed):
+def diff_readers(messages, changed, name):
     """Who read each changed path's diff in full, from the (lines, path) pairs the git server's changed tool lists:
     none for a path no agent read."""
     seen = {}
-    for reader, input in succeeded(messages, 'mcp__git__diff'):
+    for reader, input in succeeded(messages, 'mcp__git__diff', name):
         seen.setdefault(input['path'], {}).setdefault(reader, set()).add(input.get('page', 1))
     return {path: [reader for reader, got in seen.get(path, {}).items() if set(range(1, pages(lines) + 1)) <= got]
             for lines, path in changed}
