@@ -37,7 +37,7 @@ def summary(repo, number, report):
     if findings or unread:
         text += f"\n\nTo go through them, run `/pack-review {repo}#{number}`."
     # Backticks only occur inside JSON strings, where \u0060 means the same, so nothing can close the fence.
-    data = json.dumps({key: report[key] for key in ('base', 'base_ref', 'head', 'findings', 'unread', 'unread_diffs')},
+    data = json.dumps({key: report[key] for key in ('base', 'base_ref', 'head', 'findings', 'unread')},
                       indent=2, ensure_ascii=False)
     data = data.replace('`', '\\u0060')
     return github.signed(f'{text}\n\n<details><summary>Findings for the local review</summary>\n\n```json\n{data}\n'
@@ -48,12 +48,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pr', type=int, required=True, help='the PR number')
     parser.add_argument('--report', type=Path, required=True, help="the find job's report, from report.py")
-    parser.add_argument('--match', type=Path, required=True, help="the match job's pairs and commentary, from pairing.py")
+    parser.add_argument('--paired', type=Path, required=True,
+                        help="the threads job's pairs and commentary, from pairing.py")
     args = parser.parse_args()
     report = json.loads(args.report.read_text(encoding='utf-8'))
-    matched = json.loads(args.match.read_text(encoding='utf-8'))
-    threads = {pair['finding']: pair['thread'] for pair in matched['pairs']}
-    commentary = {item['finding']: item['text'] for item in matched['commentary']}
+    paired = json.loads(args.paired.read_text(encoding='utf-8'))
+    threads = {pair['finding']: pair['thread'] for pair in paired['pairs']}
+    commentary = {item['finding']: item['text'] for item in paired['commentary']}
     report['findings'] = [{**finding, 'thread': threads.get(n), 'commentary': commentary.get(n)}
                           for n, finding in enumerate(report['findings'])]
     pr = github.pull_request(args.pr)

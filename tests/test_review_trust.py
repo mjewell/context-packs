@@ -37,7 +37,7 @@ class TrustCase(ReviewCase):
 
 
 class ThreadsTests(TrustCase):
-    """threads.py prints pack-review's threads on one PR, open and resolved, for the match job's agents."""
+    """threads.py prints pack-review's threads on one PR, open and resolved, for the threads job's agents."""
 
     def test_prints_pack_reviews_threads_and_leaves_out_others(self):
         found = self.threads(thread('T_1', [ours()]),

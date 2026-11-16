@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The match job's scripts, for its two agent calls. `pair-prompt` writes, as step outputs, the prompt and claude_args
+"""The threads job's scripts, for its two agent calls. `pair-prompt` writes, as step outputs, the prompt and claude_args
 for the agent that pairs this run's findings with pack-review's threads, and whether it needs to run. `pair-check`
 checks the pairs it answered and writes them for the post job. The pairing agent gets only findings and the comment
 pack-review opened each thread with, all of which pack-review wrote, so no one's reply can bias which thread a
@@ -111,7 +111,7 @@ def comment_prompt(args):
     report = load(args.report)
     findings = report['findings']
     threads = {thread['id']: thread for thread in load(args.threads)}
-    pairs = load(args.match)['pairs']
+    pairs = load(args.paired)['pairs']
     output('needed', 'true' if pairs else 'false')
     if not pairs:
         return
@@ -122,8 +122,8 @@ def comment_prompt(args):
 
 
 def comment_check(args):
-    matched = load(args.match)
-    paired = {pair['finding'] for pair in matched['pairs']}
+    pairing = load(args.paired)
+    paired = {pair['finding'] for pair in pairing['pairs']}
     commentary = []
     if args.commentary is not None:
         try:
@@ -144,7 +144,7 @@ def comment_check(args):
                 sys.exit(f'pack-review: the commentary on finding {finding} is empty.')
             seen.add(finding)
             commentary.append({'finding': finding, 'text': text})
-    Path(args.match).write_text(json.dumps({**matched, 'commentary': commentary}), encoding='utf-8')
+    Path(args.paired).write_text(json.dumps({**pairing, 'commentary': commentary}), encoding='utf-8')
 
 
 def prompt(args):
@@ -199,7 +199,7 @@ def main():
         command.add_argument('--report', required=True, help="the find job's report")
         command.add_argument('--threads', required=True, help="pack-review's threads, as threads.py prints them")
         if name == 'comment-prompt':
-            command.add_argument('--match', required=True, help='the pairs, as pair-check wrote them')
+            command.add_argument('--paired', required=True, help='the pairs, as pair-check wrote them')
         command.add_argument('--model', default='', help="the model to use, if not Claude Code's default")
     command = commands.add_parser('pair-check', help='check the pairs and write them for the post job')
     command.add_argument('--report', required=True, help="the find job's report")
@@ -207,7 +207,7 @@ def main():
     command.add_argument('--pairs', help="the pairing agent's structured output, if it ran")
     command.add_argument('--out', required=True, help='where to write the pairs')
     command = commands.add_parser('comment-check', help="check the commentary and add it to the pairs' file")
-    command.add_argument('--match', required=True, help='the pairs, as pair-check wrote them')
+    command.add_argument('--paired', required=True, help='the pairs, as pair-check wrote them')
     command.add_argument('--commentary', help="the commentary agent's structured output, if it ran")
     args = parser.parse_args()
     {'pair-prompt': prompt, 'pair-check': check, 'comment-prompt': comment_prompt,

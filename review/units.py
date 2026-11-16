@@ -21,8 +21,8 @@ LOG = "the git server's `log` tool"
 # What a finder in CI needs beyond the unit prompt, which a local subagent gets from the agent that starts it.
 IN_CI = '''
 
-You have no shell, and no way to read or write the pull request. `diff` and `show` start each line the head has with \
-its line number there: give that number as a spot's line, not a count of lines in the diff. Read every page of a \
+You have no shell, and no way to read or write the pull request. `diff` starts each line the head has with its line \
+number there: give that number as a spot's line, not a count of lines in the diff. Read every page of a \
 path's diff before you judge it. Answer in the shape the output schema sets: each rule with a deviating spot is one \
 finding of kind `deviates`.'''
 

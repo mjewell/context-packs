@@ -2,12 +2,12 @@ import json
 import shlex
 
 from review_case import REVIEW, ReviewCase
-from test_review_match import MatchCase
+from test_review_pairing import PairingCase
 
 DOCS = 'context-packs/project/a.md\ncontext-packs/project/b.md\n\ncontext-packs/gen/core/c.md\n'
 
 
-class UnitsCase(MatchCase):
+class UnitsCase(PairingCase):
     """A checkout with an instruction file holding the context-packs block, and the docs `context-packs docs` lists,
     by pack."""
 

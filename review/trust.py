@@ -1,6 +1,6 @@
 """What of a PR's review threads an agent may read. A comment's text comes back only when its author can write to the
 repo now, or pack-review wrote it. Anyone else's comment comes back as its id and why it's hidden, without their login,
-which is text they chose. The match job reads threads only through this module, so the rule has one home."""
+which is text they chose. The threads job reads threads only through this module, so the rule has one home."""
 import urllib.parse
 
 import github

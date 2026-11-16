@@ -25,8 +25,8 @@ ALICE = {'id': 'RC_2', 'author': 'alice', 'at': '2026-11-02T10:00:00Z', 'text': 
          'ours': False}
 
 
-class MatchCase(ReviewCase):
-    """The match job, between find and post: the find job's report, and pack-review's threads as threads.py prints
+class PairingCase(ReviewCase):
+    """The threads job, between find and post: the find job's report, and pack-review's threads as threads.py prints
     them."""
 
     def setUp(self):
@@ -37,8 +37,7 @@ class MatchCase(ReviewCase):
 
     def given(self, findings, threads, head='h' * 40):
         (self.root / 'report.json').write_text(json.dumps({'base': 'b' * 40, 'base_ref': 'main', 'head': head,
-                                                           'findings': findings, 'unread': [],
-                                                           'unread_diffs': []}))
+                                                           'findings': findings, 'unread': []}))
         (self.root / 'threads.json').write_text(json.dumps(threads))
 
     def outputs(self):
@@ -58,13 +57,13 @@ class MatchCase(ReviewCase):
         if pairs is not None:
             (self.root / 'pairs.json').write_text(pairs if isinstance(pairs, str) else json.dumps({'pairs': pairs}))
         return self.script('pairing', 'pair-check', '--report', 'report.json', '--threads', 'threads.json', *args,
-                           '--out', 'match.json')
+                           '--out', 'paired.json')
 
     def matched(self):
-        return json.loads((self.root / 'match.json').read_text())
+        return json.loads((self.root / 'paired.json').read_text())
 
 
-class PromptTests(MatchCase):
+class PromptTests(PairingCase):
     """The pairing agent gets this run's findings and the findings pack-review's threads were opened for, and no
     comment anyone wrote, so no comment can bias which thread a finding lands in."""
 
@@ -101,7 +100,7 @@ class PromptTests(MatchCase):
                 self.assertEqual(self.prompt()['needed'], 'false')
 
 
-class CheckTests(MatchCase):
+class CheckTests(PairingCase):
     """The post job gets only pairs that name a new finding and one of pack-review's threads, each at most once."""
 
     def setUp(self):
@@ -128,7 +127,7 @@ class CheckTests(MatchCase):
 
                 self.assertEqual(run.returncode, 1)
                 self.assertIn(says, run.stderr)
-                self.assertFalse((self.root / 'match.json').exists())
+                self.assertFalse((self.root / 'paired.json').exists())
 
     def test_refuses_an_answer_that_isnt_pairs(self):
         run = self.check('')
@@ -143,13 +142,13 @@ RELAYED = {'id': 'RC_4', 'author': 'github-actions', 'at': '2026-11-03T10:00:00Z
 LATER = {'id': 'RC_5', 'author': 'alice', 'at': '2026-11-04T10:00:00Z', 'text': 'Fixed in the last push.', 'ours': False}
 
 
-class CommentCase(MatchCase):
-    """The match job after pairing: F1 continues T1. The review ran again at the head."""
+class CommentCase(PairingCase):
+    """The threads job after pairing: F1 continues T1. The review ran again at the head."""
 
     def setUp(self):
         super().setUp()
         self.thread([ALICE, BOB])
-        (self.root / 'match.json').write_text(json.dumps({'pairs': [{'finding': 0, 'thread': 'T_1'}]}))
+        (self.root / 'paired.json').write_text(json.dumps({'pairs': [{'finding': 0, 'thread': 'T_1'}]}))
 
     def thread(self, replies):
         self.given([F1, F3], [opened('T_1', F1, replies=replies), opened('T_2', finding('Old'), resolved=True)],
@@ -157,7 +156,7 @@ class CommentCase(MatchCase):
 
     def comment_prompt(self):
         run = self.script('pairing', 'comment-prompt', '--report', 'report.json', '--threads', 'threads.json',
-                          '--match', 'match.json')
+                          '--paired', 'paired.json')
         self.assertEqual(run.returncode, 0, run.stderr)
         return self.outputs()
 
@@ -167,7 +166,7 @@ class CommentCase(MatchCase):
             (self.root / 'commentary.json').write_text(
                 commentary if isinstance(commentary, str) else json.dumps({'commentary': commentary}))
             args = ['--commentary', 'commentary.json']
-        return self.script('pairing', 'comment-check', '--match', 'match.json', *args)
+        return self.script('pairing', 'comment-check', '--paired', 'paired.json', *args)
 
 
 class CommentPromptTests(CommentCase):
@@ -213,7 +212,7 @@ class CommentPromptTests(CommentCase):
         self.assertIn('"commentary"', args)
 
     def test_needs_no_agent_when_nothing_is_paired(self):
-        (self.root / 'match.json').write_text(json.dumps({'pairs': []}))
+        (self.root / 'paired.json').write_text(json.dumps({'pairs': []}))
 
         self.assertEqual(self.comment_prompt()['needed'], 'false')
 
@@ -232,7 +231,7 @@ class CommentCheckTests(CommentCase):
     def test_adds_no_commentary_when_the_agent_didnt_run_or_had_nothing_to_say(self):
         for commentary in (None, []):
             with self.subTest(commentary=commentary):
-                (self.root / 'match.json').write_text(json.dumps({'pairs': [{'finding': 0, 'thread': 'T_1'}]}))
+                (self.root / 'paired.json').write_text(json.dumps({'pairs': [{'finding': 0, 'thread': 'T_1'}]}))
 
                 self.assertEqual(self.comment_check(commentary).returncode, 0)
                 self.assertEqual(self.matched()['commentary'], [])

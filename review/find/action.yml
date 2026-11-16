@@ -36,14 +36,13 @@ runs:
         HEAD: ${{ github.event.pull_request.head.sha }}
         MODEL: ${{ inputs.model }}
         UNIT: ${{ inputs.unit }}
-      # The finder's prompt holds its unit's docs, and it reads the change through the git server. docs.txt and
-      # changed.txt are for the record of what it read. They go in a new folder outside the checkout, so no path the PR
-      # controls, such as a symlink, decides where they're written.
+      # The finder's prompt holds its unit's docs, and it reads the change through the git server. docs.txt is for the
+      # record of what it read. It goes in a new folder outside the checkout, so no path the PR controls, such as a
+      # symlink, decides where it's written.
       run: |
         inputs=$(mktemp -d "$RUNNER_TEMP/pack-review.XXXXXX")
         echo "inputs=$inputs" >> "$GITHUB_OUTPUT"
         python3 "$GITHUB_ACTION_PATH/../../src/cli.py" docs > "$inputs/docs.txt"
-        python3 "$GITHUB_ACTION_PATH/../git_server.py" --base "$BASE" --head "$HEAD" changed > "$inputs/changed.txt"
         python3 "$GITHUB_ACTION_PATH/../units.py" prompt --docs "$inputs/docs.txt" --unit "$UNIT" --base "$BASE" \
           --head "$HEAD" --model "$MODEL"
     - name: Check the unit
@@ -76,7 +75,7 @@ runs:
         mkdir "$RUNNER_TEMP/pack-review-unit"
         python3 "$GITHUB_ACTION_PATH/../unit_report.py" --unit "$UNIT" --docs "$INPUTS/docs.txt" \
           --findings "$RUNNER_TEMP/pack-review-findings.json" --transcript "$TRANSCRIPT" \
-          --changed "$INPUTS/changed.txt" --out "$RUNNER_TEMP/pack-review-unit/unit-$UNIT.json"
+          --out "$RUNNER_TEMP/pack-review-unit/unit-$UNIT.json"
     - name: Save the record
       # v7.0.2, pinned by commit since a tag can move.
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9

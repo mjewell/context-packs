@@ -1,12 +1,9 @@
-"""Which docs, and which changed paths' diffs, the review agent and its subagents read in full, from the transcript
-claude-code-action saves. The summary runs it after the agent, so it can't change the answer: it shows whether the
-review skipped one. A doc counts as read once one agent was returned every line of it, by one Read or by several pages,
-judged by each Read's offset and limit. A diff counts as read once one agent was returned every page of it by the git
-server's diff tool."""
+"""Which docs the review agent and its subagents read in full, from the transcript claude-code-action saves. The
+summary runs it after the agent, so it can't change the answer: it shows whether the review skipped one. A doc counts
+as read once one agent was returned every line of it, by one Read or by several pages, judged by each Read's offset and
+limit."""
 import os
 from pathlib import Path
-
-from git_server import pages
 
 # How many lines Claude Code's Read returns when it's given no limit.
 PAGE = 2000
@@ -54,12 +51,3 @@ def readers(messages, docs, checkout, name):
         found[doc] = [reader for reader, seen in lines.get(doc, {}).items() if whole <= seen]
     return found
 
-
-def diff_readers(messages, changed, name):
-    """Who read each changed path's diff in full, from the (lines, path) pairs the git server's changed tool lists:
-    none for a path no agent read."""
-    seen = {}
-    for reader, input in succeeded(messages, 'mcp__git__diff', name):
-        seen.setdefault(input['path'], {}).setdefault(reader, set()).add(input.get('page', 1))
-    return {path: [reader for reader, got in seen.get(path, {}).items() if set(range(1, pages(lines) + 1)) <= got]
-            for lines, path in changed}
