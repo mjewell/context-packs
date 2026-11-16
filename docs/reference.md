@@ -144,6 +144,8 @@ Prompts close to a row's `when` that shouldn't match it, or that match only thro
 
 ## Reviewing PRs in CI
 
+**Experimental.** The review action is still changing: its jobs, their inputs, and what it posts on a PR can change in any release. Pin it to a commit, not `@main`, and expect to update your workflow when you move the pin.
+
 The review runs as five jobs, each a composite action under `review/`. One finder per unit of your packs checks the PR, an agent merges what they found, the merged findings are paired with pack-review's threads from earlier runs, and a script posts the review. The author then goes through the findings in a local session. Add a workflow such as `.github/workflows/pack-review.yml`:
 
 ```yaml
@@ -226,7 +228,7 @@ The units are your instruction file, then each pack's docs. The workflow starts 
 
 With a Pro or Max subscription instead of an API key, run `claude setup-token` locally, add what it prints as the secret `CLAUDE_CODE_OAUTH_TOKEN`, and pass `claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}` in place of `anthropic-api-key`. Reviews then count against the subscription's usage limits.
 
-It reviews a PR when it's opened or marked ready, again on each push, and again when its base branch changes. A newer push cancels a review still running. Pin `@main` to a release tag once you've tried it. Pass `model` to `review/find`, `review/merge` or `review/match` to use a model other than Claude Code's default.
+It reviews a PR when it's opened or marked ready, again on each push, and again when its base branch changes. A newer push cancels a review still running. Pin `@main` to a commit once you've tried it. Pass `model` to `review/find`, `review/merge` or `review/match` to use a model other than Claude Code's default.
 
 Each review posts **one summary comment**, edited on each run. It counts the findings, and ends with every finding as JSON in a `<details>` block for the local run. A step after the agent writes it from the agent's answer. A run that fails posts nothing and leaves the last summary, which names the commit and base branch it reviewed. If no agent read some doc the tables point at in full, the summary lists it, as a partial review.
 
