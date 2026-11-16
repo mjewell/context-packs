@@ -80,12 +80,13 @@ class PromptTests(MatchCase):
         self.assertNotIn('balance spec', prompt)
         self.assertNotIn('alice', prompt)
 
-    def test_runs_the_agent_with_no_tools_and_the_pairs_schema(self):
+    def test_runs_the_agent_with_only_the_tool_that_returns_its_answer_and_the_pairs_schema(self):
         self.given([F1], [opened('T_1', F1)])
 
         args = self.prompt()['claude-args']
 
-        self.assertIn("--tools ''", args)
+        # Claude Code returns an answer to --json-schema through the StructuredOutput tool, which --tools '' removes.
+        self.assertIn('--tools StructuredOutput', args)
         self.assertIn('--strict-mcp-config', args)
         self.assertIn('"pairs"', args)
 

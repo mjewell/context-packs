@@ -67,7 +67,9 @@ def prompt(args):
         findings='\n\n'.join(f'{n}: {json.dumps(f, ensure_ascii=False)}' for n, f in enumerate(findings)),
         threads='\n\n'.join(f"{json.dumps(id)} on {thread['path']}:{thread['line']}: "
                               f'{json.dumps(text, ensure_ascii=False)}' for id, (thread, text) in threads.items())))
-    output('claude-args', line(['--tools', '', '--json-schema', compact(SCHEMA),
+    # Claude Code returns an answer to --json-schema through the StructuredOutput tool, so the agent keeps that one tool
+    # and no other. --tools '' would remove it too, and the agent would answer in text.
+    output('claude-args', line(['--tools', 'StructuredOutput', '--json-schema', compact(SCHEMA),
                                 *(['--model', args.model] if args.model else []), '--restricted',
                                 '--strict-mcp-config']))
 
