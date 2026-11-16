@@ -28,7 +28,7 @@ finding of kind `deviates`.'''
 
 
 def units(docs):
-    """Each unit's paths: the instruction file, then each pack's block of docs."""
+    """Each unit's paths: the instruction file, then the docs each pack's table points at."""
     blocks = [block.split() for block in Path(docs).read_text(encoding='utf-8').split('\n\n') if block.strip()]
     return [[instructions(Path('.')).name], *blocks]
 

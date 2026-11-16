@@ -256,7 +256,7 @@ class EvalTests(EvalCase):
 
 class PackTests(EvalCase):
     """A pack's .evals/ at its root: its prompts run with that pack installed alone, plus everything inside it. For
-    context-packs/, the pack at the top, that's the whole repo."""
+    context-packs/, the top-level pack, that's the whole repo."""
 
     def setUp(self):
         super().setUp()

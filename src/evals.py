@@ -1,6 +1,6 @@
 """Run each pack's eval prompts: under `## Reads`, prompts that should make an agent read a doc, and under `## Skips`,
 ones that shouldn't. A pack's prompts sit in .evals/ at its root, in a file named by the doc's path in the pack, and
-run with that pack installed alone, plus everything inside it: for context-packs/, the pack at the top, that's the
+run with that pack installed alone, plus everything inside it: for context-packs/, the top-level pack, that's the
 whole repo. Each runs as a `claude -p` session in a copy of the pack's .evals/fixture/, or, without one, of the repo
 for context-packs/ and of an empty folder for any other pack, and passes on whether the session read the doc."""
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -114,7 +114,7 @@ def init(copy):
 
 def stage(repo, pack, into):
     """Write the folder the pack's sessions run in a copy of: its fixture, or else the repo for context-packs/ or an
-    empty folder, with the pack synced into it alone, or with all of context-packs/ for the pack at the top. A folder
+    empty folder, with the pack synced into it alone, or with all of context-packs/ for the top-level pack. A folder
     read in place is named by its absolute path, so its rows point at the folder itself from the copy."""
     fixture = repo / pack.evals / 'fixture'
     if not fixture.is_dir() and pack.top:

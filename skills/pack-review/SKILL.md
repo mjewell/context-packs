@@ -43,7 +43,7 @@ Run the `pack-rule` skill once for each finding the user wants recorded in the p
 CI posts one summary comment on the PR. It counts the findings for people, and ends with every finding as JSON in a `<details>` block:
 
 ````text
-<details><summary>Findings for the local review</summary>
+<details><summary>Findings for pack-review</summary>
 
 ```json
 {"base": "...", "base_ref": "...", "head": "...", "findings": [...]}
@@ -70,11 +70,11 @@ query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
 .data.repository.pullRequest as $pr
 | {head: $pr.headRefOid, base_ref: $pr.baseRefName},
   ($pr.comments.nodes[]
-   | select(.body | contains("<summary>Findings for the local review</summary>"))
+   | select(.body | contains("<summary>Findings for pack-review</summary>"))
    | (.author.login == "github-actions" and (.body | test("<!-- pack-review -->\\s*$"))) as $ours
    | {author: .author.login, ours: $ours,
-      blocks: (.body | [match("<summary>Findings for the local review</summary>"; "g")] | length),
-      findings: (if $ours then (.bodyText | split("Findings for the local review\n")[1] | fromjson) else null end)})'
+      blocks: (.body | [match("<summary>Findings for pack-review</summary>"; "g")] | length),
+      findings: (if $ours then (.bodyText | split("Findings for pack-review\n")[1] | fromjson) else null end)})'
 ```
 
 It prints the PR's current `head` and `base_ref` once per page, then one line for each comment holding a findings block. A summary is pack-review's when its author is the bot that runs the workflow, `github-actions` for the workflow's own token, and it ends with pack-review's marker. If the workflow posts with another token, put that bot's login in place of `github-actions`. With no such line, the PR has no summary. With exactly one, go on only if it has `ours` true and `blocks` 1. Otherwise stop and show the user the lines, since a block anyone could write isn't pack-review's.

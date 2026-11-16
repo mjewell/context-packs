@@ -1,6 +1,6 @@
 ---
 name: pack-rule
-description: Write a pattern or convention into a repo's context packs, generalized from examples, updating the rule that already covers it rather than adding a duplicate. Use when asked to document a pattern or convention, add or change a rule or context doc, or when another skill hands over a candidate rule.
+description: Write a pattern or convention into a repo's context packs, generalized from examples, updating the rule that already covers it rather than adding a duplicate. Use when asked to document a pattern or convention, add or change a rule or doc, or when another skill hands over a candidate rule.
 ---
 
 # Pack rule

@@ -21,7 +21,7 @@ context/
         └── pack.md
 ```
 
-A nested pack gets a row in its parent's table, from the `when` in its `pack.md`, pointing at a generated index that holds its rules and a table of its own docs and nested packs. One whose `when` is `always` is inlined after its parent's rules and table instead, for rules that matter whenever its parent does.
+A nested pack gets a row in its parent's table, from the `when` in its `pack.md`, pointing at a generated index that holds its pack rules and a table of its own docs and nested packs. One whose `when` is `always` is inlined after its parent's rules and table instead, for rules that matter whenever its parent does.
 
 Each nested pack is a read an agent makes before reaching the docs inside it, so nest only where a subtree is big and its `when` is sharp, and use plain folders to group the rest.
 

@@ -40,7 +40,7 @@ def summary(repo, number, report):
     data = json.dumps({key: report[key] for key in ('base', 'base_ref', 'head', 'findings', 'unread')},
                       indent=2, ensure_ascii=False)
     data = data.replace('`', '\\u0060')
-    return github.signed(f'{text}\n\n<details><summary>Findings for the local review</summary>\n\n```json\n{data}\n'
+    return github.signed(f'{text}\n\n<details><summary>Findings for pack-review</summary>\n\n```json\n{data}\n'
                          '```\n\n</details>')
 
 

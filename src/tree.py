@@ -34,7 +34,7 @@ class Node(NamedTuple):
 
     @property
     def row(self):
-        """Whether the pack gets a row pointing at its index, rather than having its rules and table inlined after
+        """Whether the pack gets a row pointing at its index, rather than having its pack rules and table inlined after
         the rules and table of the pack holding it: it does when it has a when other than always."""
         return self.fields.get('when', 'always') != 'always'
 
@@ -68,7 +68,7 @@ def front(text, where, keys):
     if len(fields) != len(pairs):
         sys.exit(f'context-packs: {where} has front matter that isn\'t `key: value` lines.')
     if fields and not keys:
-        sys.exit(f'context-packs: {where} takes no front matter, since its rules are always inlined. '
+        sys.exit(f'context-packs: {where} takes no front matter, since its pack rules are always inlined. '
                  f'Remove {", ".join(sorted(fields))}.')
     unknown = sorted(set(fields) - set(keys))
     if unknown:
@@ -147,7 +147,7 @@ def load(repo, stack):
         home = Path(id)
         pack_md = source / home / 'pack.md'
         fields, rules = front(read(pack_md), pack.where(home / 'pack.md'), keys) if pack_md.is_file() else ({}, '')
-        # A nested pack's when is its row in its parent's table. The pack at the top needs none: without one, it's
+        # A nested pack's when is its row in its parent's table. The top-level pack needs none: without one, it's
         # inlined.
         if id and 'when' not in fields:
             sys.exit(f'context-packs: {pack.where(home / "pack.md")} must start with front matter saying when to '
@@ -201,7 +201,7 @@ def when(pack, path, text):
 
 
 def index(node, pack):
-    """Where a pack's generated index sits: pack.md for the pack at the top, since no doc can have that name."""
+    """Where a pack's generated index sits: pack.md for the top-level pack, since no doc can have that name."""
     return pack.generated / f'{node.id or "pack"}.md'
 
 

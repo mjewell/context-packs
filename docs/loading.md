@@ -3,14 +3,14 @@
 An agent reads `AGENTS.md` in every session. Three rules decide what else it reads, and when:
 
 - **A `when` puts content behind a lookup.** It becomes a row in a table, and the agent reads it only when the work matches. Every doc has one.
-- **`when: always`, or no `when` on a pack you import, inlines it.** Only a `pack.md` can be inlined: its rules sit wherever its parent's do, all the way up to `AGENTS.md` itself for a pack in `context-packs/`.
+- **`when: always`, or no `when` on a pack you import, inlines it.** Only a `pack.md` can be inlined: its pack rules sit wherever its parent's do, all the way up to `AGENTS.md` itself for a pack in `context-packs/`.
 - **A `pack.md` starts a new table** for the docs in its folder. A folder without one is just for organization: its docs join the nearest pack's table.
 
 `context-packs/` is a pack too, the one at the top: its `pack.md`, if it has one, is inlined into `AGENTS.md`, and its docs get the `## Context` table. A pack directly in it that gets a row gets it in that table too, pointing at its index, which starts with the pack's own heading.
 
 ## Choosing when a pack loads
 
-A pack's author suggests how it loads: if its `pack.md` has a `when`, it gets a row and loads only when that matches, and otherwise its rules are inlined into every session. A pack you install follows that suggestion, which moves with `update`, unless you choose for yourself:
+A pack's author suggests how it loads: if its `pack.md` has a `when`, it gets a row and loads only when that matches, and otherwise its pack rules are inlined into every session. A pack you install follows that suggestion, which moves with `update`, unless you choose for yourself:
 
 | You want | Do |
 |---|---|
@@ -39,7 +39,7 @@ context-packs/
         └── pack.md      # the import pack
 ```
 
-`AGENTS.md` gets one row, `Editing server/**`, pointing at `context-packs/gen/server.md`, which holds your rules, then the database pack's rules and table. Give the import pack a `when` of its own and it gets a row in that index instead.
+`AGENTS.md` gets one row, `Editing server/**`, pointing at `context-packs/gen/server.md`, which holds your pack rules, then the database pack's pack rules and table. Give the import pack a `when` of its own and it gets a row in that index instead.
 
 [The example](example.md#choosing-when-a-pack-loads) adds a pack with a `when` of its own, step by step. The tool keeps `from`, `path` and `ref`: `update` moves `ref`, and `remove` deletes the folder. An import pack's folder holds only its `pack.md`.
 

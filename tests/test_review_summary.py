@@ -104,6 +104,7 @@ class SummaryTests(SummaryCase):
         self.assertIn("pack-review checked `hhhhhhh` against this repo's context packs and found 2 deviations, "
                       '1 conflict, 3 uncovered choices.', body)
         self.assertIn('\n\nTo go through them, run `/pack-review o/r#7`.\n\n', body)
+        self.assertIn('<details><summary>Findings for pack-review</summary>', body)
         self.assertEqual(block(body)[0], {'base': BASE, 'base_ref': 'main', 'head': HEAD,
                                           'findings': [{**f, 'thread': None, 'commentary': None} for f in findings],
                                           'unread': []})
