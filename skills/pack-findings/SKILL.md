@@ -76,8 +76,8 @@ The base and head are given, and the head is checked out. The workflow has alrea
 You have no shell. You read the change through the git server's tools:
 
 - `changed` lists every path the change touches, with how many lines its diff has.
-- `diff` gives one path's diff. `log` gives the change's commits with their messages. `show`, `blame` and `file` read further.
-- `diff` and `show` start each line the head has with its line number there. Give that number as a spot's line, not a count of lines in the diff.
+- `diff` gives one path's diff. `log` gives the change's commits with their messages.
+- `diff` starts each line the head has with its line number there. Give that number as a spot's line, not a count of lines in the diff.
 - Long output comes in pages, and the last line of each page says how to get the next.
 
 The folder also holds what `context-packs docs` prints, as `docs.txt`, for step 5's search of the docs. You have no way to read or write the PR, so the signs that a deviation is deliberate come from the code and the commit messages.

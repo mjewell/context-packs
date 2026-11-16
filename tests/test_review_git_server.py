@@ -15,7 +15,7 @@ class HandshakeTests(GitCase):
         self.assertEqual(server.initialized['protocolVersion'], '2025-06-18')
         self.assertIn('tools', server.initialized['capabilities'])
         tools = server.request('tools/list')['tools']
-        self.assertEqual([tool['name'] for tool in tools], ['changed', 'diff', 'log', 'show', 'blame', 'file'])
+        self.assertEqual([tool['name'] for tool in tools], ['changed', 'diff', 'log'])
         for tool in tools:
             self.assertEqual(tool['inputSchema']['type'], 'object')
             self.assertFalse(tool['inputSchema']['additionalProperties'])
@@ -168,7 +168,7 @@ class PagingTests(GitCase):
 
 
 class CallTests(GitCase):
-    """The server runs only its six tools, with arguments their schemas allow, and answers anything else with an
+    """The server runs only its three tools, with arguments their schemas allow, and answers anything else with an
     error the agent can read, instead of stopping."""
 
     def setUp(self):
@@ -178,7 +178,7 @@ class CallTests(GitCase):
     def test_refuses_a_name_that_isnt_one_of_its_tools(self):
         server = self.server()
 
-        for name in ('paths', 'lines', '__init__', 'nope'):
+        for name in ('show', 'blame', 'file', 'paths', 'lines', '__init__', 'nope'):
             self.assertEqual(server.call(name), (f'There is no tool named {name}.', True))
 
     def test_refuses_arguments_its_schema_doesnt_allow(self):
@@ -212,48 +212,6 @@ class PathTests(GitCase):
         self.assertNotIn('b.txt', diff)
 
 
-class ShowTests(GitCase):
-    """show(commit) gives one commit's message and diff, numbered as diff() numbers them."""
-
-    def test_shows_the_message_and_numbers_each_files_diff_from_its_own_start(self):
-        self.commit('Add', {'a.txt': TWELVE})
-        commit = self.commit('Change two files\n\nThe reason.', {'a.txt': TWELVE.replace('l12\n', 'twelve\n'),
-                                                                  'b.txt': 'b\n'})
-
-        text = self.server().text('show', commit=commit[:10])
-
-        self.assertTrue(text.startswith(f'commit {commit}\n'), text)
-        self.assertIn('    Change two files\n    \n    The reason.\n', text)
-        self.assertIn('@@ -9,4 +9,4 @@ l8\n 9  l9\n10  l10\n11  l11\n   -l12\n12 +twelve\n'
-                      'diff --git a/b.txt b/b.txt\n', text)
-        self.assertTrue(text.endswith('@@ -0,0 +1 @@\n 1 +b\n'), text)
-
-    def test_shows_a_merge_as_its_change_to_the_first_parent(self):
-        self.commit('Add', {'a.txt': 'a\n'})
-        self.git('checkout', '-q', '-b', 'side')
-        self.commit('Add b', {'b.txt': 'b\n'})
-        self.git('checkout', '-q', 'main')
-        self.git('merge', '-q', '--no-ff', '-m', 'Merge side', 'side')
-
-        text = self.server().text('show', commit='HEAD')
-
-        self.assertTrue(text.endswith('diff --git a/b.txt b/b.txt\nnew file mode 100644\n'
-                                      f'index 0000000..{self.git("rev-parse", "--short=7", "HEAD:b.txt")}\n'
-                                      '--- /dev/null\n+++ b/b.txt\n@@ -0,0 +1 @@\n1 +b\n'), text)
-
-
-class RevisionTests(GitCase):
-    """A revision the agent names reaches git only as the commit hash it resolves to, so it can't be an option."""
-
-    def test_refuses_a_revision_that_isnt_a_commit_without_running_it(self):
-        self.commit('Add', {'a.txt': 'a\n'})
-        server = self.server()
-
-        for rev in ('--output=written.txt', '--outp=written.txt', 'nope', 'HEAD:a.txt', ''):
-            self.assertEqual(server.call('show', commit=rev), (f'{rev!r} names no commit.', True))
-        self.assertFalse((self.repo / 'written.txt').exists())
-
-
 class LogTests(GitCase):
     """log() lists the change's commits with their messages, since a message can say a choice was deliberate."""
 
@@ -279,54 +237,6 @@ class LogTests(GitCase):
         self.assertEqual(re.findall(r'^commit (\w+)$', self.server().text('log', path='a.txt'), re.M), [first])
 
 
-class BlameTests(GitCase):
-    """blame() names the commit behind each line at the head."""
-
-    def test_names_the_commit_behind_each_line_in_the_range(self):
-        first = self.commit('Add', {'a.txt': 'one\ntwo\nthree\n'})
-        second = self.commit('Change two', {'a.txt': 'one\n2\nthree\n'})
-
-        text = self.server().text('blame', path='a.txt', start=2, end=3)
-
-        self.assertEqual(text, f'{second[:8]} 2) 2\n{first[:8]} 3) three\n')
-
-    def test_refuses_a_range_longer_than_a_page_or_starting_past_the_end(self):
-        self.commit('Add', {'a.txt': 'one\n'})
-        server = self.server()
-
-        self.assertEqual(server.call('blame', path='a.txt', start=1, end=1001),
-                         ('blame gives at most 1000 lines at a time.', True))
-        self.assertEqual(server.call('blame', path='a.txt', start=2, end=1), ('end must not be before start.', True))
-        text, error = server.call('blame', path='a.txt', start=2, end=5)
-        self.assertTrue(error)
-        self.assertIn('has only 1 line', text)
-
-    def test_stops_at_the_last_line_when_end_is_past_it(self):
-        commit = self.commit('Add', {'a.txt': 'one\n'})
-
-        self.assertEqual(self.server().text('blame', path='a.txt', start=1, end=5), f'{commit[:8]} 1) one\n')
-
-
-class FileTests(GitCase):
-    """file() gives a file as it was at any commit, numbered like the head's lines in a diff."""
-
-    def test_gives_a_file_at_a_revision_with_its_lines_numbered(self):
-        self.commit('Add', {'a.txt': TWELVE})
-        self.commit('Change', {'a.txt': 'new\n'})
-
-        text = self.server().text('file', rev='HEAD~1', path='a.txt')
-
-        self.assertEqual(text, ''.join(f'{n:>2} l{n}\n' for n in range(1, 13)))
-
-    def test_says_when_the_file_isnt_there(self):
-        self.commit('Add', {'a.txt': 'a\n'})
-
-        text, error = self.server().call('file', rev='HEAD', path='b.txt')
-
-        self.assertTrue(error)
-        self.assertIn('b.txt', text)
-
-
 class DriverTests(GitCase):
     """No diff driver runs, even one the runner's git config sets up, since a PR picks which driver a path gets in
     .gitattributes."""
@@ -340,12 +250,8 @@ class DriverTests(GitCase):
         self.git('config', 'diff.external', str(script))
         self.git('config', 'diff.conv.textconv', str(script))
         self.commit('Add', {'.gitattributes': '*.txt diff=conv\n', 'a.txt': 'a\n'})
-        commit = self.commit('Change', {'a.txt': 'b\n'})
-        server = self.server()
+        self.commit('Change', {'a.txt': 'b\n'})
 
-        server.text('diff', path='a.txt')
-        server.text('show', commit=commit)
-        server.text('blame', path='a.txt', start=1, end=1)
-        server.text('file', rev=commit, path='a.txt')
+        self.server().text('diff', path='a.txt')
 
         self.assertFalse(ran.exists())

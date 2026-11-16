@@ -18,11 +18,6 @@ TOOLS = {
              'there.', {'path': PATH, 'page': PAGE}, ['path']),
     'log': ("The change's commits, newest first, with their messages: every one, or the ones that touched a path.",
             {'path': PATH, 'page': PAGE}, []),
-    'show': ("One commit's message and diff.", {'commit': {'type': 'string'}, 'page': PAGE}, ['commit']),
-    'blame': ('The commit behind each line of a file at the head.',
-              {'path': PATH, 'start': {'type': 'integer', 'minimum': 1}, 'end': {'type': 'integer', 'minimum': 1}},
-              ['path', 'start', 'end']),
-    'file': ('A file at a revision.', {'rev': {'type': 'string'}, 'path': PATH, 'page': PAGE}, ['rev', 'path']),
 }
 
 
@@ -56,23 +51,6 @@ class Change:
         paths = ['--', checked(path)] if path is not None else []
         return paged('the log', git('log', '--no-decorate', '--format=medium', f'{self.start}..{self.head}',
                                     *paths).splitlines(), page)
-
-    def blame(self, path, start, end):
-        if end < start:
-            raise Refused('end must not be before start.')
-        if end - start >= LINES:
-            raise Refused(f'blame gives at most {LINES} lines at a time.')
-        return git('blame', '--no-textconv', '-s', '-L', f'{start},{end}', self.head, '--', checked(path))
-
-    def file(self, rev, path, page=1):
-        lines = git('cat-file', 'blob', f'{named(rev)}:{checked(path)}').splitlines()
-        width = len(str(len(lines)))
-        return paged(path, [f'{n:>{width}} {line}' for n, line in enumerate(lines, 1)], page)
-
-    def show(self, commit, page=1):
-        return paged(commit, numbered(git('show', '--no-ext-diff', '--no-textconv', '--no-renames',
-                                          '--diff-merges=first-parent', '--format=medium', named(commit)
-                                          ).splitlines()), page)
 
     def diff(self, path, page=1):
         if checked(path) not in self.paths():
@@ -173,14 +151,6 @@ def commit(rev):
     """The hash of the commit rev names. --end-of-options, and the ^{commit} after rev, keep rev from being read as
     an option."""
     return git('rev-parse', '--verify', '--end-of-options', f'{rev}^{{commit}}').strip()
-
-
-def named(rev):
-    """The hash of the commit the agent's rev names, which is all of it that reaches another git command."""
-    try:
-        return commit(rev)
-    except Refused:
-        raise Refused(f'{rev!r} names no commit.') from None
 
 
 def listed():
