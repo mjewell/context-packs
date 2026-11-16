@@ -5,7 +5,7 @@ Syncs context packs, which are shared agent rules and docs kept in git repos, in
 <!-- context-packs:start -->
 ## Context Packs
 
-Context packs bring shared rules and docs in from elsewhere. Each pack has its pack rules and a table of its context docs here, and a doc may hold a table of its own. Before starting work that a row in any of these tables matches, read its doc. The paths in these tables start from the repo root. Look for a path a doc names in the doc's folder first, then from the repo root. The packs here, and everything under `context-packs/gen/`, are generated from `context-packs/`: change them there, never here.
+Context packs bring shared rules and docs in from elsewhere. Each pack has its pack rules and a table of its pack docs here, and a doc may hold a table of its own. Before starting work that a row in any of these tables matches, read its doc. The paths in these tables start from the repo root. Look for a path a doc names in the doc's folder first, then from the repo root. The packs here, and everything under `context-packs/gen/`, are generated from `context-packs/`: change them there, never here.
 
 ## Context
 
@@ -116,7 +116,7 @@ Edit only files I own. Plugins, synced skills, and installed dependencies belong
 | Writing or changing tests, or fixing a bug | `context-packs/gen/core/testing.md` |
 | Writing commit messages, PR titles or descriptions, changelog entries, READMEs, or anything else others will read without session context | `context-packs/gen/core/writing-for-humans.md` |
 <!-- context-packs:pack-end core -->
-<!-- context-packs:end sha256:10f71a1298ee -->
+<!-- context-packs:end sha256:5d9002338cda -->
 
 ## Project
 
@@ -125,4 +125,4 @@ Edit only files I own. Plugins, synced skills, and installed dependencies belong
 - The skills in `skills/` are for anyone using the tool, so they rely on nothing from any one person's packs.
 - Run the tests with `python3 -m unittest discover tests`.
 - `GLOSSARY.md` holds the terms for the packs and the review. Use them in code, docs and skills. When a name settles, add or update its entry there.
-- This repo's own docs are in `context-packs/project/`, and its shared rules come from agent-config through the import pack `context-packs/core/`. After adding a doc or changing its `when:` line, run `node bin/context-packs.js` and commit the result.
+- This repo's own pack docs are in `context-packs/project/`, and its shared rules come from agent-config through the import pack `context-packs/core/`. After adding a doc or changing its `when:` line, run `node bin/context-packs.js` and commit the result.

@@ -5,7 +5,7 @@ Shared agent rules and docs, kept in git repos and synced into each repo's instr
 ## Packs
 
 **Pack**:
-A collection of pack rules and docs that can be synced into a repo's instruction file.
+A collection of pack rules and pack docs that can be synced into a repo's instruction file.
 
 **Import pack**:
 A folder the repo owns, holding only a `pack.md`, that names a pack kept elsewhere, and the commit or tag it's pinned to when it comes from git. Its `pack.md` can also set the pack's `when`, and add pack rules of its own, but no docs.
@@ -23,9 +23,9 @@ One instruction to agents, in a pack, a doc, or the instruction file. Not a Clau
 The rules in a pack's `pack.md`. They load wherever the pack does: where its parent's are when it's inlined, in its own index otherwise.
 _Avoid_: "a pack's rules" or "its rules" for these, since a pack's docs hold rules too
 
-**Doc**:
-A file of rules in a pack, which an agent reads only when its `when` matches the work.
-_Avoid_: context doc, except in the header the sync writes, where an agent reads it without this glossary
+**Pack doc**:
+A file of rules in a pack, which an agent reads only when its `when` matches the work. Plain "doc" is fine where a pack, a `when` or `context-packs docs` makes that meaning clear.
+_Avoid_: context doc; doc on its own, where a repo's other docs could be meant
 
 **`when`**:
 The line saying what work a doc or pack applies to. A pack whose `when` is `always` is inlined.
