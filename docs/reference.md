@@ -146,7 +146,7 @@ Prompts close to a row's `when` that shouldn't match it, or that match only thro
 
 **Experimental.** The review action is still changing: its jobs, their inputs, and what it posts on a PR can change in any release. Pin it to a commit, not `@main`, and expect to update your workflow when you move the pin.
 
-The review runs as five jobs, each a composite action under `review/`. One finder per unit of your packs checks the PR, an agent merges what they found, the merged findings are paired with pack-review's threads from earlier runs, and a script posts the review. The author then goes through the findings in a local session. Add a workflow such as `.github/workflows/pack-review.yml`:
+The review is a reusable workflow, `.github/workflows/review.yml`. One finder per unit of your packs checks the PR, an agent merges what they found, the merged findings are paired with pack-review's threads from earlier runs, and a script posts the review. The author then goes through the findings in a local session. Add a workflow such as `.github/workflows/pack-review.yml`, with the commit you pin in place of `<commit>`:
 
 ```yaml
 name: pack-review
@@ -154,81 +154,20 @@ on:
   pull_request:
     types: [opened, reopened, ready_for_review, synchronize, edited]
 jobs:
-  units:
-    # Drafts wait until they're ready. PRs from forks get no secrets, so they're skipped. An edit reviews again only
-    # when it changed the base branch, so the findings match the new diff.
-    if: >-
-      ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository
-      && (github.event.action != 'edited' || github.event.changes.base.ref.from) }}
-    runs-on: ubuntu-latest
+  review:
+    uses: mjewell/context-packs/.github/workflows/review.yml@<commit>
     permissions:
       contents: read
-    outputs:
-      units: ${{ steps.units.outputs.units }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - id: units
-        uses: mjewell/context-packs/review/units@main
-  find:
-    needs: units
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        unit: ${{ fromJSON(needs.units.outputs.units) }}
-    concurrency:
-      group: pack-review-find-${{ github.event.pull_request.number }}-${{ matrix.unit }}
-      cancel-in-progress: true
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-      - uses: mjewell/context-packs/review/find@main
-        with:
-          unit: ${{ matrix.unit }}
-          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
-  merge:
-    needs: find
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-      - uses: mjewell/context-packs/review/merge@main
-        with:
-          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
-  match:
-    needs: merge
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: read
-    steps:
-      - uses: mjewell/context-packs/review/match@main
-        with:
-          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
-  post:
-    needs: [merge, match]
-    runs-on: ubuntu-latest
-    concurrency:
-      group: pack-review-post-${{ github.event.pull_request.number }}
-    permissions:
       pull-requests: write
-    steps:
-      - uses: mjewell/context-packs/review/post@main
+    secrets:
+      anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
-The units are your instruction file, then each pack's docs. The workflow starts a finder for each, so every unit is checked: no agent can decide one isn't worth it. The finders and the merging agent run in jobs whose token can only read the repo. The `match` job's agents get only text pack-review wrote, and the replies of people who can write. The `post` job runs no agent, and only it can write to the PR. Keep each job's `permissions` as shown: GitHub enforces them, whatever the agents' tools allow. The jobs hand their results on as artifacts, kept for a day.
+It runs five jobs: units, find, merge, match and post. The units are your instruction file, then each pack's docs, and the workflow starts a finder for each, so every unit is checked: no agent can decide one isn't worth it. The `permissions` you grant are the most any job gets, and each job narrows them. The finders and the merging agent can only read the repo, the match job's agents can only read the PR, and the post job, which runs no agent, is the only one that can write to it. It skips drafts and PRs from forks. Each job checks out the review at the commit you pinned, so its parts always match. It needs GitHub.com: GitHub Enterprise Server doesn't give a reusable workflow its own commit.
 
-With a Pro or Max subscription instead of an API key, run `claude setup-token` locally, add what it prints as the secret `CLAUDE_CODE_OAUTH_TOKEN`, and pass `claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}` in place of `anthropic-api-key`. Reviews then count against the subscription's usage limits.
+With a Pro or Max subscription instead of an API key, run `claude setup-token` locally, add what it prints as the secret `CLAUDE_CODE_OAUTH_TOKEN`, and pass `claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}` in place of `anthropic_api_key`. Reviews then count against the subscription's usage limits.
 
-It reviews a PR when it's opened or marked ready, again on each push, and again when its base branch changes. A newer push cancels a review still running. Pin `@main` to a commit once you've tried it. Pass `model` to `review/find`, `review/merge` or `review/match` to use a model other than Claude Code's default.
+It reviews a PR when it's opened or marked ready, again on each push, and again when its base branch changes. A newer push cancels a review still running. Pass `with: model: <model>` to use a model other than Claude Code's default.
 
 Each review posts **one summary comment**, edited on each run. It counts the findings, and ends with every finding as JSON in a `<details>` block for the local run. A step after the agent writes it from the agent's answer. A run that fails posts nothing and leaves the last summary, which names the commit and base branch it reviewed. If no agent read some doc the tables point at in full, the summary lists it, as a partial review.
 
