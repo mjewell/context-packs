@@ -147,7 +147,7 @@ def load(repo, stack):
         home = Path(id)
         pack_md = source / home / 'pack.md'
         fields, rules = front(read(pack_md), pack.where(home / 'pack.md'), keys) if pack_md.is_file() else ({}, '')
-        # A nested pack's when is its row in its parent's table. The pack at the top needs none: without one, it's
+        # A nested pack's when is its row in its parent's table. The top-level pack needs none: without one, it's
         # inlined.
         if id and 'when' not in fields:
             sys.exit(f'context-packs: {pack.where(home / "pack.md")} must start with front matter saying when to '
@@ -201,7 +201,7 @@ def when(pack, path, text):
 
 
 def index(node, pack):
-    """Where a pack's generated index sits: pack.md for the pack at the top, since no doc can have that name."""
+    """Where a pack's generated index sits: pack.md for the top-level pack, since no doc can have that name."""
     return pack.generated / f'{node.id or "pack"}.md'
 
 
