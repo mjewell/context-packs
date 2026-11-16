@@ -206,13 +206,8 @@ jobs:
     needs: merge
     runs-on: ubuntu-latest
     permissions:
-      contents: read
       pull-requests: read
     steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
       - uses: mjewell/context-packs/review/match@main
         with:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -235,7 +230,7 @@ It reviews a PR when it's opened or marked ready, again on each push, and again 
 
 Each review posts **one summary comment**, edited on each run. It counts the findings, and ends with every finding as JSON in a `<details>` block for the local run. A step after the agent writes it from the agent's answer. A run that fails posts nothing and leaves the last summary, which names the commit and base branch it reviewed. If no agent read some doc the tables point at in full, the summary lists it, as a partial review.
 
-Each new finding also gets **a thread on the diff**, on a line where it applies. The thread says what was found, the rule it breaks and what to do. A later review reads that comment to tell when it finds the same issue again: then it posts nothing new, unless the thread was resolved, when it replies that the finding is still there. When something is new in a thread since the review last commented there, a teammate's reply or a change to the finding's lines, and it gives the author a reason to act, the review sums that up in a reply. A re-run with nothing new posts nothing. Only replies from people who can write to the repo are read. A thread whose finding a later review doesn't find gets nothing. The review never resolves a thread: that's the author's call.
+Each new finding also gets **a thread on the diff**, on a line where it applies. The thread says what was found, the rule it breaks and what to do. A later review reads that comment to tell when it finds the same issue again: then it posts nothing new, unless the thread was resolved, when it replies that the finding is still there. When a teammate's reply in a thread, or the review finding it again, gives the author a reason to act that the review hasn't already given there, the review sums that up in a reply. Most runs add none. Only replies from people who can write to the repo are read. A thread whose finding a later review doesn't find gets nothing. The review never resolves a thread: that's the author's call.
 
 To go through the findings, the author runs `/pack-review <owner>/<repo>#<number>` in Claude Code with the PR's branch checked out, as the summary says. Naming the repo lets it work from a session in a folder above the repos; inside the repo, the number alone does. `pack-review` reads the summary's JSON rather than finding them again, goes through each finding with the author, and runs `pack-rule` for each one they want recorded. Neither run commits or pushes.
 

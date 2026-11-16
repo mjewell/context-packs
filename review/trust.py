@@ -7,7 +7,7 @@ import github
 from sanitize import clean
 
 PAGE = 100
-FIELDS = 'id author { login __typename } createdAt body bodyText viewerDidAuthor isMinimized originalCommit { oid }'
+FIELDS = 'id author { login __typename } createdAt body bodyText viewerDidAuthor isMinimized'
 LIST = f'pageInfo {{ hasNextPage endCursor }} nodes {{ {FIELDS} }}'
 THREADS = f'''query Threads($owner: String!, $name: String!, $number: Int!, $after: String) {{
   repository(owner: $owner, name: $name) {{ pullRequest(number: $number) {{
@@ -71,10 +71,9 @@ def shown(node, access):
         why = None
     if why:
         return {'id': node['id'], 'hidden': why}
-    # commit is the one the comment was made at, which stays the same as the PR moves on, so the match job can tell
-    # what changed since pack-review last commented.
+    # ours lets the commentary agent tell its own earlier replies from people's, so it doesn't repeat itself.
     return {'id': node['id'], 'author': author['login'], 'at': node['createdAt'], 'text': clean(node['bodyText']),
-            'ours': own(node), 'commit': node['originalCommit']['oid']}
+            'ours': own(node)}
 
 
 def threads(number):
