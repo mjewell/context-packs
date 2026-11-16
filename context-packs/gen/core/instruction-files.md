@@ -1,7 +1,7 @@
 ---
-when: Adding or changing a rule, an instruction file (AGENTS.md, CLAUDE.md) or a context doc
+when: Adding or changing a rule, an instruction file (AGENTS.md, CLAUDE.md) or a pack doc
 ---
-# Instruction files and context docs
+# Instruction files and pack docs
 
 Use the `pack-rule` skill to place and write a rule. This doc covers the choices it leaves to the repo's instructions.
 

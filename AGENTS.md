@@ -111,12 +111,12 @@ Edit only files I own. Plugins, synced skills, and installed dependencies belong
 |---|---|
 | Drafting a design doc, RFC, proposal, ticket or bug report for people to read | `context-packs/gen/core/docs-and-tickets.md` |
 | Committing, pushing, creating a git worktree, or opening or updating a PR | `context-packs/gen/core/git-and-prs.md` |
-| Adding or changing a rule, an instruction file (AGENTS.md, CLAUDE.md) or a context doc | `context-packs/gen/core/instruction-files.md` |
+| Adding or changing a rule, an instruction file (AGENTS.md, CLAUDE.md) or a pack doc | `context-packs/gen/core/instruction-files.md` |
 | Writing or editing a skill (`**/SKILL.md`) | `context-packs/gen/core/skill-authoring.md` |
 | Writing or changing tests, or fixing a bug | `context-packs/gen/core/testing.md` |
 | Writing commit messages, PR titles or descriptions, changelog entries, READMEs, or anything else others will read without session context | `context-packs/gen/core/writing-for-humans.md` |
 <!-- context-packs:pack-end core -->
-<!-- context-packs:end sha256:5d9002338cda -->
+<!-- context-packs:end sha256:774fe6045fa9 -->
 
 ## Project
 
