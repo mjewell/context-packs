@@ -127,7 +127,7 @@ The docs under `gen/` are copies of the docs in each pack's repo. `AGENTS.md`, i
 <!-- context-packs:start -->
 ## Context Packs
 
-Context packs bring shared rules and docs in from elsewhere. Each pack has its rules and a table of its context docs here, and a doc may hold a table of its own. Before starting work that a row in any of these tables matches, read its doc. The paths in these tables start from the repo root. Look for a path a doc names in the doc's folder first, then from the repo root. The packs here, and everything under `context-packs/gen/`, are generated from `context-packs/`: change them there, never here.
+Context packs bring shared rules and docs in from elsewhere. Each pack has its pack rules and a table of its context docs here, and a doc may hold a table of its own. Before starting work that a row in any of these tables matches, read its doc. The paths in these tables start from the repo root. Look for a path a doc names in the doc's folder first, then from the repo root. The packs here, and everything under `context-packs/gen/`, are generated from `context-packs/`: change them there, never here.
 
 ## Context
 
@@ -163,7 +163,7 @@ Build UI from `@acme/ui` components; don't style raw HTML elements. Every user-f
 
 The web app's own docs come first, in the `## Context` table, followed by each pack in the order of its folder. Each pack sits between comments naming its folder in `context-packs/`, which show people reading the file where it starts and ends; the sync doesn't read them, and Claude Code strips them before an agent sees the file.
 
-The nested `react` pack gets a row rather than having its rules inlined. The row points at a generated index, `react.md`, which holds its rules and its own table:
+The nested `react` pack gets a row rather than having its pack rules inlined. The row points at a generated index, `react.md`, which holds its pack rules and its own table:
 
 ```markdown
 Fetch data with the React Query hooks in `src/api/`, never in `useEffect`.
@@ -183,7 +183,7 @@ Asked to add a sign-up form, the agent matches "Building or changing a form" and
 
 ## Choosing when a pack loads
 
-The web app keeps its sessions table in a small `db/` folder, so it wants the database team's rules, but only when it touches that folder. Added as it is, the `database` pack would inline its rules into every session, since its `pack.md` has no `when`: its team wrote it for API services, where nearly every task touches the database. So the web app adds it with a `when` of its own:
+The web app keeps its sessions table in a small `db/` folder, so it wants the database team's rules, but only when it touches that folder. Added as it is, the `database` pack would inline its pack rules into every session, since its `pack.md` has no `when`: its team wrote it for API services, where nearly every task touches the database. So the web app adds it with a `when` of its own:
 
 ```console
 $ npx context-packs add database https://github.com/acme/agent-context.git --path database --ref database-v2.0.0 --when 'Editing `db/**`'
@@ -213,7 +213,7 @@ The database rules stay out of `AGENTS.md`. The `## Context` table gets one row 
 | Adding a page or route | `context-packs/routes.md` |
 ```
 
-The row points at a generated index of the pack's rules and table, which only a session editing `db/` reads:
+The row points at a generated index of the pack's pack rules and table, which only a session editing `db/` reads:
 
 ```markdown
 Every query goes through the repositories in `src/db/`. Never write SQL in a request handler.

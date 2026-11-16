@@ -42,7 +42,7 @@ Stop if a ref doesn't resolve or the diff is empty. Read the packs as they are a
 
 ## 2. List the units
 
-Run `npx context-packs docs` in the repo. It prints every doc the tables point at, with a blank line between packs. The units are the instruction file, whole, then each pack's block of docs, in the order it prints them. Each file is read by exactly one unit. The instruction file holds its own rules, and every pack's rules inlined in the context-packs block. A nested pack's index holds that pack's rules, and the rules of any pack inlined in it. Done when you have the units' paths.
+Run `npx context-packs docs` in the repo. It prints every doc the tables point at, with a blank line between packs. The units are the instruction file, whole, then each pack's block of docs, in the order it prints them. Each file is read by exactly one unit. The instruction file holds its own rules, and the pack rules of every pack inlined in the context-packs block. A nested pack's index holds that pack's pack rules, and the pack rules of any pack inlined in it. Done when you have the units' paths.
 
 ## 3. Dispatch the units
 

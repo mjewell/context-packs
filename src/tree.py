@@ -34,7 +34,7 @@ class Node(NamedTuple):
 
     @property
     def row(self):
-        """Whether the pack gets a row pointing at its index, rather than having its rules and table inlined after
+        """Whether the pack gets a row pointing at its index, rather than having its pack rules and table inlined after
         the rules and table of the pack holding it: it does when it has a when other than always."""
         return self.fields.get('when', 'always') != 'always'
 
@@ -68,7 +68,7 @@ def front(text, where, keys):
     if len(fields) != len(pairs):
         sys.exit(f'context-packs: {where} has front matter that isn\'t `key: value` lines.')
     if fields and not keys:
-        sys.exit(f'context-packs: {where} takes no front matter, since its rules are always inlined. '
+        sys.exit(f'context-packs: {where} takes no front matter, since its pack rules are always inlined. '
                  f'Remove {", ".join(sorted(fields))}.')
     unknown = sorted(set(fields) - set(keys))
     if unknown:
