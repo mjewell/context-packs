@@ -38,11 +38,11 @@ class SummaryCase(ReviewCase):
         super().setUp()
         self.github.responses.update({'PullRequest': pull_request(), 'AddComment': ok({}), 'UpdateComment': ok({})})
 
-    def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', docs=(), messages=(), changed=(),
+    def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', docs=(), messages=(),
                   pairs=(), commentary=(), shown=None, finders=None):
         """Post the summary of the merging agent's output, with docs as `context-packs docs` lists them, each pack a
-        list, changed as the git server's changed tool lists the paths, each a (lines, path) pair, and pairs as the
-        match job checked them. finders is each unit's finder's transcript, in unit order: by default, each reads its
+        list, and pairs as the match job
+        checked them. finders is each unit's finder's transcript, in unit order: by default, each reads its
         whole unit."""
         (self.root / 'output.json').write_text(
             output if output is not None else json.dumps({'findings': list(findings)}))
@@ -52,7 +52,6 @@ class SummaryCase(ReviewCase):
             (self.root / path).write_text(DOC)
         (self.root / 'docs.txt').write_text('\n'.join(''.join(f'{path}\n' for path in pack) for pack in docs))
         (self.root / 'transcript.json').write_text(json.dumps(list(messages)))
-        (self.root / 'changed.txt').write_text(''.join(f'{lines}\t{path}\n' for lines, path in changed))
         (self.root / 'shown.json').write_text(json.dumps(shown or {}))
         units = [['AGENTS.md'], *docs]
         if finders is None:
@@ -63,8 +62,7 @@ class SummaryCase(ReviewCase):
             (self.root / f'finder-{n}.json').write_text(json.dumps(list(transcript)))
             (self.root / 'finder-output.json').write_text(json.dumps({'findings': []}))
             run = self.script('unit_report', '--unit', n, '--docs', 'docs.txt', '--findings', 'finder-output.json',
-                              '--transcript', f'finder-{n}.json', '--changed', 'changed.txt', '--out',
-                              f'units/unit-{n}.json')
+                              '--transcript', f'finder-{n}.json', '--out', f'units/unit-{n}.json')
             self.assertEqual(run.returncode, 0, run.stderr)
             log += run.stdout
         report = self.report(base_ref, head)
@@ -80,8 +78,7 @@ class SummaryCase(ReviewCase):
         """The merge job's report on the merging agent's output and the finders' records, written to report.json for
         the post job."""
         return self.script('report', '--base', BASE, '--base-ref', base_ref, '--head', head, '--findings',
-                           'output.json', '--transcript', 'transcript.json', '--docs', 'docs.txt', '--changed',
-                           'changed.txt', '--shown', 'shown.json', '--units', 'units', '--out', 'report.json')
+                           'output.json', '--transcript', 'transcript.json', '--docs', 'docs.txt', '--shown', 'shown.json', '--units', 'units', '--out', 'report.json')
 
     def body(self):
         [sent] = self.sent('AddComment') or self.sent('UpdateComment')
@@ -109,7 +106,7 @@ class SummaryTests(SummaryCase):
         self.assertIn('\n\nTo go through them, run `/pack-review o/r#7`.\n\n', body)
         self.assertEqual(block(body)[0], {'base': BASE, 'base_ref': 'main', 'head': HEAD,
                                           'findings': [{**f, 'thread': None, 'commentary': None} for f in findings],
-                                          'unread': [], 'unread_diffs': []})
+                                          'unread': []})
         self.assertNotIn('skipped', body)
 
     def test_names_the_thread_each_paired_finding_continues(self):
@@ -221,7 +218,7 @@ class SummaryTests(SummaryCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         report = json.loads((self.root / 'report.json').read_text())
         self.assertEqual(report, {'base': BASE, 'base_ref': 'main', 'head': HEAD, 'findings': [finding()],
-                                  'anchors': [None], 'unread': [], 'unread_diffs': []})
+                                  'anchors': [None], 'unread': []})
         self.github.requests.clear()
         self.env.pop('GITHUB_TOKEN')
 

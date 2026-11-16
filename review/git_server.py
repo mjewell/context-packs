@@ -220,15 +220,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base', required=True, help='the commit the reviewed change starts from')
     parser.add_argument('--head', required=True, help='the commit that is reviewed')
-    parser.add_argument('command', nargs='?', choices=['changed', 'shown'],
-                        help="print what the changed tool returns, for the report to tell which paths' diffs no "
-                             'agent read, or as JSON the head lines each diff shows, for new threads to be left on, '
-                             'and stop')
+    parser.add_argument('command', nargs='?', choices=['shown'],
+                        help='print as JSON the head lines each diff shows, for new threads to be left on, and stop')
     args = parser.parse_args()
     change = Change(args.base, args.head)
-    if args.command == 'changed':
-        print(change.changed(), end='')
-        return
     if args.command == 'shown':
         print(json.dumps(change.shown()))
         return

@@ -37,8 +37,7 @@ class MatchCase(ReviewCase):
 
     def given(self, findings, threads, head='h' * 40):
         (self.root / 'report.json').write_text(json.dumps({'base': 'b' * 40, 'base_ref': 'main', 'head': head,
-                                                           'findings': findings, 'unread': [],
-                                                           'unread_diffs': []}))
+                                                           'findings': findings, 'unread': []}))
         (self.root / 'threads.json').write_text(json.dumps(threads))
 
     def outputs(self):

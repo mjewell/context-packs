@@ -45,12 +45,10 @@ runs:
         HEAD: ${{ github.event.pull_request.head.sha }}
         MODEL: ${{ inputs.model }}
         INPUTS: ${{ steps.folder.outputs.inputs }}
-      # The folder holds each finder's unit-<n>.json and docs.txt for the agent. changed.txt is for the report of which
-      # diffs no agent read. The lines each diff shows go outside the agent's folder, for the report to pick where each
-      # new thread opens.
+      # The folder holds each finder's unit-<n>.json and docs.txt for the agent. The lines each diff shows go outside
+      # the agent's folder, for the report to pick where each new thread opens.
       run: |
         python3 "$GITHUB_ACTION_PATH/../../src/cli.py" docs > "$INPUTS/docs.txt"
-        python3 "$GITHUB_ACTION_PATH/../git_server.py" --base "$BASE" --head "$HEAD" changed > "$INPUTS/changed.txt"
         python3 "$GITHUB_ACTION_PATH/../git_server.py" --base "$BASE" --head "$HEAD" shown > "$RUNNER_TEMP/pack-review-shown.json"
         echo "claude-args=$(python3 "$GITHUB_ACTION_PATH/../args.py" --inputs "$INPUTS" --base "$BASE" --head "$HEAD" \
           --model "$MODEL")" >> "$GITHUB_OUTPUT"
@@ -80,14 +78,14 @@ runs:
         INPUTS: ${{ steps.folder.outputs.inputs }}
         TRANSCRIPT: ${{ steps.review.outputs.execution_file }}
       # The report lists the docs no agent read in full, from the finders' records and this transcript, so a review
-      # that skipped one is posted as partial. It also lists the changed paths whose diff no agent read, which doesn't
-      # make it partial. The transcript can hold file contents, so it stays in this job, and only the report goes on.
+      # that skipped one is posted as partial. The transcript can hold file contents, so it stays in this job, and only
+      # the report goes on.
       run: |
         printf '%s' "$FINDINGS" > "$RUNNER_TEMP/pack-review-findings.json"
         mkdir "$RUNNER_TEMP/pack-review-report"
         python3 "$GITHUB_ACTION_PATH/../report.py" --base "$BASE" --base-ref "$BASE_REF" --head "$HEAD" \
           --findings "$RUNNER_TEMP/pack-review-findings.json" --transcript "$TRANSCRIPT" --docs "$INPUTS/docs.txt" \
-          --changed "$INPUTS/changed.txt" --shown "$RUNNER_TEMP/pack-review-shown.json" --units "$INPUTS" \
+          --shown "$RUNNER_TEMP/pack-review-shown.json" --units "$INPUTS" \
           --out "$RUNNER_TEMP/pack-review-report/report.json"
     - name: Save the report
       # v7.0.2, pinned by commit since a tag can move.

@@ -38,8 +38,7 @@ class PostCase(ReviewCase):
 
     def post(self, findings, anchors, pairs=(), commentary=()):
         (self.root / 'report.json').write_text(json.dumps({
-            'base': BASE, 'base_ref': 'main', 'head': HEAD, 'findings': findings, 'anchors': anchors, 'unread': [],
-            'unread_diffs': []}))
+            'base': BASE, 'base_ref': 'main', 'head': HEAD, 'findings': findings, 'anchors': anchors, 'unread': []}))
         (self.root / 'match.json').write_text(json.dumps({'pairs': list(pairs), 'commentary': list(commentary)}))
         return self.script('post', '--pr', 7, '--report', 'report.json', '--match', 'match.json')
 

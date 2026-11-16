@@ -37,7 +37,7 @@ def summary(repo, number, report):
     if findings or unread:
         text += f"\n\nTo go through them, run `/pack-review {repo}#{number}`."
     # Backticks only occur inside JSON strings, where \u0060 means the same, so nothing can close the fence.
-    data = json.dumps({key: report[key] for key in ('base', 'base_ref', 'head', 'findings', 'unread', 'unread_diffs')},
+    data = json.dumps({key: report[key] for key in ('base', 'base_ref', 'head', 'findings', 'unread')},
                       indent=2, ensure_ascii=False)
     data = data.replace('`', '\\u0060')
     return github.signed(f'{text}\n\n<details><summary>Findings for the local review</summary>\n\n```json\n{data}\n'

@@ -37,14 +37,6 @@ class ChangedTests(GitCase):
         # A new file's diff is six lines of header and a line for each line it holds.
         self.assertEqual(self.server().text('changed'), '9\ta.txt\n7\tdocs/b.md\n')
 
-    def test_prints_the_list_once_for_the_action_when_asked_to(self):
-        self.commit('Add', {'a.txt': 'one\n'})
-
-        run = subprocess.run([sys.executable, str(REVIEW / 'git_server.py'), '--base', self.base, '--head', 'HEAD',
-                              'changed'], cwd=self.repo, capture_output=True, text=True, check=True)
-
-        self.assertEqual(run.stdout, '7\ta.txt\n')
-
     def test_prints_the_head_lines_each_diff_shows_for_comments_on_them(self):
         self.commit('Add', {'a.txt': TWELVE, 'gone.txt': 'x\n'})
         self.base = self.git('rev-parse', 'HEAD')
