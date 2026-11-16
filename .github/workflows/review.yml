@@ -95,10 +95,10 @@ jobs:
           model: ${{ inputs.model }}
           claude-code-oauth-token: ${{ secrets.claude_code_oauth_token }}
           anthropic-api-key: ${{ secrets.anthropic_api_key }}
-  match:
+  threads:
     needs: merge
     runs-on: ubuntu-latest
-    # The match job's agents read pack-review's threads and can't write.
+    # The threads job's agents read pack-review's threads and can't write.
     permissions:
       contents: read
       pull-requests: read
@@ -109,13 +109,13 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .pack-review
           persist-credentials: false
-      - uses: ./.pack-review/review/match
+      - uses: ./.pack-review/review/threads
         with:
           model: ${{ inputs.model }}
           claude-code-oauth-token: ${{ secrets.claude_code_oauth_token }}
           anthropic-api-key: ${{ secrets.anthropic_api_key }}
   post:
-    needs: [merge, match]
+    needs: [merge, threads]
     runs-on: ubuntu-latest
     # Two posts at once could each find no summary and add one, so they wait their turn.
     concurrency:

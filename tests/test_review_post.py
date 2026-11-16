@@ -2,7 +2,7 @@ import json
 
 from fake_github import connection, ok, role
 from review_case import HEAD, MARKER, ReviewCase
-from test_review_match import F1, F3, finding
+from test_review_pairing import F1, F3, finding
 from test_review_trust import ours
 
 BASE = 'b' * 40
@@ -19,7 +19,7 @@ def thread(id, resolved=False, replies=()):
 
 
 class PostCase(ReviewCase):
-    """The post job: the find job's report, the match job's pairs and commentary, and the PR on the fake GitHub."""
+    """The post job: the find job's report, the threads job's pairs and commentary, and the PR on the fake GitHub."""
 
     def setUp(self):
         super().setUp()
@@ -39,8 +39,8 @@ class PostCase(ReviewCase):
     def post(self, findings, anchors, pairs=(), commentary=()):
         (self.root / 'report.json').write_text(json.dumps({
             'base': BASE, 'base_ref': 'main', 'head': HEAD, 'findings': findings, 'anchors': anchors, 'unread': []}))
-        (self.root / 'match.json').write_text(json.dumps({'pairs': list(pairs), 'commentary': list(commentary)}))
-        return self.script('post', '--pr', 7, '--report', 'report.json', '--match', 'match.json')
+        (self.root / 'paired.json').write_text(json.dumps({'pairs': list(pairs), 'commentary': list(commentary)}))
+        return self.script('post', '--pr', 7, '--report', 'report.json', '--paired', 'paired.json')
 
     def review(self):
         """What the one review posted: its new threads, and its replies by thread."""

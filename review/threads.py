@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Print pack-review's review threads on a PR as JSON, with each comment as trust.py lets an agent see it. The match
+"""Print pack-review's review threads on a PR as JSON, with each comment as trust.py lets an agent see it. The threads
 job runs it, and its agents read the threads from this output, so they need no tools."""
 import argparse
 import json

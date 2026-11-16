@@ -1,5 +1,5 @@
 name: pack-review merge
-description: Merge the finders' answers into the review's findings with claude-code-action, look for choices no rule covers, and save the findings as the artifact pack-review-report, for the match and post actions. Run it in a job with only contents read, after every finder.
+description: Merge the finders' answers into the review's findings with claude-code-action, look for choices no rule covers, and save the findings as the artifact pack-review-report, for the threads and post actions. Run it in a job with only contents read, after every finder.
 inputs:
   anthropic-api-key:
     description: An Anthropic API key for the merging agent. Pass this or claude-code-oauth-token.

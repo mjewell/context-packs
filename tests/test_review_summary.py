@@ -41,7 +41,7 @@ class SummaryCase(ReviewCase):
     def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', docs=(), messages=(),
                   pairs=(), commentary=(), shown=None, finders=None):
         """Post the summary of the merging agent's output, with docs as `context-packs docs` lists them, each pack a
-        list, and pairs as the match job
+        list, and pairs as the threads job
         checked them. finders is each unit's finder's transcript, in unit order: by default, each reads its
         whole unit."""
         (self.root / 'output.json').write_text(
@@ -69,8 +69,8 @@ class SummaryCase(ReviewCase):
         report.stdout = log + report.stdout
         if report.returncode:
             return report
-        (self.root / 'match.json').write_text(json.dumps({'pairs': list(pairs), 'commentary': list(commentary)}))
-        post = self.script('summary', '--pr', 7, '--report', 'report.json', '--match', 'match.json')
+        (self.root / 'paired.json').write_text(json.dumps({'pairs': list(pairs), 'commentary': list(commentary)}))
+        post = self.script('summary', '--pr', 7, '--report', 'report.json', '--paired', 'paired.json')
         post.stdout = report.stdout + post.stdout
         return post
 

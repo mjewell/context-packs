@@ -40,11 +40,11 @@ def reply(head, resolved, commentary):
     return github.signed(f'{lead}\n\n{finding_comment.quoted(commentary)}')
 
 
-def planned(report, matched, threads):
+def planned(report, paired, threads):
     """The new threads and the replies, by thread id, that the review posts."""
     head, findings = report['head'], report['findings']
-    pairs = {pair['finding']: pair['thread'] for pair in matched['pairs']}
-    commentary = {item['finding']: item['text'] for item in matched['commentary']}
+    pairs = {pair['finding']: pair['thread'] for pair in paired['pairs']}
+    commentary = {item['finding']: item['text'] for item in paired['commentary']}
     for thread in pairs.values():
         if thread not in threads:
             sys.exit(f"pack-review: the pairs name {thread}, which isn't one of pack-review's threads on this PR.")
@@ -69,10 +69,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pr', type=int, required=True, help='the PR number')
     parser.add_argument('--report', type=Path, required=True, help="the find job's report, from report.py")
-    parser.add_argument('--match', type=Path, required=True, help="the match job's pairs and commentary")
+    parser.add_argument('--paired', type=Path, required=True, help="the threads job's pairs and commentary")
     args = parser.parse_args()
     report = json.loads(args.report.read_text(encoding='utf-8'))
-    matched = json.loads(args.match.read_text(encoding='utf-8'))
+    paired = json.loads(args.paired.read_text(encoding='utf-8'))
     owner, name = github.repository()
     pr = github.graphql('PullRequestHead', PR_HEAD, {'owner': owner, 'name': name, 'number': args.pr})
     pr = pr['repository']['pullRequest']
@@ -85,7 +85,7 @@ def main():
               'posts no threads. The run for the new base will.')
         return
     threads = {thread['id']: thread for thread in trust.threads(args.pr)}
-    new, replies = planned(report, matched, threads)
+    new, replies = planned(report, paired, threads)
     if not new and not replies:
         print('pack-review: nothing to post in threads.')
         return

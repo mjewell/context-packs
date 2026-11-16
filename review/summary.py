@@ -48,12 +48,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pr', type=int, required=True, help='the PR number')
     parser.add_argument('--report', type=Path, required=True, help="the find job's report, from report.py")
-    parser.add_argument('--match', type=Path, required=True, help="the match job's pairs and commentary, from pairing.py")
+    parser.add_argument('--paired', type=Path, required=True,
+                        help="the threads job's pairs and commentary, from pairing.py")
     args = parser.parse_args()
     report = json.loads(args.report.read_text(encoding='utf-8'))
-    matched = json.loads(args.match.read_text(encoding='utf-8'))
-    threads = {pair['finding']: pair['thread'] for pair in matched['pairs']}
-    commentary = {item['finding']: item['text'] for item in matched['commentary']}
+    paired = json.loads(args.paired.read_text(encoding='utf-8'))
+    threads = {pair['finding']: pair['thread'] for pair in paired['pairs']}
+    commentary = {item['finding']: item['text'] for item in paired['commentary']}
     report['findings'] = [{**finding, 'thread': threads.get(n), 'commentary': commentary.get(n)}
                           for n, finding in enumerate(report['findings'])]
     pr = github.pull_request(args.pr)
