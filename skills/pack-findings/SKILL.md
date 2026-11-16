@@ -53,7 +53,7 @@ Wait until every subagent has answered before you go on. A subagent running in t
 
 ## 4. Merge their answers
 
-Each rule with a deviating spot is one deviates finding, with every spot the subagents reported and whether its doc was routed. Two rules from different units that point opposite ways at the same spot are conflicting. Keep every finding the subagents reported.
+Each choice that deviates is one deviates finding, with every spot the subagents reported. When rules from different units flag the same choice at the same spots, such as two docs that each require the standard library, they're one finding that quotes each rule and says whether each one's doc was routed: the author has one thing to fix. Two rules that point opposite ways at the same spot are conflicting. Keep every rule the subagents reported, in the finding that holds it.
 
 ## 5. Look for uncovered choices
 
