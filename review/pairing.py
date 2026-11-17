@@ -8,11 +8,9 @@ each paired finding from its thread's replies, as trust.py filters them."""
 import argparse
 import json
 from pathlib import Path
-import os
 import sys
-import uuid
 
-from args import compact, line
+from args import compact, line, output
 from sanitize import clean
 
 SCHEMA = {'type': 'object', 'additionalProperties': False, 'required': ['pairs'], 'properties': {'pairs': {
@@ -71,14 +69,6 @@ def opened_with(threads):
     """The text of the comment pack-review opened each thread with, by thread id. threads.py lists a thread only when
     pack-review wrote its first comment, so trust.py always gives that comment's text."""
     return {thread['id']: (thread, thread['comments'][0]['text']) for thread in threads}
-
-
-def output(name, value):
-    """Write a step output, under a delimiter the value can't hold."""
-    delimiter = f'EOF_{uuid.uuid4().hex}'
-    assert delimiter not in value
-    with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
-        out.write(f'{name}<<{delimiter}\n{value}\n{delimiter}\n')
 
 
 def claude_args(schema, model):
