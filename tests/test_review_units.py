@@ -51,6 +51,13 @@ class PromptTests(UnitsCase):
         self.assertNotIn('c.md', prompt)
         self.assertNotIn('{', prompt.split('Read each one in full')[0])
 
+    def test_keeps_a_doc_path_with_a_space_whole(self):
+        (self.root / 'docs.txt').write_text('context-packs/project/team rules.md\ncontext-packs/project/b.md\n')
+
+        prompt = self.prompt(1)['prompt']
+
+        self.assertIn('- `context-packs/project/team rules.md`\n- `context-packs/project/b.md`\n', prompt)
+
     def test_gives_the_first_unit_the_instruction_file(self):
         prompt = self.prompt(0)['prompt']
 
