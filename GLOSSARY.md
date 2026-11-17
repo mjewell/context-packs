@@ -96,9 +96,6 @@ Said of a doc whose `when` matches the work in the diff.
 **Summary**:
 The one comment a CI review keeps on a PR, counting the findings and carrying every finding for pack-review.
 
-**Partial review**:
-A CI review in which some doc wasn't read in full by any agent.
-
 **Review thread**:
 A thread on the diff that a CI review opened for one finding.
 

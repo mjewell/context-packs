@@ -1,16 +1,12 @@
 #!/usr/bin/env python3
-"""Write the merge job's report for the post job: the findings the merging agent returned, cleaned, and which docs
-no agent read in full, from each finder's record and the merging agent's transcript. It
-reaches nothing outside the runner, so the transcript, which can hold file contents, never leaves the job."""
+"""Write the merge job's report for the threads and post jobs: the findings the merging agent returned, cleaned, and
+the line each one's thread can open on. It reaches nothing outside the runner."""
 import argparse
 import json
-import os
 from pathlib import Path
 import sys
 
-import reads
 from sanitize import clean
-import units
 
 
 def cleaned(value):
@@ -34,36 +30,6 @@ def findings_in(path):
     return cleaned(output['findings'])
 
 
-def unread(found):
-    """The docs no one read in full, after printing who read each one in the run's log."""
-    for path, who in found.items():
-        print(f'read by {", ".join(who)}: {path}' if who else f'not read: {path}')
-    return cleaned([path for path, who in found.items() if not who])
-
-
-def records_in(folder, count):
-    """Each finder's record, from unit_report.py, in unit order. A missing one stops the run, since its unit's docs
-    would otherwise count as unread with no word on why."""
-    records = []
-    for n in range(count):
-        path = folder / f'unit-{n}.json'
-        if not path.is_file():
-            sys.exit(f"pack-review: there's no record from unit {n}'s finder, at {path}.")
-        records.append(json.loads(path.read_text(encoding='utf-8')))
-    return records
-
-
-def merged(records, merger):
-    """Who read each doc in full, across every finder's record and the merging agent."""
-    found = {}
-    for record in records:
-        for path, who in record['docs'].items():
-            found.setdefault(path, []).extend(who)
-    for path, who in merger.items():
-        found.setdefault(path, []).extend(who)
-    return found
-
-
 def anchors(findings, shown):
     """The spot each finding's thread can open on: its first spot that deviates and the diff shows, or else its first
     spot the diff shows, or None when the diff shows none, since a review comment needs a line in the diff."""
@@ -81,23 +47,13 @@ def main():
     parser.add_argument('--base-ref', required=True, help='the branch the PR was to merge into when it was reviewed')
     parser.add_argument('--head', required=True, help='the commit that was reviewed')
     parser.add_argument('--findings', type=Path, required=True, help="the merging agent's structured output")
-    parser.add_argument('--transcript', type=Path, required=True,
-                        help="the merging agent's claude-execution-output.json, from claude-code-action")
-    parser.add_argument('--docs', type=Path, required=True,
-                        help='the docs the finders should read, from the checkout, as `context-packs docs` prints them')
     parser.add_argument('--shown', type=Path, required=True,
                         help='the head lines each diff shows, as `git_server.py shown` prints them')
-    parser.add_argument('--units', type=Path, required=True, help="the folder holding each finder's unit-<n>.json")
     parser.add_argument('--out', type=Path, required=True, help='where to write the report')
     args = parser.parse_args()
     findings = findings_in(args.findings)
-    paths = [path for unit in units.units(args.docs) for path in unit]
-    records = records_in(args.units, len(units.units(args.docs)))
-    messages = json.loads(args.transcript.read_text(encoding='utf-8'))
-    docs = merged(records, reads.readers(messages, paths, os.path.realpath('.'), 'the merging agent'))
     report = {'base': args.base, 'base_ref': args.base_ref, 'head': args.head, 'findings': findings,
-              'anchors': anchors(findings, json.loads(args.shown.read_text(encoding='utf-8'))),
-              'unread': unread({path: docs.get(path, []) for path in paths})}
+              'anchors': anchors(findings, json.loads(args.shown.read_text(encoding='utf-8')))}
     args.out.write_text(json.dumps(report, ensure_ascii=False), encoding='utf-8')
 
 
