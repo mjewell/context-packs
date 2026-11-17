@@ -1,24 +1,29 @@
 #!/usr/bin/env python3
-"""Post the review's threads as one GitHub review: a new thread for each finding no thread was opened for, and a reply
-in a pack-review thread only when there's something to say. It runs in the post job, which has no agent. It reads
-pack-review's threads afresh through trust.py, so it writes only to threads pack-review opened on this PR."""
+"""Post the review: a GitHub review holding a new thread for each finding no thread was opened for, and a reply in a
+pack-review thread only when there's something to say, then the one summary comment. It runs in the post job, which
+has no agent. It plans every write and checks the plan before the first one, so a run that stops on a check leaves the
+PR as it was. It reads pack-review's threads afresh through trust.py, so it writes only to threads pack-review opened
+on this PR."""
 import argparse
 import json
+import os
 from pathlib import Path
 import sys
 
 import finding_comment
 import github
+import summary
 import trust
 
-PR_HEAD = '''query PullRequestHead($owner: String!, $name: String!, $number: Int!) {
-  repository(owner: $owner, name: $name) { pullRequest(number: $number) { id headRefOid baseRefName } } }'''
 ADD_REVIEW = '''mutation AddReview($input: AddPullRequestReviewInput!) {
   addPullRequestReview(input: $input) { pullRequestReview { id } } }'''
 ADD_REPLY = '''mutation AddReply($input: AddPullRequestReviewThreadReplyInput!) {
   addPullRequestReviewThreadReply(input: $input) { comment { id } } }'''
 SUBMIT_REVIEW = '''mutation SubmitReview($input: SubmitPullRequestReviewInput!) {
   submitPullRequestReview(input: $input) { pullRequestReview { id } } }'''
+ADD_COMMENT = '''mutation AddComment($input: AddCommentInput!) { addComment(input: $input) { clientMutationId } }'''
+UPDATE_COMMENT = '''mutation UpdateComment($input: UpdateIssueCommentInput!) {
+  updateIssueComment(input: $input) { clientMutationId } }'''
 
 
 STILL_FOUND = 'still found'
@@ -40,8 +45,20 @@ def reply(head, resolved, commentary):
     return github.signed(f'{lead}\n\n{finding_comment.quoted(commentary)}')
 
 
-def planned(report, paired, threads):
-    """The new threads and the replies, by thread id, that the review posts."""
+def stale(report, pr):
+    """Why the PR no longer matches what was reviewed, or None when it does."""
+    if pr['headRefOid'] != report['head']:
+        return (f'the PR moved on to {pr["headRefOid"]} since this review of {report["head"]}, so it posts nothing. '
+                'The run for the newer commit will.')
+    if pr['baseRefName'] != report['base_ref']:
+        return (f'the PR moved from {report["base_ref"]} to {pr["baseRefName"]} since this review, so it posts '
+                'nothing. The run for the new base will.')
+    return None
+
+
+def planned(repo, number, report, paired, pr, threads):
+    """Every write the review makes: the new threads, the replies by thread id, and the summary's body with the id of
+    the summary it replaces, or None when it adds one. It stops on anything that would fail partway through posting."""
     head, findings = report['head'], report['findings']
     pairs = {pair['finding']: pair['thread'] for pair in paired['pairs']}
     commentary = {item['finding']: item['text'] for item in paired['commentary']}
@@ -62,7 +79,15 @@ def planned(report, paired, threads):
         body = reply(head, resolved, commentary.get(n))
         if body is not None:
             replies[thread] = body
-    return new, replies
+    body = summary.body(repo, number, {**report, 'findings': [
+        {**finding, 'thread': pairs.get(n), 'commentary': commentary.get(n)} for n, finding in enumerate(findings)]})
+    if len(body) > summary.LIMIT:
+        sys.exit(f'pack-review: the summary is {len(body)} characters, and GitHub allows {summary.LIMIT} in a comment.')
+    summaries = [c['id'] for c in pr['comments'] if github.own(c)]
+    if len(summaries) > 1:
+        sys.exit(f'pack-review: the PR has more than one pack-review summary ({", ".join(summaries)}). Delete all '
+                 'but one.')
+    return new, replies, (body, summaries[0] if summaries else None)
 
 
 def main():
@@ -73,31 +98,29 @@ def main():
     args = parser.parse_args()
     report = json.loads(args.report.read_text(encoding='utf-8'))
     paired = json.loads(args.paired.read_text(encoding='utf-8'))
-    owner, name = github.repository()
-    pr = github.graphql('PullRequestHead', PR_HEAD, {'owner': owner, 'name': name, 'number': args.pr})
-    pr = pr['repository']['pullRequest']
-    if pr['headRefOid'] != report['head']:
-        print(f'pack-review: the PR moved on to {pr["headRefOid"]} since this review of {report["head"]}, so it posts '
-              'no threads. The run for the newer commit will.')
-        return
-    if pr['baseRefName'] != report['base_ref']:
-        print(f'pack-review: the PR moved from {report["base_ref"]} to {pr["baseRefName"]} since this review, so it '
-              'posts no threads. The run for the new base will.')
+    pr = github.pull_request(args.pr)
+    why = stale(report, pr)
+    if why:
+        print(f'pack-review: {why}')
         return
     threads = {thread['id']: thread for thread in trust.threads(args.pr)}
-    new, replies = planned(report, paired, threads)
-    if not new and not replies:
-        print('pack-review: nothing to post in threads.')
-        return
-    # A review with no event stays pending, so the replies join it and everything appears at once when it's submitted.
-    review = github.graphql('AddReview', ADD_REVIEW, {'input': {
-        'pullRequestId': pr['id'], 'commitOID': report['head'], 'threads': new}})
-    review = review['addPullRequestReview']['pullRequestReview']['id']
-    for thread, body in replies.items():
-        github.graphql('AddReply', ADD_REPLY, {'input': {'pullRequestReviewId': review,
-                                                         'pullRequestReviewThreadId': thread, 'body': body}})
-    github.graphql('SubmitReview', SUBMIT_REVIEW, {'input': {'pullRequestReviewId': review, 'event': 'COMMENT'}})
-    print(f'pack-review: opened {len(new)} threads and replied in {len(replies)}.')
+    new, replies, (body, existing) = planned(os.environ['GITHUB_REPOSITORY'], args.pr, report, paired, pr, threads)
+    if new or replies:
+        # A review with no event stays pending, so the replies join it and everything appears at once when it's
+        # submitted.
+        review = github.graphql('AddReview', ADD_REVIEW, {'input': {
+            'pullRequestId': pr['id'], 'commitOID': report['head'], 'threads': new}})
+        review = review['addPullRequestReview']['pullRequestReview']['id']
+        for thread, text in replies.items():
+            github.graphql('AddReply', ADD_REPLY, {'input': {'pullRequestReviewId': review,
+                                                             'pullRequestReviewThreadId': thread, 'body': text}})
+        github.graphql('SubmitReview', SUBMIT_REVIEW, {'input': {'pullRequestReviewId': review, 'event': 'COMMENT'}})
+    if existing:
+        github.graphql('UpdateComment', UPDATE_COMMENT, {'input': {'id': existing, 'body': body}})
+    else:
+        github.graphql('AddComment', ADD_COMMENT, {'input': {'subjectId': pr['id'], 'body': body}})
+    print(f'pack-review: opened {len(new)} threads, replied in {len(replies)}, and posted the summary of '
+          f'{len(report["findings"])} findings.')
 
 
 if __name__ == '__main__':
