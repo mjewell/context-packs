@@ -7,14 +7,17 @@ import github
 
 # Each kind's label, set in code like the commit's, so both read as tags at the start of the comment.
 LABELS = {'deviates': 'deviation', 'conflicting': 'conflict', 'uncovered': 'uncovered choice'}
-# A GitHub mention: a login, or an org's team, after an @ that doesn't end a word, as in an email address.
-MENTION = re.compile(r'(?<![\w`])@[A-Za-z0-9][A-Za-z0-9-]*(?:/[A-Za-z0-9_.-]+)?')
+# GitHub links a mention only when a login's first character follows the @. A word joiner between them doesn't show,
+# and it breaks the mention whatever Markdown is around it. Backticks around the mention wouldn't hold, since the
+# agent's own backticks can pair with them.
+MENTION = re.compile(r'@(?=[A-Za-z0-9])')
+JOINER = '\u2060'
 
 
 def defused(text):
-    """The agent's text as Markdown that can't notify anyone or hide text: each mention is wrapped in backticks, and
-    each < is escaped, so no HTML comment or tag can form."""
-    return MENTION.sub(lambda found: f'`{found.group(0)}`', text).replace('<', '&lt;')
+    """The agent's text as Markdown that can't notify anyone or hide text: each @ that could start a mention has a word
+    joiner after it, and each < is escaped, so no HTML comment or tag can form."""
+    return MENTION.sub('@' + JOINER, text).replace('<', '&lt;')
 
 
 def quoted(text):
