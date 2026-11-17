@@ -86,7 +86,7 @@ class NewThreadTests(PostCase):
 
         added, _ = self.review()
         body = added['threads'][0]['body']
-        self.assertIn('**Ask `@alice` &lt;!-- or not -->**', body)
+        self.assertIn('**Ask @\u2060alice &lt;!-- or not -->**', body)
         self.assertIn('See &lt;b>this&lt;/b>.', body)
         self.assertNotIn('```json', body)
 
@@ -167,6 +167,17 @@ class CommentaryTests(PostCase):
         self.assertEqual(self.reply('Alice says this is deliberate, per the balance spec.'),
                          f'🤖 `hhhhhhh`\n\n> Alice says this is deliberate, per the balance spec.\n\n{MARKER}')
 
+    def test_keeps_a_mention_from_notifying_anyone_whatever_markdown_is_around_it(self):
+        found = {**F1, 'headline': 'Ask ` @alice ` or \\@bob', 'take': 'Or `@carol`.'}
+
+        self.post([found], [{'path': 'src/sim.ts', 'line': 42}])
+
+        added, _ = self.review()
+        body = added['threads'][0]['body']
+        # GitHub links a mention only when a login's first character follows the @.
+        self.assertNotRegex(body, r'@[A-Za-z0-9]')
+        self.assertIn('**Ask ` @\u2060alice ` or \\@\u2060bob**', body)
+
     def test_says_a_resolved_thread_is_still_found_before_the_commentary(self):
         self.assertEqual(self.reply('Alice said it was fixed in abc1234.', resolved=True),
                          '🤖 `still found` `hhhhhhh`\n\n> Alice said it was fixed in abc1234.'
@@ -178,4 +189,4 @@ class CommentaryTests(PostCase):
     def test_keeps_mentions_from_notifying_and_html_from_hiding_text(self):
         body = self.reply('@alice and @org/team-a said so. <!-- hidden --> <b>x</b> Mail a@b.com.')
 
-        self.assertIn('> `@alice` and `@org/team-a` said so. &lt;!-- hidden --> &lt;b>x&lt;/b> Mail a@b.com.', body)
+        self.assertIn('> @\u2060alice and @\u2060org/team-a said so. &lt;!-- hidden --> &lt;b>x&lt;/b> Mail a@\u2060b.com.', body)

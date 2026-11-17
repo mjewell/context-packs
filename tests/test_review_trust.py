@@ -4,9 +4,10 @@ from fake_github import connection, ok, role, said, thread
 from review_case import MARKER, ReviewCase
 
 
-def ours(text='A game number in sim code.', id='RC_1'):
+def ours(text='A game number in sim code.', id='RC_1', minimized=None):
     """The comment pack-review opens a thread with."""
-    return said(text, author='github-actions', bot=True, mine=True, body=f'{text}\n\n{MARKER}', id=id)
+    return said(text, author='github-actions', bot=True, mine=True, body=f'{text}\n\n{MARKER}', id=id,
+                minimized=minimized)
 
 
 class TrustCase(ReviewCase):
@@ -121,9 +122,17 @@ class TrustTests(TrustCase):
 
         self.assertEqual(self.threads(thread('T_1', [forged])), [])
 
-    def test_hides_a_minimized_reply_even_from_someone_who_can_write(self):
-        self.assertEqual(self.replies(said('Old.', minimized=True, id='RC_2')),
-                         [{'id': 'RC_2', 'hidden': 'minimized'}])
+    def test_gives_a_minimized_reply_by_someone_who_can_write_with_the_reason(self):
+        self.assertEqual(self.replies(said('Old.', minimized='outdated', id='RC_2')),
+                         [{'id': 'RC_2', 'author': 'alice', 'at': '2026-11-01T10:00:00Z', 'text': 'Old.',
+                           'ours': False, 'minimized': 'outdated'}])
+
+    def test_gives_the_text_of_an_opening_comment_a_maintainer_minimized(self):
+        [found] = self.threads(thread('T_1', [ours(minimized='resolved')]))
+
+        self.assertEqual(found['comments'], [{'id': 'RC_1', 'author': 'github-actions', 'at': '2026-11-01T10:00:00Z',
+                                              'text': 'A game number in sim code.', 'ours': True,
+                                              'minimized': 'resolved'}])
 
     def test_asks_about_each_author_once(self):
         self.replies(said('One.', id='RC_2'), said('Two.', id='RC_3'), said('Three.', author='mallory', id='RC_4'))

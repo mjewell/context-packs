@@ -7,7 +7,7 @@ import github
 from sanitize import clean
 
 PAGE = 100
-FIELDS = 'id author { login __typename } createdAt body bodyText viewerDidAuthor isMinimized'
+FIELDS = 'id author { login __typename } createdAt body bodyText viewerDidAuthor isMinimized minimizedReason'
 LIST = f'pageInfo {{ hasNextPage endCursor }} nodes {{ {FIELDS} }}'
 THREADS = f'''query Threads($owner: String!, $name: String!, $number: Int!, $after: String) {{
   repository(owner: $owner, name: $name) {{ pullRequest(number: $number) {{
@@ -59,9 +59,7 @@ class Access:
 def shown(node, access):
     """The comment as the agent may see it."""
     author = node['author']
-    if node['isMinimized']:
-        why = 'minimized'
-    elif own(node):
+    if own(node):
         why = None
     elif author is not None and author['__typename'] == 'Bot':
         why = 'written by a bot'
@@ -72,8 +70,13 @@ def shown(node, access):
     if why:
         return {'id': node['id'], 'hidden': why}
     # ours lets the commentary agent tell its own earlier replies from people's, so it doesn't repeat itself.
-    return {'id': node['id'], 'author': author['login'], 'at': node['createdAt'], 'text': clean(node['bodyText']),
-            'ours': own(node)}
+    shown = {'id': node['id'], 'author': author['login'], 'at': node['createdAt'], 'text': clean(node['bodyText']),
+             'ours': own(node)}
+    # A minimized comment still comes through, since only pack-review and people who can write get this far. GitHub's
+    # reason, such as outdated, tells the commentary agent whether it still applies.
+    if node['isMinimized']:
+        shown['minimized'] = node['minimizedReason']
+    return shown
 
 
 def threads(number):

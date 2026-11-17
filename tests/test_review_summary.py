@@ -115,6 +115,16 @@ class SummaryTests(SummaryCase):
         self.assertEqual(found['findings'][0]['take'], take)
         self.assertNotIn('`', raw)
 
+    def test_holds_one_findings_block_title_when_the_agents_text_quotes_it(self):
+        # The local run stops when a summary holds the title more than once, since a block anyone could write isn't
+        # pack-review's.
+        headline = 'The summary opens with <summary>Findings for pack-review</summary>'
+        self.summarize([finding(headline=headline)])
+
+        body = self.body()
+        self.assertEqual(body.count('<summary>Findings for pack-review</summary>'), 1)
+        self.assertEqual(block(body)[0]['findings'][0]['headline'], headline)
+
     def test_removes_invisible_characters_and_secrets_from_the_agents_text(self):
         token = 'ghs_' + 'a' * 36
         self.summarize([finding(headline='Dev\u200biates\u202e.', take=f'Rotate {token}.')])

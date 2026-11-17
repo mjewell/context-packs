@@ -33,10 +33,11 @@ def summary(repo, number, report):
     text = f"pack-review checked `{report['head'][:7]}` against this repo's context packs and found {found}."
     if findings:
         text += f"\n\nTo go through them, run `/pack-review {repo}#{number}`."
-    # Backticks only occur inside JSON strings, where \u0060 means the same, so nothing can close the fence.
+    # Backticks and < only occur inside JSON strings, where \u0060 and \u003c mean the same. So nothing can close the
+    # fence, and the block's title, which the local run counts, appears nowhere else.
     data = json.dumps({key: report[key] for key in ('base', 'base_ref', 'head', 'findings')},
                       indent=2, ensure_ascii=False)
-    data = data.replace('`', '\\u0060')
+    data = data.replace('`', '\\u0060').replace('<', '\\u003c')
     return github.signed(f'{text}\n\n<details><summary>Findings for pack-review</summary>\n\n```json\n{data}\n'
                          '```\n\n</details>')
 
