@@ -71,7 +71,7 @@ def planned(repo, number, report, paired, pr, threads):
         if n not in pairs:
             if anchor is not None:
                 new.append({'path': anchor['path'], 'line': anchor['line'], 'side': 'RIGHT',
-                            'body': finding_comment.body(finding, head)})
+                            'body': finding_comment.body(finding, head, anchor)})
             continue
         thread = pairs[n]
         # A resolved thread hears its finding is still found once, until someone comments after that.
