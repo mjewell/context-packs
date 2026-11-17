@@ -1,6 +1,15 @@
 name: pack-review merge
 description: Merge the finders' answers into the review's findings with claude-code-action, look for choices no rule covers, and save the findings as the artifact pack-review-report, for the threads and post actions. Run it in a job with only contents read, after every finder.
 inputs:
+  head:
+    description: The PR's head commit to review, from the units job.
+    required: true
+  base:
+    description: The PR's base commit, from the units job.
+    required: true
+  base-ref:
+    description: The branch the PR merges into, from the units job.
+    required: true
   anthropic-api-key:
     description: An Anthropic API key for the merging agent. Pass this or claude-code-oauth-token.
     required: false
@@ -19,10 +28,10 @@ runs:
     - name: Check the checkout
       shell: bash
       env:
-        HEAD: ${{ github.event.pull_request.head.sha }}
+        HEAD: ${{ inputs.head }}
       run: |
         if [ "$(git rev-parse HEAD)" != "$HEAD" ]; then
-          echo "::error::The PR's head, $HEAD, isn't checked out. Check out with ref: \${{ github.event.pull_request.head.sha }}."
+          echo "::error::The PR's head, $HEAD, isn't checked out. Check out the head the units job read."
           exit 1
         fi
     - name: Make the agent's folder
@@ -41,8 +50,8 @@ runs:
       id: prepare
       shell: bash
       env:
-        BASE: ${{ github.event.pull_request.base.sha }}
-        HEAD: ${{ github.event.pull_request.head.sha }}
+        BASE: ${{ inputs.base }}
+        HEAD: ${{ inputs.head }}
         MODEL: ${{ inputs.model }}
         INPUTS: ${{ steps.folder.outputs.inputs }}
       # The folder holds each finder's unit-<n>.json and docs.txt for the agent. The lines each diff shows go outside
@@ -60,7 +69,7 @@ runs:
         anthropic_api_key: ${{ inputs.anthropic-api-key }}
         claude_code_oauth_token: ${{ inputs.claude-code-oauth-token }}
         github_token: ${{ github.token }}
-        prompt: /context-packs:pack-findings ci ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} ${{ steps.folder.outputs.inputs }}
+        prompt: /context-packs:pack-findings ci ${{ inputs.base }}...${{ inputs.head }} ${{ steps.folder.outputs.inputs }}
         claude_args: ${{ steps.prepare.outputs.claude-args }}
     - name: Show what the agent did
       if: always() && steps.review.outputs.execution_file != ''
@@ -72,9 +81,9 @@ runs:
       shell: bash
       env:
         FINDINGS: ${{ steps.review.outputs.structured_output }}
-        BASE: ${{ github.event.pull_request.base.sha }}
-        BASE_REF: ${{ github.event.pull_request.base.ref }}
-        HEAD: ${{ github.event.pull_request.head.sha }}
+        BASE: ${{ inputs.base }}
+        BASE_REF: ${{ inputs.base-ref }}
+        HEAD: ${{ inputs.head }}
       run: |
         printf '%s' "$FINDINGS" > "$RUNNER_TEMP/pack-review-findings.json"
         mkdir "$RUNNER_TEMP/pack-review-report"

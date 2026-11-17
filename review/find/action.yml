@@ -1,6 +1,12 @@
 name: pack-review find
 description: Check a PR against one unit of the repo's context packs with claude-code-action, and save the finder's answer as the artifact pack-review-unit-<unit>, for the merge action. Run it in a job with only contents read, once per unit the units action lists.
 inputs:
+  head:
+    description: The PR's head commit to review, from the units job.
+    required: true
+  base:
+    description: The PR's base commit, from the units job.
+    required: true
   unit:
     description: The unit's number, from the units action.
     required: true
@@ -22,18 +28,18 @@ runs:
     - name: Check the checkout
       shell: bash
       env:
-        HEAD: ${{ github.event.pull_request.head.sha }}
+        HEAD: ${{ inputs.head }}
       run: |
         if [ "$(git rev-parse HEAD)" != "$HEAD" ]; then
-          echo "::error::The PR's head, $HEAD, isn't checked out. Check out with ref: \${{ github.event.pull_request.head.sha }}."
+          echo "::error::The PR's head, $HEAD, isn't checked out. Check out the head the units job read."
           exit 1
         fi
     - name: Prepare the finder
       id: prepare
       shell: bash
       env:
-        BASE: ${{ github.event.pull_request.base.sha }}
-        HEAD: ${{ github.event.pull_request.head.sha }}
+        BASE: ${{ inputs.base }}
+        HEAD: ${{ inputs.head }}
         MODEL: ${{ inputs.model }}
         UNIT: ${{ inputs.unit }}
       # The finder's prompt holds its unit's docs, and it reads the change through the git server. docs.txt goes in a
