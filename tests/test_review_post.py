@@ -1,15 +1,11 @@
 import json
 
-from fake_github import connection, ok, role
+from fake_github import connection, ok, pull_request, role
 from review_case import HEAD, MARKER, ReviewCase
 from test_review_pairing import F1, F3, finding
 from test_review_trust import ours
 
 BASE = 'b' * 40
-
-
-def pr(head=HEAD, base_ref='main'):
-    return ok({'repository': {'pullRequest': {'id': 'PR_1', 'headRefOid': head, 'baseRefName': base_ref}}})
 
 
 def thread(id, resolved=False, replies=()):
@@ -24,11 +20,12 @@ class PostCase(ReviewCase):
     def setUp(self):
         super().setUp()
         self.github.responses.update({
-            'PullRequestHead': pr(),
+            'PullRequest': pull_request(),
             'Threads': ok({'repository': {'pullRequest': {'reviewThreads': connection([])}}}),
             'AddReview': ok({'addPullRequestReview': {'pullRequestReview': {'id': 'PRR_1'}}}),
             'AddReply': ok({'addPullRequestReviewThreadReply': {'comment': {'id': 'RC_9'}}}),
             'SubmitReview': ok({'submitPullRequestReview': {'pullRequestReview': {'id': 'PRR_1'}}}),
+            'AddComment': ok({}),
         })
         self.github.rest['/repos/o/r/collaborators/alice/permission'] = role('write')
 
@@ -94,7 +91,7 @@ class NewThreadTests(PostCase):
         result = self.post([F1], [None])
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.github.writes(), [])
+        self.assertEqual(self.github.writes(), ['AddComment'])
 
 
 class PairedTests(PostCase):
@@ -106,8 +103,8 @@ class PairedTests(PostCase):
         result = self.post([F1], [{'path': 'src/sim.ts', 'line': 42}], pairs=[{'finding': 0, 'thread': 'T_1'}])
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.github.writes(), [])
-        self.assertIn('nothing to post', result.stdout)
+        self.assertEqual(self.github.writes(), ['AddComment'])
+        self.assertIn('opened 0 threads, replied in 0', result.stdout)
 
     def test_tells_a_resolved_thread_its_finding_is_still_found(self):
         self.threads(thread('T_1', resolved=True))
@@ -126,7 +123,7 @@ class PairedTests(PostCase):
         result = self.post([F1], [None], pairs=[{'finding': 0, 'thread': 'T_1'}])
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.github.writes(), [])
+        self.assertEqual(self.github.writes(), ['AddComment'])
 
     def test_stops_on_a_pair_with_a_thread_that_isnt_pack_reviews_on_this_pr(self):
         self.threads(thread('T_1'))
@@ -140,15 +137,28 @@ class PairedTests(PostCase):
 
 class StaleTests(PostCase):
     def test_posts_nothing_when_the_pr_moved_on_or_to_another_base(self):
-        for answer, says in ((pr(head='o' * 40), 'moved on'), (pr(base_ref='release'), 'moved from main')):
+        for answer, says in ((pull_request(head='o' * 40), 'moved on'), (pull_request(base_ref='release'), 'moved from main')):
             with self.subTest(says=says):
-                self.github.responses['PullRequestHead'] = answer
+                self.github.responses['PullRequest'] = answer
 
                 result = self.post([F1], [{'path': 'src/sim.ts', 'line': 42}])
 
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn(says, result.stdout)
                 self.assertEqual(self.github.writes(), [])
+
+
+class BeforeWritingTests(PostCase):
+    """Every check that can fail runs before the first write, so a run that stops leaves the PR as it was."""
+
+    def test_writes_nothing_when_the_summary_wont_fit_though_each_thread_would(self):
+        findings = [{**F1, 'headline': 'x' * 33000}, {**F3, 'headline': 'y' * 33000}]
+
+        result = self.post(findings, [{'path': 'src/sim.ts', 'line': 42}, {'path': 'src/rng.ts', 'line': 17}])
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('65536', result.stderr)
+        self.assertEqual(self.github.writes(), [])
 
 
 class CommentaryTests(PostCase):

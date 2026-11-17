@@ -15,19 +15,12 @@ runs:
       with:
         name: pack-review-threads
         path: ${{ runner.temp }}/pack-review-threads
-    - name: Post the threads
+    - name: Post the review
       shell: bash
       env:
         GITHUB_TOKEN: ${{ github.token }}
         PR: ${{ github.event.pull_request.number }}
         REPORT: ${{ runner.temp }}/pack-review-report/report.json
         PAIRED: ${{ runner.temp }}/pack-review-threads/paired.json
+      # One script plans the threads and the summary and checks both before it writes either.
       run: python3 "$GITHUB_ACTION_PATH/../post.py" --pr "$PR" --report "$REPORT" --paired "$PAIRED"
-    - name: Post the summary
-      shell: bash
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-        PR: ${{ github.event.pull_request.number }}
-        REPORT: ${{ runner.temp }}/pack-review-report/report.json
-        PAIRED: ${{ runner.temp }}/pack-review-threads/paired.json
-      run: python3 "$GITHUB_ACTION_PATH/../summary.py" --pr "$PR" --report "$REPORT" --paired "$PAIRED"

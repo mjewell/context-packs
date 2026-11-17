@@ -30,11 +30,6 @@ def every(operation, query, variables, field, after=None):
         after = page['pageInfo']['endCursor']
 
 
-def own(node):
-    """Whether pack-review wrote it: the token's identity wrote it, and it ends with the marker."""
-    return node['viewerDidAuthor'] and node['body'].rstrip().endswith(github.MARKER)
-
-
 class Access:
     """Who can write to the repo now, asked of GitHub once per author."""
 
@@ -59,7 +54,7 @@ class Access:
 def shown(node, access):
     """The comment as the agent may see it."""
     author = node['author']
-    if own(node):
+    if github.own(node):
         why = None
     elif author is not None and author['__typename'] == 'Bot':
         why = 'written by a bot'
@@ -71,7 +66,7 @@ def shown(node, access):
         return {'id': node['id'], 'hidden': why}
     # ours lets the commentary agent tell its own earlier replies from people's, so it doesn't repeat itself.
     shown = {'id': node['id'], 'author': author['login'], 'at': node['createdAt'], 'text': clean(node['bodyText']),
-             'ours': own(node)}
+             'ours': github.own(node)}
     # A minimized comment still comes through, since only pack-review and people who can write get this far. GitHub's
     # reason, such as outdated, tells the commentary agent whether it still applies.
     if node['isMinimized']:
@@ -92,7 +87,7 @@ def threads(number):
         if first['pageInfo']['hasNextPage']:
             comments += every('ThreadComments', THREAD_COMMENTS, {'id': thread['id']},
                               lambda data: data['node']['comments'], first['pageInfo']['endCursor'])
-        if not comments or not own(comments[0]):
+        if not comments or not github.own(comments[0]):
             continue
         found.append({'id': thread['id'], 'path': clean(thread['path']), 'line': thread['line'],
                       'resolved': thread['isResolved'], 'comments': [shown(node, access) for node in comments]})

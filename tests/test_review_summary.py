@@ -1,8 +1,9 @@
 import json
 import re
 
-from fake_github import comment, ok, pull_request
+from fake_github import comment, connection, ok, pull_request
 from review_case import HEAD, MARKER, ReviewCase, own
+from test_review_post import thread
 
 BASE = 'b' * 40
 
@@ -27,7 +28,12 @@ class SummaryCase(ReviewCase):
 
     def setUp(self):
         super().setUp()
-        self.github.responses.update({'PullRequest': pull_request(), 'AddComment': ok({}), 'UpdateComment': ok({})})
+        self.github.responses.update({
+            'PullRequest': pull_request(), 'AddComment': ok({}), 'UpdateComment': ok({}),
+            'Threads': ok({'repository': {'pullRequest': {'reviewThreads': connection([])}}}),
+            'AddReview': ok({'addPullRequestReview': {'pullRequestReview': {'id': 'PRR_1'}}}),
+            'AddReply': ok({'addPullRequestReviewThreadReply': {'comment': {'id': 'RC_9'}}}),
+            'SubmitReview': ok({'submitPullRequestReview': {'pullRequestReview': {'id': 'PRR_1'}}})})
 
     def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', pairs=(), commentary=(), shown=None):
         """Post the summary of the merging agent's output, with pairs as the threads job checked them."""
@@ -38,7 +44,10 @@ class SummaryCase(ReviewCase):
         if report.returncode:
             return report
         (self.root / 'paired.json').write_text(json.dumps({'pairs': list(pairs), 'commentary': list(commentary)}))
-        post = self.script('summary', '--pr', 7, '--report', 'report.json', '--paired', 'paired.json')
+        # Each pair names one of pack-review's threads, as the threads job checked.
+        self.github.responses['Threads'] = ok({'repository': {'pullRequest': {'reviewThreads': connection(
+            [thread(pair['thread']) for pair in pairs])}}})
+        post = self.script('post', '--pr', 7, '--report', 'report.json', '--paired', 'paired.json')
         post.stdout = report.stdout + post.stdout
         return post
 
@@ -155,20 +164,6 @@ class SummaryTests(SummaryCase):
         self.assertIn('IC_1, IC_2', result.stderr)
         self.assertEqual(self.github.writes(), [])
 
-    def test_posts_nothing_when_the_pr_moved_on_since_the_review(self):
-        result = self.summarize([finding()], head='o' * 40)
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(f'moved on to {HEAD}', result.stdout)
-        self.assertEqual(self.github.writes(), [])
-
-    def test_posts_nothing_when_the_pr_moved_to_another_base_branch_since_the_review(self):
-        result = self.summarize([finding()], base_ref='release')
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('moved from release to main', result.stdout)
-        self.assertEqual(self.github.writes(), [])
-
     def test_writes_the_report_in_the_find_job_without_reaching_github(self):
         result = self.summarize([finding()])
 
@@ -200,13 +195,6 @@ class SummaryTests(SummaryCase):
                 self.assertEqual(result.returncode, 1)
                 self.assertIn('returned no findings', result.stderr)
                 self.assertEqual(self.github.requests, [])
-
-    def test_stops_before_writing_when_the_summary_wont_fit_in_a_comment(self):
-        result = self.summarize([finding(headline='x' * 66000)])
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('65536', result.stderr)
-        self.assertEqual(self.github.writes(), [])
 
     def test_stops_on_an_error_from_github(self):
         self.github.responses['AddComment'] = (200, {'data': None, 'errors': [{'message': 'Forbidden'}]})
