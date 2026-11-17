@@ -2,12 +2,15 @@
 """The claude_args the review hands claude-code-action, each as one line. A finder checks one unit of the packs, and
 the merging agent merges the finders' answers with the pack-findings skill. Both get the schema their answer is
 checked against, tools that only read, and the git server, which reads the change. claude-code-action splits the line
-the way a shell would. Run, it prints the merging agent's line."""
+the way a shell would. Run, it prints the merging agent's line. output() writes a prompt, a claude_args line or the
+units' matrix as a GitHub step output."""
 import argparse
 import json
+import os
 from pathlib import Path
 import shlex
 import sys
+import uuid
 
 REVIEW = Path(__file__).resolve().parent
 # The diff and the repo's files can hold text written to steer the agent, so its tools only read: confined by
@@ -33,6 +36,14 @@ def line(values):
     if quoted:
         sys.exit(f'pack-review: these arguments hold a single quote, which claude-code-action may split: {quoted}')
     return ' '.join(shlex.quote(value) for value in values)
+
+
+def output(name, value):
+    """Write a step output, under a delimiter the value can't hold."""
+    delimiter = f'EOF_{uuid.uuid4().hex}'
+    assert delimiter not in value
+    with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
+        out.write(f'{name}<<{delimiter}\n{value}\n{delimiter}\n')
 
 
 def reading(base, head, model):

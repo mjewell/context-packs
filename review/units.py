@@ -9,7 +9,6 @@ from pathlib import Path
 import sys
 
 import args as claude
-from pairing import output
 
 REVIEW = Path(__file__).resolve().parent
 sys.path.insert(0, str(REVIEW.parent / 'src'))
@@ -34,7 +33,7 @@ def units(docs):
 
 
 def list_units(args):
-    output('units', json.dumps(list(range(len(units(args.docs))))))
+    claude.output('units', json.dumps(list(range(len(units(args.docs))))))
 
 
 def prompt(args):
@@ -43,8 +42,8 @@ def prompt(args):
         sys.exit(f'pack-review: there is no unit {args.unit}: the docs make {len(found)} units.')
     docs = ''.join(f'- `{path}`\n' for path in found[args.unit])
     text = PROMPT.read_text(encoding='utf-8').format(diff=DIFF, log=LOG, docs=docs.rstrip('\n'))
-    output('prompt', text.rstrip('\n') + IN_CI)
-    output('claude-args', claude.finder(args.base, args.head, args.model))
+    claude.output('prompt', text.rstrip('\n') + IN_CI)
+    claude.output('claude-args', claude.finder(args.base, args.head, args.model))
 
 
 def main():
