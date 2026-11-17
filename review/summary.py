@@ -4,6 +4,7 @@ the agent is what the report holds."""
 import json
 from pathlib import Path
 
+import finding_comment
 import github
 
 # GitHub's limit on a comment's length.
@@ -18,13 +19,22 @@ def counted(findings):
     return ', '.join(f"{n} {kind}{'s' * (n != 1)}" for kind, n in counts.items() if n)
 
 
+def listed(finding, anchor):
+    """The finding's line in the list for people: its kind, its headline escaped as thread text is, and where its
+    thread is. The headline is kept on one line and always followed by more text, since the local run takes the JSON
+    from after the first "Findings for pack-review" and a line break."""
+    where = f"at `{finding_comment.escaped(anchor['path'])}:{anchor['line']}`" if anchor else 'on no line the diff shows'
+    return f"- `{finding['kind']}` {finding_comment.escaped(' '.join(finding['headline'].split()))}, {where}"
+
+
 def body(repo, number, report):
-    """The summary: the counts for people, and the whole report as JSON. The agent's text appears only in the JSON, where nothing
-    renders, so nothing they hold can show people something other than what the author's local
-    run reads."""
+    """The summary: the counts and a line for each finding for people, and the whole report as JSON for the local run.
+    The listed headlines are escaped as thread text is, so they can't notify anyone or hide text."""
     findings = report['findings']
     found = counted(findings) or 'nothing'
     text = f"pack-review checked `{report['head'][:7]}` against this repo's context packs and found {found}."
+    if findings:
+        text += '\n\n' + '\n'.join(listed(finding, anchor) for finding, anchor in zip(findings, report['anchors']))
     if findings:
         text += f"\n\nTo go through them, run `/pack-review {repo}#{number}`."
     # Backticks and < only occur inside JSON strings, where \u0060 and \u003c mean the same. So nothing can close the
