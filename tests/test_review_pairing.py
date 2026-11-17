@@ -200,6 +200,14 @@ class CommentPromptTests(CommentCase):
         self.assertIn('- alice at 2026-11-04T10:00:00Z, new since your last comment: "Fixed in the last push."',
                       prompt)
 
+    def test_says_why_a_comment_was_minimized(self):
+        self.thread([{**ALICE, 'minimized': 'outdated'}, {**RELAYED, 'minimized': 'resolved'}])
+
+        prompt = self.comment_prompt()['prompt']
+
+        self.assertIn('- alice at 2026-11-02T10:00:00Z, minimized as outdated: "Kept on purpose', prompt)
+        self.assertIn('- you (pack-review), at 2026-11-03T10:00:00Z, minimized as resolved: "🤖 abc1234', prompt)
+
     def test_asks_about_a_paired_thread_even_with_no_new_reply(self):
         self.thread([ALICE, RELAYED])
 

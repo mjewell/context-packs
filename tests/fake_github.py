@@ -79,13 +79,14 @@ def pull_request(comments=(), more=False, head='h' * 40, base_ref='main'):
         'id': 'PR_1', 'headRefOid': head, 'baseRefName': base_ref, 'comments': connection(list(comments), more)}}})
 
 
-def said(text, author='alice', id='C_1', body=None, mine=False, minimized=False, bot=False,
+def said(text, author='alice', id='C_1', body=None, mine=False, minimized=None, bot=False,
          at='2026-11-01T10:00:00Z'):
     """A review comment as GitHub's GraphQL API returns one: text is its bodyText, and body its Markdown, the same
-    unless given. author None is a deleted account, which GitHub returns as no author."""
+    unless given. author None is a deleted account, which GitHub returns as no author. minimized is the reason a
+    maintainer gave for minimizing it, such as 'outdated', or None."""
     return {'id': id, 'author': None if author is None else {'login': author, '__typename': 'Bot' if bot else 'User'},
             'createdAt': at, 'body': text if body is None else body, 'bodyText': text, 'viewerDidAuthor': mine,
-            'isMinimized': minimized}
+            'isMinimized': minimized is not None, 'minimizedReason': minimized}
 
 
 def thread(id, comments, path='src/a.py', line=3, resolved=False, more=False, end=None):
