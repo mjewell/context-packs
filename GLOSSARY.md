@@ -80,15 +80,12 @@ One choice in a diff that the review reports. It is a deviation, a conflict or a
 
 **Deviation**:
 A finding where the change goes against a written rule.
-_Avoid_: deviates, except as the schema's value
 
 **Conflict**:
 A finding where two rules point opposite ways at the same spot.
-_Avoid_: conflicting, except as the schema's value
 
 **Uncovered choice**:
 A finding where the change makes a kind of decision that will come up again, another way would be reasonable, and no rule covers it.
-_Avoid_: uncovered, except as the schema's value
 
 **Routed**:
 Said of a doc whose `when` matches the work in the diff.

@@ -5,8 +5,6 @@ import re
 
 import github
 
-# Each kind's label, set in code like the commit's, so both read as tags at the start of the comment.
-LABELS = {'deviates': 'deviation', 'conflicting': 'conflict', 'uncovered': 'uncovered choice'}
 # GitHub links a mention only when a login's first character follows the @. A word joiner between them doesn't show,
 # and it breaks the mention whatever Markdown is around it. Backticks around the mention wouldn't hold, since the
 # agent's own backticks can pair with them.
@@ -27,7 +25,8 @@ def quoted(text):
 
 def body(finding, head):
     """The comment that opens a thread for the finding: what it is, the rules it quotes, and the take."""
-    parts = [f"`{LABELS[finding['kind']]}` `{head[:7]}` **{defused(finding['headline'])}**"]
+    # The kind is set in code like the commit, so both read as tags at the start of the comment.
+    parts = [f"`{finding['kind']}` `{head[:7]}` **{defused(finding['headline'])}**"]
     parts += [f"From `{defused(rule['file'])}`:\n\n{quoted(rule['quote'])}" for rule in finding['rules']]
     parts.append(defused(finding['take']))
     return github.signed('\n\n'.join(parts))

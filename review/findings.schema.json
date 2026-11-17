@@ -23,9 +23,9 @@
         "properties": {
           "kind": {
             "enum": [
-              "deviates",
-              "conflicting",
-              "uncovered"
+              "deviation",
+              "conflict",
+              "uncovered choice"
             ]
           },
           "headline": {

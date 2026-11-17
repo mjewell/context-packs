@@ -4,7 +4,7 @@ import re
 from review_case import ReviewCase
 
 
-def finding(headline, path='src/sim.ts', line=42, kind='deviates'):
+def finding(headline, path='src/sim.ts', line=42, kind='deviation'):
     return {'kind': kind, 'headline': headline, 'rules': [], 'spots': [{'path': path, 'line': line, 'follows': False}],
             'deliberate': [], 'exemplars': [], 'take': 'Move it to content.'}
 

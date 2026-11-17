@@ -12,7 +12,7 @@ Done when:
 - the user has seen a summary of every finding, gone through them one at a time, and said what to do about each;
 - the `pack-rule` skill was run once for each finding the user wants recorded in the packs.
 
-The findings come from the `pack-findings` skill, which defines their three kinds: deviates, conflicting and uncovered. Like it, this review checks the change only against what the repo's packs and instruction file say.
+The findings come from the `pack-findings` skill, which defines their three kinds: deviation, conflict and uncovered choice. Like it, this review checks the change only against what the repo's packs and instruction file say.
 
 A PR named as `owner/repo#number` is in that repo: from a folder above the repos, work in its checkout.
 
@@ -28,9 +28,9 @@ Take them from the first source that has them:
 
 Start with a summary: the number of findings of each kind, and a line for each. A deviation's line says whether its doc was routed. Then go through them one at a time. For each, quote the rule or the hunk, give any signs the deviation is deliberate, give your take, and wait for the user to say what to do:
 
-- **Deviates**: fix the change, or change the rule by sharpening its wording, adding the exception the change shows, or replacing it. When the rule's doc wasn't routed, its `when` may also need fixing, whichever way the rest goes.
-- **Conflicting**: which rule wins.
-- **Uncovered**: whether to write it, and which way new code should follow.
+- **Deviation**: fix the change, or change the rule by sharpening its wording, adding the exception the change shows, or replacing it. When the rule's doc wasn't routed, its `when` may also need fixing, whichever way the rest goes.
+- **Conflict**: which rule wins.
+- **Uncovered choice**: whether to write it, and which way new code should follow.
 
 Keep the review in chat. Posting it to the PR writes to an external system: do it only if the user asks, and show them the comments first.
 

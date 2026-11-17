@@ -17,9 +17,9 @@ This checks the change only against what the repo's packs and instruction file s
 
 Each finding is one of three kinds:
 
-- **Deviates**: the change deviates from a written rule. The change may be wrong, the rule may lack an exception, or the convention may have moved on. The diff can't tell which, so the user decides. Each deviation also says whether the rule's doc was routed, meaning its `when` matches the work.
-- **Conflicting**: two rules point opposite ways at the same spot.
-- **Uncovered**: the change makes a kind of decision that will come up again, another way would be reasonable, and no rule covers it.
+- **Deviation**: the change deviates from a written rule. The change may be wrong, the rule may lack an exception, or the convention may have moved on. The diff can't tell which, so the user decides. Each deviation also says whether the rule's doc was routed, meaning its `when` matches the work.
+- **Conflict**: two rules point opposite ways at the same spot.
+- **Uncovered choice**: the change makes a kind of decision that will come up again, another way would be reasonable, and no rule covers it.
 
 ## Where it runs
 
@@ -53,7 +53,7 @@ Wait until every subagent has answered before you go on. A subagent running in t
 
 ## 4. Merge their answers
 
-Each choice that deviates is one deviates finding, with every spot the subagents reported. When rules from different units flag the same choice at the same spots, such as two docs that each require the standard library, they're one finding that quotes each rule and says whether each one's doc was routed: the author has one thing to fix. Two rules that point opposite ways at the same spot are conflicting. Keep every rule the subagents reported, in the finding that holds it.
+Each choice that deviates is one deviation, with every spot the subagents reported. When rules from different units flag the same choice at the same spots, such as two docs that each require the standard library, they're one finding that quotes each rule and says whether each one's doc was routed: the author has one thing to fix. Two rules that point opposite ways at the same spot are a conflict. Keep every rule the subagents reported, in the finding that holds it.
 
 ## 5. Look for uncovered choices
 

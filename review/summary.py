@@ -12,16 +12,17 @@ import github
 
 # GitHub's limit on a comment's length.
 LIMIT = 65536
-NAMES = {'deviates': ('deviation', 'deviations'), 'conflicting': ('conflict', 'conflicts'),
-         'uncovered': ('uncovered choice', 'uncovered choices')}
+# The finding kinds, in the order the summary counts them. Each is a noun that takes an s for more than one.
+KINDS = json.loads((Path(__file__).resolve().parent / 'findings.schema.json').read_text(encoding='utf-8'))[
+    'properties']['findings']['items']['properties']['kind']['enum']
 ADD_COMMENT = '''mutation AddComment($input: AddCommentInput!) { addComment(input: $input) { clientMutationId } }'''
 UPDATE_COMMENT = '''mutation UpdateComment($input: UpdateIssueCommentInput!) {
   updateIssueComment(input: $input) { clientMutationId } }'''
 
 
 def counted(findings):
-    counts = {kind: sum(f['kind'] == kind for f in findings) for kind in NAMES}
-    return ', '.join(f'{n} {NAMES[kind][n != 1]}' for kind, n in counts.items() if n)
+    counts = {kind: sum(f['kind'] == kind for f in findings) for kind in KINDS}
+    return ', '.join(f"{n} {kind}{'s' * (n != 1)}" for kind, n in counts.items() if n)
 
 
 def summary(repo, number, report):
