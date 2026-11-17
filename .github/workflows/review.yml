@@ -123,13 +123,18 @@ jobs:
           claude-code-oauth-token: ${{ secrets.claude_code_oauth_token }}
           anthropic-api-key: ${{ secrets.anthropic_api_key }}
   threads:
-    needs: merge
+    needs: [units, merge]
     runs-on: ubuntu-latest
     # The threads job's agents read pack-review's threads and can't write.
     permissions:
       contents: read
       pull-requests: read
     steps:
+      # The agents here read no files, but claude-code-action restores .claude and the instruction files from the base
+      # branch with git, which fails outside a checkout.
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.units.outputs.head }}
       - uses: actions/checkout@v6
         with:
           repository: ${{ job.workflow_repository }}
