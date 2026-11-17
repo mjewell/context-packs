@@ -16,14 +16,17 @@ on:
       anthropic_api_key:
         description: An Anthropic API key. Pass this or claude_code_oauth_token.
         required: false
-# One run per PR. A run that will review cancels the one before it, and reviews the PR as it is when its units job
-# starts, so whichever run is left reviews the newest head. A run that won't review, such as one for a title edit,
-# waits instead of cancelling: its condition is the units job's, written twice since concurrency can't read a job's if.
+# One reviewing run per PR. A run that will review cancels the one before it, and reviews the PR as it is when its
+# units job starts, so whichever run is left reviews the newest head. A run that won't review, such as one for a title
+# edit, gets a group of its own: GitHub cancels a run waiting in a group when another joins, and a review waits there
+# while the run before it is cancelled. Its condition is the units job's, written twice since concurrency can't read a
+# job's if.
 concurrency:
-  group: pack-review-${{ github.event.pull_request.number }}
-  cancel-in-progress: >-
+  group: >-
     ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository
-    && (github.event.action != 'edited' || github.event.changes.base.ref.from != null) }}
+    && (github.event.action != 'edited' || github.event.changes.base.ref.from != null)
+    && format('pack-review-{0}', github.event.pull_request.number) || format('pack-review-skip-{0}', github.run_id) }}
+  cancel-in-progress: true
 # Every job checks out this repo at the commit the caller pinned, job.workflow_sha, into .pack-review, and runs its
 # actions from there, so the actions and this workflow always match. The PR's own checkout comes first where a job
 # needs one, since checking it out cleans the workspace.
