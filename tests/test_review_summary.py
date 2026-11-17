@@ -7,7 +7,7 @@ from review_case import HEAD, MARKER, ReviewCase, own
 BASE = 'b' * 40
 
 
-def finding(kind='deviates', headline='A game number in sim code', take='Move it to content.', spots=()):
+def finding(kind='deviation', headline='A game number in sim code', take='Move it to content.', spots=()):
     return {'kind': kind, 'headline': headline, 'rules': [], 'spots': list(spots), 'deliberate': [], 'exemplars': [],
             'take': take}
 
@@ -57,8 +57,8 @@ class SummaryTests(SummaryCase):
     author's local run."""
 
     def test_posts_a_summary_counting_the_findings_and_holding_them_all(self):
-        findings = [finding(), finding(), finding('conflicting'), finding('uncovered'), finding('uncovered'),
-                    finding('uncovered')]
+        findings = [finding(), finding(), finding('conflict'), finding('uncovered choice'), finding('uncovered choice'),
+                    finding('uncovered choice')]
 
         result = self.summarize(findings)
 
