@@ -40,6 +40,8 @@ git log --oneline <base>..<head>
 
 Stop if a ref doesn't resolve or the diff is empty. Read the packs as they are at the head, so a change that updates a rule along with the code is judged by the new rule. Note any changes the diff makes to the packs, for whoever reads the findings.
 
+Every later step reads the packs and the existing code from the checkout, so it has to be the head. Compare `git rev-parse HEAD` with the head. When they differ, stop: say which commit is checked out, and offer to check out the head. Then list any uncommitted changes to the instruction file or to a doc `context-packs docs` lists, since the units read them as the head's rules, and go on. Done when the checkout is the head and the user has seen any uncommitted changes to the rules.
+
 ## 2. List the units
 
 Run `npx context-packs docs` in the repo. It prints every doc the tables point at, with a blank line between packs. The units are the instruction file, whole, then the docs each pack's table points at, in the order it prints them. Each file is read by exactly one unit. The instruction file holds its own rules, and the pack rules of every pack inlined in the context-packs block. A nested pack's index holds that pack's pack rules, and the pack rules of any pack inlined in it. Done when you have the units' paths.
