@@ -31,7 +31,7 @@ runs:
         HEAD: ${{ inputs.head }}
       run: |
         if [ "$(git rev-parse HEAD)" != "$HEAD" ]; then
-          echo "::error::The PR's head, $HEAD, isn't checked out. Check out with ref: \${{ needs.units.outputs.head }}."
+          echo "::error::The PR's head, $HEAD, isn't checked out. Check out the head the units job read."
           exit 1
         fi
     - name: Prepare the finder
