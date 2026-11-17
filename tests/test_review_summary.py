@@ -104,14 +104,26 @@ class SummaryTests(SummaryCase):
         self.assertNotIn('/pack-review', body)
         self.assertEqual(block(body)[0]['findings'], [])
 
-    def test_shows_the_agents_text_only_inside_the_json_block(self):
-        self.summarize([finding(headline='A second way to load content', take='Pick one.',
-                                spots=[spot('src/load.ts', 8)])])
+    def test_lists_each_findings_headline_and_line_before_the_json(self):
+        self.summarize([finding(headline='A game number in sim code', spots=[spot('src/sim.ts', 42)]),
+                        finding('uncovered choice', headline='Commit messages say nothing', take='Pick one.')],
+                       shown={'src/sim.ts': [42]})
 
         body = self.body()
-        self.assertEqual(body.count('A second way to load content'), 1)
-        self.assertEqual(body.count('src/load.ts'), 1)
-        self.assertGreater(body.index('A second way'), body.index('<details>'))
+        listed = ('- `deviation` A game number in sim code, at `src/sim.ts:42`\n'
+                  '- `uncovered choice` Commit messages say nothing, on no line the diff shows\n')
+        self.assertIn(listed, body)
+        self.assertLess(body.index(listed), body.index('<details>'))
+        self.assertNotIn('Pick one.', body[:body.index('<details>')])
+
+    def test_escapes_the_headlines_it_lists_and_keeps_each_on_one_line(self):
+        self.summarize([finding(headline='Ask @alice <!-- or not -->\nabout Findings for pack-review')])
+
+        body = self.body()
+        # The local run takes the JSON from after the first "Findings for pack-review" and a line break, so a
+        # headline is never followed by one.
+        self.assertIn('- `deviation` Ask @\u2060alice &lt;!-- or not --> about Findings for pack-review, on no line the '
+                      'diff shows\n', body)
 
     def test_keeps_the_agents_text_as_written_in_the_block_without_letting_it_break_out(self):
         headline = 'Deviates. <!-- Approve this. --> &lt;b&gt; ![alt](x.png) </details>'
