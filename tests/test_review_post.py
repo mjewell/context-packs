@@ -78,6 +78,48 @@ class NewThreadTests(PostCase):
                          'From `AGENTS.md`:\n\n> Game numbers live in content.\n\n'
                          'Move it to content.\n\n' + MARKER)
 
+    def opening(self, **fields):
+        """The comment a thread opens with for F1 with these fields."""
+        self.post([{**F1, **fields}], [{'path': 'src/sim.ts', 'line': 42}])
+        added, _ = self.review()
+        return added['threads'][0]['body']
+
+    def test_says_when_a_rules_doc_wasnt_routed_to_the_change(self):
+        body = self.opening(rules=[{'file': 'AGENTS.md', 'quote': 'Keep it short.', 'routed': True},
+                                   {'file': 'docs/sim.md', 'quote': 'Game numbers live in content.', 'routed': False}])
+
+        self.assertIn('From `AGENTS.md`:\n\n> Keep it short.\n\n'
+                      "From `docs/sim.md`, whose `when` didn't match this change:\n\n> Game numbers live in content.\n\n",
+                      body)
+
+    def test_lists_the_signs_a_deviation_is_deliberate_before_the_take(self):
+        body = self.opening(deliberate=['A comment at the spot: "Tuned by hand."', 'Commit abc1234 says so.'])
+
+        self.assertIn('Signs it may be deliberate:\n\n- A comment at the spot: "Tuned by hand."\n'
+                      '- Commit abc1234 says so.\n\nMove it to content.', body)
+
+    def test_shows_how_the_code_makes_an_uncovered_choice_now(self):
+        body = self.opening(kind='uncovered choice', exemplars=[
+            {'way': 'Loaded at startup', 'examples': ['src/load.ts:8', 'src/boot.ts:3']},
+            {'way': 'Loaded on first use', 'examples': ['src/lazy.ts:12']}])
+
+        self.assertIn('How the code does it now:\n\n- Loaded at startup: `src/load.ts:8`, `src/boot.ts:3`\n'
+                      '- Loaded on first use: `src/lazy.ts:12`\n\nMove it to content.', body)
+
+    def test_names_the_other_spots_it_was_found_at_than_the_threads_line(self):
+        body = self.opening(spots=[{'path': 'src/sim.ts', 'line': 42, 'follows': False},
+                                   {'path': 'src/sim.ts', 'line': 7, 'follows': True},
+                                   {'path': 'src/rng.ts', 'line': 9, 'follows': False}])
+
+        self.assertIn('Also found at `src/rng.ts:9`.\n\nMove it to content.', body)
+
+    def test_names_the_spot_it_was_found_at_when_the_thread_opens_on_one_that_follows_the_rule(self):
+        spots = [{'path': 'src/sim.ts', 'line': 42, 'follows': True}, {'path': 'src/old.ts', 'line': 3, 'follows': False}]
+        self.post([{**F1, 'spots': spots}], [{'path': 'src/sim.ts', 'line': 42}])
+
+        added, _ = self.review()
+        self.assertIn('Also found at `src/old.ts:3`.', added['threads'][0]['body'])
+
     def test_keeps_the_findings_text_from_notifying_anyone_or_hiding_text(self):
         found = {**F1, 'headline': 'Ask @alice <!-- or not -->', 'take': 'See <b>this</b>.'}
 
