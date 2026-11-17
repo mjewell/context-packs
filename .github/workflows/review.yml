@@ -33,7 +33,8 @@ concurrency:
 jobs:
   units:
     # Drafts wait until they're ready. PRs from forks get no secrets, so they're skipped. An edit reviews again only
-    # when it changed the base branch, so the findings match the new diff.
+    # when it changed the base branch, so the findings match the new diff. The concurrency group at the top repeats this
+    # condition: change both together.
     if: >-
       ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository
       && (github.event.action != 'edited' || github.event.changes.base.ref.from != null) }}
