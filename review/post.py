@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Post the review: a GitHub review holding a new thread for each finding no thread was opened for, and a reply in a
-pack-review thread only when there's something to say, then the one summary comment. It runs in the post job, which
+"""Post the review: a GitHub review that opens a thread for each finding no thread was opened for, a reply in a
+pack-review thread only when there's something to say, then the one summary comment. No review is ever left pending:
+the new threads are submitted as they're created and each reply is posted on its own, so a write that fails or a run
+that's cancelled leaves only comments the next run can pick up from. It runs in the post job, which
 has no agent. It plans every write and checks the plan before the first one, so a run that stops on a check leaves the
 PR as it was. It reads pack-review's threads afresh through trust.py, so it writes only to threads pack-review opened
 on this PR."""
@@ -19,8 +21,6 @@ ADD_REVIEW = '''mutation AddReview($input: AddPullRequestReviewInput!) {
   addPullRequestReview(input: $input) { pullRequestReview { id } } }'''
 ADD_REPLY = '''mutation AddReply($input: AddPullRequestReviewThreadReplyInput!) {
   addPullRequestReviewThreadReply(input: $input) { comment { id } } }'''
-SUBMIT_REVIEW = '''mutation SubmitReview($input: SubmitPullRequestReviewInput!) {
-  submitPullRequestReview(input: $input) { pullRequestReview { id } } }'''
 ADD_COMMENT = '''mutation AddComment($input: AddCommentInput!) { addComment(input: $input) { clientMutationId } }'''
 UPDATE_COMMENT = '''mutation UpdateComment($input: UpdateIssueCommentInput!) {
   updateIssueComment(input: $input) { clientMutationId } }'''
@@ -105,16 +105,15 @@ def main():
         return
     threads = {thread['id']: thread for thread in trust.threads(args.pr)}
     new, replies, (body, existing) = planned(os.environ['GITHUB_REPOSITORY'], args.pr, report, paired, pr, threads)
-    if new or replies:
-        # A review with no event stays pending, so the replies join it and everything appears at once when it's
-        # submitted.
-        review = github.graphql('AddReview', ADD_REVIEW, {'input': {
-            'pullRequestId': pr['id'], 'commitOID': report['head'], 'threads': new}})
-        review = review['addPullRequestReview']['pullRequestReview']['id']
-        for thread, text in replies.items():
-            github.graphql('AddReply', ADD_REPLY, {'input': {'pullRequestReviewId': review,
-                                                             'pullRequestReviewThreadId': thread, 'body': text}})
-        github.graphql('SubmitReview', SUBMIT_REVIEW, {'input': {'pullRequestReviewId': review, 'event': 'COMMENT'}})
+    if new:
+        github.graphql('AddReview', ADD_REVIEW, {'input': {
+            'pullRequestId': pr['id'], 'commitOID': report['head'], 'event': 'COMMENT', 'threads': new}})
+    for thread, text in replies.items():
+        # A reply joins a review only while that review is pending, so each one is posted on its own.
+        try:
+            github.graphql('AddReply', ADD_REPLY, {'input': {'pullRequestReviewThreadId': thread, 'body': text}})
+        except github.GitHubError as error:
+            sys.exit(f'pack-review: in thread {thread}: {error}')
     if existing:
         github.graphql('UpdateComment', UPDATE_COMMENT, {'input': {'id': existing, 'body': body}})
     else:

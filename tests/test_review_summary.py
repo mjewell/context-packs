@@ -32,8 +32,7 @@ class SummaryCase(ReviewCase):
             'PullRequest': pull_request(), 'AddComment': ok({}), 'UpdateComment': ok({}),
             'Threads': ok({'repository': {'pullRequest': {'reviewThreads': connection([])}}}),
             'AddReview': ok({'addPullRequestReview': {'pullRequestReview': {'id': 'PRR_1'}}}),
-            'AddReply': ok({'addPullRequestReviewThreadReply': {'comment': {'id': 'RC_9'}}}),
-            'SubmitReview': ok({'submitPullRequestReview': {'pullRequestReview': {'id': 'PRR_1'}}})})
+            'AddReply': ok({'addPullRequestReviewThreadReply': {'comment': {'id': 'RC_9'}}})})
 
     def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', pairs=(), commentary=(), shown=None):
         """Post the summary of the merging agent's output, with pairs as the threads job checked them."""

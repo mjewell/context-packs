@@ -24,7 +24,6 @@ class PostCase(ReviewCase):
             'Threads': ok({'repository': {'pullRequest': {'reviewThreads': connection([])}}}),
             'AddReview': ok({'addPullRequestReview': {'pullRequestReview': {'id': 'PRR_1'}}}),
             'AddReply': ok({'addPullRequestReviewThreadReply': {'comment': {'id': 'RC_9'}}}),
-            'SubmitReview': ok({'submitPullRequestReview': {'pullRequestReview': {'id': 'PRR_1'}}}),
             'AddComment': ok({}),
         })
         self.github.rest['/repos/o/r/collaborators/alice/permission'] = role('write')
@@ -40,14 +39,18 @@ class PostCase(ReviewCase):
         return self.script('post', '--pr', 7, '--report', 'report.json', '--paired', 'paired.json')
 
     def review(self):
-        """What the one review posted: its new threads, and its replies by thread."""
-        [added] = self.sent('AddReview')
+        """What the post wrote in threads: the review that opened the new threads, or None when there were none, and
+        the replies by thread. No review is ever left pending: the new threads are submitted as they're created, and
+        each reply is posted on its own."""
+        self.assertEqual(self.sent('SubmitReview'), [])
+        added = [sent['input'] for sent in self.sent('AddReview')]
+        self.assertLessEqual(len(added), 1)
+        for review in added:
+            self.assertEqual(review['event'], 'COMMENT')
         replies = {sent['input']['pullRequestReviewThreadId']: sent['input'] for sent in self.sent('AddReply')}
-        [submitted] = self.sent('SubmitReview')
-        self.assertEqual(submitted['input'], {'pullRequestReviewId': 'PRR_1', 'event': 'COMMENT'})
         for reply in replies.values():
-            self.assertEqual(reply['pullRequestReviewId'], 'PRR_1')
-        return added['input'], replies
+            self.assertNotIn('pullRequestReviewId', reply)
+        return (added[0] if added else None), replies
 
 
 class NewThreadTests(PostCase):
@@ -60,7 +63,6 @@ class NewThreadTests(PostCase):
         added, replies = self.review()
         self.assertEqual(added['pullRequestId'], 'PR_1')
         self.assertEqual(added['commitOID'], HEAD)
-        self.assertNotIn('event', added)
         self.assertEqual([(t['path'], t['line'], t['side']) for t in added['threads']],
                          [('src/sim.ts', 42, 'RIGHT'), ('src/rng.ts', 17, 'RIGHT')])
         self.assertEqual(replies, {})
@@ -112,7 +114,7 @@ class PairedTests(PostCase):
         self.post([F1], [None], pairs=[{'finding': 0, 'thread': 'T_1'}])
 
         added, replies = self.review()
-        self.assertEqual(added['threads'], [])
+        self.assertIsNone(added)
         body = replies['T_1']['body']
         self.assertEqual(body, f'🤖 `still found` `hhhhhhh`\n\n{MARKER}')
         self.assertTrue(body.endswith(MARKER))
@@ -124,6 +126,16 @@ class PairedTests(PostCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.github.writes(), ['AddComment'])
+
+    def test_names_the_thread_when_github_refuses_a_reply(self):
+        self.github.responses['AddReply'] = (200, {'data': None, 'errors': [{'message': 'Thread is locked'}]})
+        self.threads(thread('T_1', resolved=True))
+
+        result = self.post([F1], [None], pairs=[{'finding': 0, 'thread': 'T_1'}])
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('T_1', result.stderr)
+        self.assertIn('Thread is locked', result.stderr)
 
     def test_stops_on_a_pair_with_a_thread_that_isnt_pack_reviews_on_this_pr(self):
         self.threads(thread('T_1'))
