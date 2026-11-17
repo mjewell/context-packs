@@ -1,5 +1,5 @@
 name: pack-review find
-description: Check a PR against one unit of the repo's context packs with claude-code-action, and save the finder's answer and what it read as the artifact pack-review-unit-<unit>, for the merge action. Run it in a job with only contents read, once per unit the units action lists.
+description: Check a PR against one unit of the repo's context packs with claude-code-action, and save the finder's answer as the artifact pack-review-unit-<unit>, for the merge action. Run it in a job with only contents read, once per unit the units action lists.
 inputs:
   unit:
     description: The unit's number, from the units action.
@@ -36,9 +36,8 @@ runs:
         HEAD: ${{ github.event.pull_request.head.sha }}
         MODEL: ${{ inputs.model }}
         UNIT: ${{ inputs.unit }}
-      # The finder's prompt holds its unit's docs, and it reads the change through the git server. docs.txt is for the
-      # record of what it read. It goes in a new folder outside the checkout, so no path the PR controls, such as a
-      # symlink, decides where it's written.
+      # The finder's prompt holds its unit's docs, and it reads the change through the git server. docs.txt goes in a
+      # new folder outside the checkout, so no path the PR controls, such as a symlink, decides where it's written.
       run: |
         inputs=$(mktemp -d "$RUNNER_TEMP/pack-review.XXXXXX")
         echo "inputs=$inputs" >> "$GITHUB_OUTPUT"
@@ -62,21 +61,20 @@ runs:
       env:
         TRANSCRIPT: ${{ steps.review.outputs.execution_file }}
       run: python3 "$GITHUB_ACTION_PATH/../transcript.py" --file "$TRANSCRIPT"
-    - name: Write the record
+    - name: Write the answer
       shell: bash
       env:
         FINDINGS: ${{ steps.review.outputs.structured_output }}
-        INPUTS: ${{ steps.prepare.outputs.inputs }}
-        TRANSCRIPT: ${{ steps.review.outputs.execution_file }}
         UNIT: ${{ inputs.unit }}
-      # The transcript can hold file contents, so it stays in this job, and only the record goes on.
+      # claude-code-action checks the answer against the output schema, so the one way it can be wrong is missing.
       run: |
-        printf '%s' "$FINDINGS" > "$RUNNER_TEMP/pack-review-findings.json"
+        if [ -z "$FINDINGS" ]; then
+          echo "::error::Unit $UNIT's finder returned no answer."
+          exit 1
+        fi
         mkdir "$RUNNER_TEMP/pack-review-unit"
-        python3 "$GITHUB_ACTION_PATH/../unit_report.py" --unit "$UNIT" --docs "$INPUTS/docs.txt" \
-          --findings "$RUNNER_TEMP/pack-review-findings.json" --transcript "$TRANSCRIPT" \
-          --out "$RUNNER_TEMP/pack-review-unit/unit-$UNIT.json"
-    - name: Save the record
+        printf '%s' "$FINDINGS" > "$RUNNER_TEMP/pack-review-unit/unit-$UNIT.json"
+    - name: Save the answer
       # v7.0.2, pinned by commit since a tag can move.
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
       with:

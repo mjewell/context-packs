@@ -25,19 +25,16 @@ def counted(findings):
 
 
 def summary(repo, number, report):
-    """The counts for people, and the whole report as JSON. The agent's text and the docs' paths appear only in the
-    JSON, where nothing renders, so nothing they hold can show people something other than what the author's local
+    """The counts for people, and the whole report as JSON. The agent's text appears only in the JSON, where nothing
+    renders, so nothing they hold can show people something other than what the author's local
     run reads."""
-    findings, unread = report['findings'], report['unread']
+    findings = report['findings']
     found = counted(findings) or 'nothing'
     text = f"pack-review checked `{report['head'][:7]}` against this repo's context packs and found {found}."
-    if unread:
-        text += (f' The review should read every doc the tables point at, and it skipped {len(unread)}. That\'s most '
-                 'likely a problem in the review action, not in your docs. The JSON lists them.')
-    if findings or unread:
+    if findings:
         text += f"\n\nTo go through them, run `/pack-review {repo}#{number}`."
     # Backticks only occur inside JSON strings, where \u0060 means the same, so nothing can close the fence.
-    data = json.dumps({key: report[key] for key in ('base', 'base_ref', 'head', 'findings', 'unread')},
+    data = json.dumps({key: report[key] for key in ('base', 'base_ref', 'head', 'findings')},
                       indent=2, ensure_ascii=False)
     data = data.replace('`', '\\u0060')
     return github.signed(f'{text}\n\n<details><summary>Findings for pack-review</summary>\n\n```json\n{data}\n'
