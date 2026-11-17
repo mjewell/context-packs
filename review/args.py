@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """The claude_args the review hands claude-code-action, each as one line. A finder checks one unit of the packs, and
-the merging agent merges the finders' answers with the pack-findings skill. Both get the schema their answer is
-checked against, tools that only read, and the git server, which reads the change. claude-code-action splits the line
-the way a shell would. Run, it prints the merging agent's line. output() writes a prompt, a claude_args line or the
-units' matrix as a GitHub step output."""
-import argparse
+the merging agent merges the finders' answers. Both get the schema their answer is checked against, tools that only
+read, and the git server, which reads the change. claude-code-action splits the line the way a shell would. output()
+writes a prompt, a claude_args line or the units' matrix as a GitHub step output."""
 import json
 import os
 from pathlib import Path
@@ -62,19 +60,6 @@ def finder(base, head, model):
 
 
 def merger(inputs, base, head, model):
-    """The merging agent's line: the pack-findings skill, and the folder holding the finders' answers."""
-    return line(['--plugin-dir', str(REVIEW.parent), '--add-dir', inputs, *reading(base, head, model)])
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--inputs', required=True, help="the folder holding docs.txt and the finders' answers")
-    parser.add_argument('--base', required=True, help='the commit the reviewed change starts from')
-    parser.add_argument('--head', required=True, help='the commit that is reviewed')
-    parser.add_argument('--model', default='', help="the model to review with, if not Claude Code's default")
-    args = parser.parse_args()
-    print(merger(args.inputs, args.base, args.head, args.model))
-
-
-if __name__ == '__main__':
-    main()
+    """The merging agent's line: its prompt holds its instructions, and it gets the folder holding the finders'
+    answers."""
+    return line(['--add-dir', inputs, *reading(base, head, model)])

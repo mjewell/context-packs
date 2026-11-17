@@ -25,8 +25,8 @@ class UnitsCase(PairingCase):
 class ListTests(UnitsCase):
     """The units job lists one unit per finder: the instruction file, then each pack's docs."""
 
-    def test_lists_the_instruction_file_and_each_packs_docs_as_units(self):
-        self.assertEqual(json.loads(self.units('list', '--docs', 'docs.txt')['units']), [0, 1, 2])
+    def test_lists_the_instruction_file_each_packs_docs_and_the_uncovered_unit_as_units(self):
+        self.assertEqual(json.loads(self.units('list', '--docs', 'docs.txt')['units']), [0, 1, 2, 3])
 
     def test_uses_claude_md_when_it_holds_the_block(self):
         (self.root / 'AGENTS.md').unlink()
@@ -64,6 +64,24 @@ class PromptTests(UnitsCase):
         self.assertIn('- `AGENTS.md`\n', prompt)
         self.assertNotIn('a.md', prompt)
 
+    def test_gives_the_uncovered_unit_its_own_prompt_and_every_doc_to_search(self):
+        prompt = self.prompt(3)['prompt']
+
+        self.assertTrue(prompt.startswith("You're looking for the choices a change makes that no rule covers"),
+                        prompt[:80])
+        self.assertIn('- `AGENTS.md`\n- `context-packs/project/a.md`\n- `context-packs/project/b.md`\n'
+                      '- `context-packs/gen/core/c.md`\n', prompt)
+        self.assertIn("The diff is the git server's `diff` tool", prompt)
+        self.assertIn('finding of kind `uncovered choice`', prompt)
+        self.assertNotIn('kind `deviation`', prompt)
+        self.assertNotIn('{', prompt)
+
+    def test_has_each_rule_unit_report_deviations(self):
+        prompt = self.prompt(1)['prompt']
+
+        self.assertIn('finding of kind `deviation`', prompt)
+        self.assertNotIn('uncovered choice', prompt)
+
     def test_points_the_finder_at_the_git_server_for_the_diff_and_log(self):
         prompt = self.prompt(2)['prompt']
 
@@ -83,7 +101,7 @@ class PromptTests(UnitsCase):
         self.assertNotIn('--plugin-dir', args)
 
     def test_refuses_a_unit_the_docs_dont_have(self):
-        run = self.script('units', 'prompt', '--docs', 'docs.txt', '--unit', '3', '--base', 'b' * 40, '--head', 'h' * 40)
+        run = self.script('units', 'prompt', '--docs', 'docs.txt', '--unit', '4', '--base', 'b' * 40, '--head', 'h' * 40)
 
         self.assertEqual(run.returncode, 1)
-        self.assertIn('3 units', run.stderr)
+        self.assertIn('4 units', run.stderr)

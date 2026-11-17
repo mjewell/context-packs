@@ -1,31 +1,38 @@
 import json
 import shlex
-import subprocess
 import sys
-import unittest
 
 from review_case import REVIEW
+from test_review_units import UnitsCase
 
 INPUTS = '/runner/temp/pack-review.abc123'
 BASE, HEAD = 'b' * 40, 'h' * 40
-COMMAND = [sys.executable, str(REVIEW / 'args.py'), '--inputs', INPUTS, '--base', BASE, '--head', HEAD]
 
 
-class ArgsTests(unittest.TestCase):
-    """The arguments the merge action hands claude-code-action for the agent that merges the finders' answers."""
+class MergeTests(UnitsCase):
+    """The merge job's agent: the merge prompt the skill pins, with where the finders' answers are, and the arguments
+    claude-code-action runs it with."""
+
+    def merge(self, *extra):
+        return self.units('merge', '--inputs', INPUTS, '--base', BASE, '--head', HEAD, *extra)
 
     def args(self, *extra):
-        run = subprocess.run([*COMMAND, *extra], capture_output=True, text=True, check=True)
-        self.assertEqual(run.stdout.count('\n'), 1)
-        return shlex.split(run.stdout)
+        return shlex.split(self.merge(*extra)['claude-args'])
 
     def flag(self, args, name):
         return args[args.index(name) + 1]
 
-    def test_loads_the_skill_and_validates_the_answer_against_the_schema(self):
+    def test_fills_the_skills_merge_prompt_with_where_the_finders_answers_are(self):
+        prompt = self.merge()['prompt']
+
+        self.assertTrue(prompt.startswith("You're merging the finders' answers in a pack review"), prompt[:80])
+        self.assertIn(f'`{INPUTS}` as `unit-<n>.json`', prompt)
+        self.assertNotIn('{', prompt.replace('{"', ''))
+
+    def test_validates_the_answer_against_the_schema_without_loading_the_skill(self):
         args = self.args()
 
-        self.assertEqual(self.flag(args, '--plugin-dir'), str(REVIEW.parent))
+        self.assertNotIn('--plugin-dir', args)
         self.assertEqual(json.loads(self.flag(args, '--json-schema')),
                          json.loads((REVIEW / 'findings.schema.json').read_text()))
 
@@ -51,11 +58,10 @@ class ArgsTests(unittest.TestCase):
 
     def test_passes_a_model_when_given_one(self):
         self.assertEqual(self.flag(self.args('--model', 'opus'), '--model'), 'opus')
+        self.output.write_text('')
         self.assertNotIn('--model', self.args('--model', ''))
 
     def test_quotes_each_value_whole_so_any_shell_style_parser_reads_it_the_same(self):
-        line = subprocess.run(COMMAND, capture_output=True, text=True, check=True).stdout
-        for value in shlex.split(line):
+        for value in self.args():
             quoted = shlex.quote(value)
             self.assertTrue(quoted == value or (quoted.startswith("'") and quoted.count("'") == 2), value[:60])
-

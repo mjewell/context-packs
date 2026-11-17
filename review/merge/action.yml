@@ -1,5 +1,5 @@
 name: pack-review merge
-description: Merge the finders' answers into the review's findings with claude-code-action, look for choices no rule covers, and save the findings as the artifact pack-review-report, for the threads and post actions. Run it in a job with only contents read, after every finder.
+description: Merge the finders' answers into the review's findings with claude-code-action, and save the findings as the artifact pack-review-report, for the threads and post actions. Run it in a job with only contents read, after every finder.
 inputs:
   head:
     description: The PR's head commit to review, from the units job.
@@ -54,13 +54,11 @@ runs:
         HEAD: ${{ inputs.head }}
         MODEL: ${{ inputs.model }}
         INPUTS: ${{ steps.folder.outputs.inputs }}
-      # The folder holds each finder's unit-<n>.json and docs.txt for the agent. The lines each diff shows go outside
-      # the agent's folder, for the report to pick where each new thread opens.
+      # The folder holds each finder's unit-<n>.json for the agent. The lines each diff shows go outside the agent's
+      # folder, for the report to pick where each new thread opens.
       run: |
-        python3 "$GITHUB_ACTION_PATH/../../src/cli.py" docs > "$INPUTS/docs.txt"
         python3 "$GITHUB_ACTION_PATH/../git_server.py" --base "$BASE" --head "$HEAD" shown > "$RUNNER_TEMP/pack-review-shown.json"
-        echo "claude-args=$(python3 "$GITHUB_ACTION_PATH/../args.py" --inputs "$INPUTS" --base "$BASE" --head "$HEAD" \
-          --model "$MODEL")" >> "$GITHUB_OUTPUT"
+        python3 "$GITHUB_ACTION_PATH/../units.py" merge --inputs "$INPUTS" --base "$BASE" --head "$HEAD" --model "$MODEL"
     - name: Merge
       id: review
       # v1.0.268, pinned by commit since a tag can move.
@@ -69,7 +67,7 @@ runs:
         anthropic_api_key: ${{ inputs.anthropic-api-key }}
         claude_code_oauth_token: ${{ inputs.claude-code-oauth-token }}
         github_token: ${{ github.token }}
-        prompt: /context-packs:pack-findings ci ${{ inputs.base }}...${{ inputs.head }} ${{ steps.folder.outputs.inputs }}
+        prompt: ${{ steps.prepare.outputs.prompt }}
         claude_args: ${{ steps.prepare.outputs.claude-args }}
     - name: Show what the agent did
       if: always() && steps.review.outputs.execution_file != ''
