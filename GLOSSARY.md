@@ -73,7 +73,10 @@ _Avoid_: using it for the CI review, or for the identity that posts the CI revie
 The docs one finder checks: the instruction file, or the docs one pack's table points at.
 
 **Finder**:
-An agent that checks a diff against one unit.
+An agent that checks a diff against one unit, or the uncovered finder.
+
+**Uncovered finder**:
+The finder with no unit, which reads the whole diff for uncovered choices and searches every unit's docs for a rule that settles each one.
 
 **Finding**:
 One choice in a diff that the review reports. It is a deviation, a conflict or an uncovered choice.
