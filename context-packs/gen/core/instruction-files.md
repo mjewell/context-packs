@@ -13,6 +13,6 @@ Project-specific rules go in the repo's own instruction file or docs. They cover
 
 ## How it's written
 
-Instruction files state the current rule or fact, never the history of what changed. They describe a pattern in general terms rather than pointing at files that show it, since a committed doc outlives the files it names and the pointer goes stale unnoticed. Writing used right away, such as a plan or a handoff, can point at files, since they're still where it says.
+Instruction files state the current rule or fact, never the history of what changed. They describe a pattern in general terms rather than pointing at files that show it, since a committed doc outlives the files it names and the pointer goes stale unnoticed. Writing used right away, such as a plan or a handoff, can point at files, since they're still where it says. So can a doc whose `when` covers changing the files it names, such as one on why a module works the way it does. Every change to those files brings the agent to the doc, so a moved or renamed file is caught in the same change.
 
 Illustrate a rule with a general case, not one taken from a particular codebase or framework, such as a named field or one language's idiom. A reader without that context can't tell what the example stands for, and an agent may treat it as the whole rule. A project's own docs, or a pack for one stack, can draw on that project or stack, since everyone reading them works in it.
