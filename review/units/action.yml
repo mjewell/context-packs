@@ -1,5 +1,5 @@
 name: pack-review units
-description: List the review's units, the instruction file, each pack's docs and then the uncovered unit, as the output units, a JSON list of their numbers for a matrix that starts one finder each. Run it in a job with only contents read.
+description: List the review's finders, one for the instruction file, one for each pack's docs and then the uncovered finder, as the output units, a JSON list of their numbers for a matrix that starts each. Run it in a job with only contents read.
 outputs:
   units:
     description: The units' numbers, as a JSON list.

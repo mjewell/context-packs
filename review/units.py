@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""The review's units, one per finder: the instruction file, then each pack's docs as `context-packs docs` lists
-them, then the uncovered unit, which reads the whole diff for choices no rule covers. `list` writes their numbers as
-a step output, for the workflow's matrix to start one finder each, so no agent decides whether a unit is worth
-checking. `prompt` writes one finder's prompt and claude_args: the skill's prompt for its kind of unit, with the docs
+"""The review's finders: one per unit, the instruction file then each pack's docs as `context-packs docs` lists
+them, and the uncovered finder, which has no unit and reads the whole diff for choices no rule covers. `list` writes
+their numbers as a step output, for the workflow's matrix to start each, so no agent decides whether a unit is worth
+checking. `prompt` writes one finder's prompt and claude_args: the skill's prompt for its kind of finder, with the docs
 it reads and the git server for the diff and log. `merge` writes the merging agent's, from the skill's merge prompt."""
 import argparse
 import json
@@ -29,7 +29,7 @@ MERGE_IN_CI = '''
 
 You have no shell, and no way to read or write the pull request. The git server's `changed`, `diff` and `log` tools \
 read the change, if a spot needs checking. Answer in the shape the output schema sets.'''
-# The rest of that last sentence, for a rule unit and for the uncovered unit.
+# The rest of that last sentence, for a unit's finder and for the uncovered finder.
 RULE_KIND = 'each rule with a deviating spot is one finding of kind `deviation`.'
 UNCOVERED_KIND = 'each choice is one finding of kind `uncovered choice`, with no rules.'
 
@@ -49,7 +49,8 @@ def prompt(args):
     found = units(args.docs)
     if not 0 <= args.unit <= len(found):
         sys.exit(f'pack-review: there is no unit {args.unit}: the docs make {len(found) + 1} units.')
-    # The uncovered unit, after the rule units, searches every doc for a rule that settles a choice.
+    # The number after the last unit's is the uncovered finder, which searches every doc for a rule that settles a
+    # choice. The matrix calls it a unit too.
     uncovered = args.unit == len(found)
     paths = [path for unit in found for path in unit] if uncovered else found[args.unit]
     docs = ''.join(f'- `{path}`\n' for path in paths)

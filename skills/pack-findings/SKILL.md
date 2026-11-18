@@ -41,11 +41,11 @@ Stop if a ref doesn't resolve or the diff is empty. Read the packs as they are a
 
 ## 2. List the units
 
-Run `npx context-packs docs` in the repo. It prints every doc the tables point at, with a blank line between packs. The units are the instruction file, whole, then the docs each pack's table points at, in the order it prints them, then the uncovered unit. Each file is read by exactly one rule unit. The uncovered unit reads the whole diff for choices no rule covers, and searches every unit's docs. The instruction file holds its own rules, and the pack rules of every pack inlined in the context-packs block. A nested pack's index holds that pack's pack rules, and the pack rules of any pack inlined in it. Done when you have the units' paths.
+Run `npx context-packs docs` in the repo. It prints every doc the tables point at, with a blank line between packs. The units are the instruction file, whole, then the docs each pack's table points at, in the order it prints them. Each file is read by exactly one unit. One more subagent, the uncovered finder, has no unit: it reads the whole diff for choices no rule covers, and searches every unit's docs. The instruction file holds its own rules, and the pack rules of every pack inlined in the context-packs block. A nested pack's index holds that pack's pack rules, and the pack rules of any pack inlined in it. Done when you have the units' paths.
 
 ## 3. Dispatch the units
 
-Launch one subagent per unit, all in one message, so they run at the same time. Don't read the docs or the diff yourself: each is read by the subagent that checks it. Give each rule unit's subagent exactly the prompt in [unit-prompt.md](unit-prompt.md), and the uncovered unit's exactly the prompt in [uncovered-prompt.md](uncovered-prompt.md). Replace `{docs}` with the unit's paths, or every unit's paths for the uncovered unit, each on its own line as ``- `path` ``. Replace `{diff}` and `{log}` with the diff and log as your run has them: a file, or the git command.
+Launch one subagent per unit and the uncovered finder, all in one message, so they run at the same time. Don't read the docs or the diff yourself: each is read by the subagent that checks it. Give each unit's subagent exactly the prompt in [unit-prompt.md](unit-prompt.md), and the uncovered finder exactly the prompt in [uncovered-prompt.md](uncovered-prompt.md). Replace `{docs}` with the unit's paths, or every unit's paths for the uncovered finder, each on its own line as ``- `path` ``. Replace `{diff}` and `{log}` with the diff and log as your run has them: a file, or the git command.
 
 Wait until every subagent has answered before you go on. A subagent running in the background reports when it's done.
 

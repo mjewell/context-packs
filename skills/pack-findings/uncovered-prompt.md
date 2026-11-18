@@ -1,4 +1,4 @@
-You're looking for the choices a change makes that no rule covers, as the uncovered unit of a pack review. The diff is {diff}, and the log is {log}. The change's head is checked out in the current folder.
+You're looking for the choices a change makes that no rule covers, as the uncovered finder of a pack review. The diff is {diff}, and the log is {log}. The change's head is checked out in the current folder.
 
 Read the diff for kinds of decision that will come up again, where another way would be reasonable: where a kind of logic lives, how a kind of file is shaped, which library or style it uses, how errors travel, how a kind of thing is named. Leave out choices with no real alternative, what a linter, formatter or type check enforces, and one-off logic.
 

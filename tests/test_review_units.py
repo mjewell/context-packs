@@ -23,9 +23,10 @@ class UnitsCase(PairingCase):
 
 
 class ListTests(UnitsCase):
-    """The units job lists one unit per finder: the instruction file, then each pack's docs."""
+    """The units job lists the finders: one per unit, the instruction file then each pack's docs, and the uncovered
+    finder."""
 
-    def test_lists_the_instruction_file_each_packs_docs_and_the_uncovered_unit_as_units(self):
+    def test_lists_a_finder_for_each_unit_and_the_uncovered_finder(self):
         self.assertEqual(json.loads(self.units('list', '--docs', 'docs.txt')['units']), [0, 1, 2, 3])
 
     def test_uses_claude_md_when_it_holds_the_block(self):
@@ -38,7 +39,7 @@ class ListTests(UnitsCase):
 
 
 class PromptTests(UnitsCase):
-    """Each finder gets the unit prompt the skill pins, with its own docs and the git server."""
+    """Each finder gets the prompt the skill pins for its kind, with the docs it reads and the git server."""
 
     def prompt(self, unit):
         return self.units('prompt', '--docs', 'docs.txt', '--unit', str(unit), '--base', 'b' * 40, '--head', 'h' * 40)
@@ -64,7 +65,7 @@ class PromptTests(UnitsCase):
         self.assertIn('- `AGENTS.md`\n', prompt)
         self.assertNotIn('a.md', prompt)
 
-    def test_gives_the_uncovered_unit_its_own_prompt_and_every_doc_to_search(self):
+    def test_gives_the_uncovered_finder_its_own_prompt_and_every_doc_to_search(self):
         prompt = self.prompt(3)['prompt']
 
         self.assertTrue(prompt.startswith("You're looking for the choices a change makes that no rule covers"),
@@ -76,7 +77,7 @@ class PromptTests(UnitsCase):
         self.assertNotIn('kind `deviation`', prompt)
         self.assertNotIn('{', prompt)
 
-    def test_has_each_rule_unit_report_deviations(self):
+    def test_has_each_units_finder_report_deviations(self):
         prompt = self.prompt(1)['prompt']
 
         self.assertIn('finding of kind `deviation`', prompt)
