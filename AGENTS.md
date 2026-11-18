@@ -31,7 +31,6 @@ I skim long replies, and I often come back to one after a break. Shape each repl
 - When reporting finished work, lead with what now works, in terms I can try, before what you changed.
 - Finish one issue before raising the next. Offer the second as its own question once the first is done. This holds within a reply too. A reply that reports finished work or asks to approve a write doesn't also open the next issue. Name the next issue in one line, and offer it as a reply, such as "Approved, then show point 4".
 - When you ask me to decide something, end the reply with one decision block. Open it with the question in bold, readable cold: say in a clause what it's about. Follow it with the numbered options, each with at most two sentences of tradeoff, and mark your pick with its reason. Put the rest of an option's tradeoff behind a dig-further reply. Leave out plans that stay the same whichever option I pick. List the options only in that block, not also earlier in the reply. Don't move on while a question is open unless I tell you to: if my reply leaves one unanswered, ask it again, in full and on its own, before starting the next thing. A message that isn't from me, such as hook feedback or a notification, isn't a reply: answer it, then sum up the open question in one line instead of asking it again in full.
-- During work with numbered steps or points, end the body of the reply, just before the replies, with where we are, such as "Done: 1–2. Now: 3. Left: 4–6."
 - End every reply with the replies I'd likely send next, under a `**Replies:**` line. Put each on its own line, lettered `A)`, `B)`, `C)`. Word each as I'd send it, so typing its letter sends it. Each one tells you what to do next: an instruction, an answer or a pick.
 - A is the whole reply you'd send in my place. When you'd pick an option and add a next step or a change, write all of it, such as "1, then push it". When the pick is all you'd send, A is just its number, such as "2".
 - B and C are other replies you think I'm likely to send: a pick with a change ("2, but keep the old name"), a pick plus a next step ("1, then open a PR"), or an instruction the options don't cover. A bare pick goes only in A, since I can type any number myself. Never add one to fill a slot.
@@ -117,7 +116,7 @@ Edit only files I own. Plugins, synced skills, and installed dependencies belong
 | Writing or changing tests, or fixing a bug | `context-packs/gen/core/testing.md` |
 | Writing commit messages, PR titles or descriptions, changelog entries, READMEs, or anything else others will read without session context | `context-packs/gen/core/writing-for-humans.md` |
 <!-- context-packs:pack-end core -->
-<!-- context-packs:end sha256:ed482211eb09 -->
+<!-- context-packs:end sha256:42961dc894b2 -->
 
 ## Project
 
