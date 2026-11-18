@@ -78,6 +78,9 @@ An agent that checks a diff against one unit, or the uncovered finder.
 **Uncovered finder**:
 The finder with no unit, which reads the whole diff for uncovered choices and searches every unit's docs for a rule that settles each one.
 
+**Group**:
+The merging agent's answer for one finding: the ids of the finders' findings it merges, with its kind, headline and take.
+
 **Finding**:
 One choice in a diff that the review reports. It is a deviation, a conflict or an uncovered choice.
 

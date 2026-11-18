@@ -55,4 +55,4 @@ Wait until every subagent has answered before you go on. A subagent running in t
 
 ## 4. Merge their answers
 
-Merge the subagents' answers as [merge-prompt.md](merge-prompt.md) says, with `{answers}` read as "The finders' answers are the subagents' answers." CI runs the same three prompts, so a local review and a CI review check the same way.
+Merge the subagents' answers as [merge-prompt.md](merge-prompt.md) says, with `{answers}` read as "The finders' answers are the subagents' answers." Write each finding out in full, with every rule, spot, sign and exemplar of the subagents' findings it merges. CI runs the same three prompts, so a local review and a CI review check the same way.

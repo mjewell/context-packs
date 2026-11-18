@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The claude_args the review hands claude-code-action, each as one line. A finder checks one unit of the packs, and
-the merging agent merges the finders' answers. Both get the schema their answer is checked against, tools that only
+the merging agent groups the finders' findings. Both get the schema their answer is checked against, tools that only
 read, and the git server, which reads the change. claude-code-action splits the line the way a shell would. output()
 writes a prompt, a claude_args line or the units' matrix as a GitHub step output."""
 import json
@@ -46,9 +46,24 @@ def output(name, value):
         out.write(f'{name}<<{delimiter}\n{value}\n{delimiter}\n')
 
 
-def reading(base, head, model):
+def findings_schema():
+    return json.loads(SCHEMA.read_text(encoding='utf-8'))
+
+
+def groups_schema():
+    """The merging agent's answer: which of the finders' findings make each finding, with its kind, headline and take,
+    from the findings schema. A script builds the rest of each finding from its group's findings."""
+    finding = findings_schema()['properties']['findings']['items']['properties']
+    group = {'type': 'object', 'additionalProperties': False, 'required': ['ids', 'kind', 'headline', 'take'],
+             'properties': {'ids': {'type': 'array', 'minItems': 1, 'items': {'type': 'string'},
+                                    'description': "The ids of the finders' findings this one merges."},
+                            'kind': finding['kind'], 'headline': finding['headline'], 'take': finding['take']}}
+    return {'type': 'object', 'additionalProperties': False, 'required': ['groups'],
+            'properties': {'groups': {'type': 'array', 'items': group}}}
+
+
+def reading(base, head, model, schema):
     """The arguments every agent that reads the change gets."""
-    schema = json.loads(SCHEMA.read_text(encoding='utf-8'))
     servers = {'mcpServers': {'git': {'type': 'stdio', 'command': sys.executable,
                                       'args': [str(REVIEW / 'git_server.py'), '--base', base, '--head', head]}}}
     return ['--json-schema', compact(schema), '--tools', ','.join(TOOLS), '--allowedTools', ','.join([*TOOLS, SERVER]),
@@ -58,10 +73,10 @@ def reading(base, head, model):
 
 def finder(base, head, model):
     """A finder's line: its prompt holds everything it needs, so it gets no skill and no folder."""
-    return line(reading(base, head, model))
+    return line(reading(base, head, model, findings_schema()))
 
 
 def merger(inputs, base, head, model):
     """The merging agent's line: its prompt holds its instructions, and it gets the folder holding the finders'
     answers."""
-    return line(['--add-dir', inputs, *reading(base, head, model)])
+    return line(['--add-dir', inputs, *reading(base, head, model, groups_schema())])

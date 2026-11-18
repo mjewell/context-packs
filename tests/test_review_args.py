@@ -5,16 +5,28 @@ import sys
 from review_case import REVIEW, SCHEMA
 from test_review_units import UnitsCase
 
-INPUTS = '/runner/temp/pack-review.abc123'
 BASE, HEAD = 'b' * 40, 'h' * 40
+
+
+def found(headline):
+    return {'kind': 'deviation', 'headline': headline, 'rules': [], 'spots': [], 'deliberate': [], 'exemplars': [],
+            'take': 'Fix it.'}
 
 
 class MergeTests(UnitsCase):
     """The merge job's agent: the merge prompt the skill pins, with where the finders' answers are, and the arguments
     claude-code-action runs it with."""
 
+    def setUp(self):
+        super().setUp()
+        self.inputs = self.root / 'inputs'
+        self.inputs.mkdir()
+        (self.inputs / 'unit-0.json').write_text(json.dumps({'findings': [found('A')]}))
+        (self.inputs / 'unit-1.json').write_text(json.dumps({'findings': []}))
+        (self.inputs / 'unit-2.json').write_text(json.dumps({'findings': [found('B'), found('C')]}))
+
     def merge(self, *extra):
-        return self.units('merge', '--inputs', INPUTS, '--base', BASE, '--head', HEAD, *extra)
+        return self.units('merge', '--inputs', self.inputs, '--base', BASE, '--head', HEAD, *extra)
 
     def args(self, *extra):
         return shlex.split(self.merge(*extra)['claude-args'])
@@ -22,19 +34,25 @@ class MergeTests(UnitsCase):
     def flag(self, args, name):
         return args[args.index(name) + 1]
 
-    def test_fills_the_skills_merge_prompt_with_where_the_finders_answers_are(self):
+    def test_numbers_every_finders_findings_in_one_file_the_prompt_points_at(self):
         prompt = self.merge()['prompt']
 
         self.assertTrue(prompt.startswith("You're merging the finders' answers in a pack review"), prompt[:80])
-        self.assertIn(f'`{INPUTS}` as `unit-<n>.json`', prompt)
+        self.assertIn(f"`{self.inputs / 'sources.json'}`", prompt)
         self.assertNotIn('{', prompt.replace('{"', ''))
+        sources = json.loads((self.inputs / 'sources.json').read_text())
+        self.assertEqual(sources, [{'id': '0:0', 'finding': found('A')}, {'id': '2:0', 'finding': found('B')},
+                                   {'id': '2:1', 'finding': found('C')}])
 
-    def test_validates_the_answer_against_the_schema_without_loading_the_skill(self):
+    def test_has_the_agent_answer_with_groups_of_ids_without_loading_the_skill(self):
         args = self.args()
 
         self.assertNotIn('--plugin-dir', args)
-        self.assertEqual(json.loads(self.flag(args, '--json-schema')),
-                         json.loads(SCHEMA.read_text()))
+        schema = json.loads(self.flag(args, '--json-schema'))
+        group = schema['properties']['groups']['items']
+        self.assertEqual(group['required'], ['ids', 'kind', 'headline', 'take'])
+        findings = json.loads(SCHEMA.read_text())
+        self.assertEqual(group['properties']['kind'], findings['properties']['findings']['items']['properties']['kind'])
 
     def test_gives_the_agent_only_the_git_server_for_the_change(self):
         args = self.args()
@@ -52,7 +70,7 @@ class MergeTests(UnitsCase):
         # mcp__git allows every tool on the git server. It must not start with mcp__github, or claude-code-action adds
         # its own GitHub servers.
         self.assertEqual(self.flag(args, '--allowedTools'), 'Read,Glob,Grep,mcp__git')
-        self.assertEqual(self.flag(args, '--add-dir'), INPUTS)
+        self.assertEqual(self.flag(args, '--add-dir'), str(self.inputs))
         self.assertEqual(self.flag(args, '--disallowedTools'), 'Read(./.git/**)')
         self.assertIn('--restricted', args)
 
