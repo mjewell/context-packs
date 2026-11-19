@@ -9,20 +9,16 @@ from tree_model import LINK, nodes, own_words, parse, where
 NODE_WORDS = 40
 CHILDREN = 7
 VIEW_WORDS = 150
-FILE_WORDS = 1500
-# A nested subtree this small, or a promoted file under MERGE_WORDS, only warns: it's a sign to flatten or merge back.
+# A nested subtree this small only warns: it's a sign to flatten it.
 FLATTEN_WORDS = 60
-MERGE_WORDS = 500
 
 
 def tree_roots(repo):
-    """Each tree's root file, `<id>.tree/<id>.md`, anywhere in the repo outside dot-folders."""
+    """Each tree's file, `<id>.tree.md`, anywhere in the repo outside dot-folders."""
     roots = []
-    for folder, dirs, _ in os.walk(repo):
+    for folder, dirs, files in os.walk(repo):
         dirs[:] = sorted(d for d in dirs if not d.startswith('.'))
-        for d in dirs:
-            if d.endswith('.tree'):
-                roots.append(Path(folder) / d / (d[:-len('.tree')] + '.md'))
+        roots += [Path(folder) / f for f in sorted(files) if f.endswith('.tree.md')]
     return roots
 
 
@@ -30,13 +26,6 @@ def check(repo):
     """Every problem in the repo's trees, as (file, level, message), with level 'fail' or 'warn'."""
     problems, trees = [], [parse(root) for root in tree_roots(repo)]
     problems += [(file, 'fail', message) for tree in trees for file, message in tree.problems]
-    for tree in trees:
-        folder, page = tree.file.parent, tree.file.with_suffix('.html')
-        for file in sorted(f for f in folder.rglob('*') if f.is_file()):
-            if file.suffix != '.md' and file != page:
-                problems.append((file, 'fail', "a .tree folder holds only the tree's Markdown and its rendered page"))
-            elif file.suffix == '.md' and file not in tree.files:
-                problems.append((file, 'fail', 'no More: line reaches this file'))
     by_id = {}
     for node in sorted((n for tree in trees for n in nodes(tree) if n.id), key=lambda n: n.file):
         by_id.setdefault(node.id, []).append(node)
@@ -61,10 +50,6 @@ def check(repo):
             if any(child.children for child in node.children) and size <= FLATTEN_WORDS:
                 problems.append((node.file, 'warn', f'nested subtree is {size} words (flatten at {FLATTEN_WORDS} or '
                                                     f'fewer), under "{where(node)}"'))
-        for file, size in file_words(tree).items():
-            problems += sized(file, 'file is {} words', size, FILE_WORDS)
-            if file != tree.file and size < MERGE_WORDS:
-                problems.append((file, 'warn', f'promoted file is {size} words (merge it back under {MERGE_WORDS})'))
     return problems
 
 
@@ -82,19 +67,10 @@ def sized(file, what, size, target, under=None):
     return []
 
 
-def file_words(tree):
-    """Each file in a tree, with the words of the nodes it holds."""
-    per_file = {}
-    for node in nodes(tree):
-        per_file[node.file] = per_file.get(node.file, 0) + own_words(node)
-    return per_file
-
-
 def stats(repo):
-    """Lines giving each file's size, then each view's size, child count and subtree size, indented by depth."""
+    """Lines giving each view's size, child count and subtree size, indented by depth."""
     lines = []
     for tree in (parse(root) for root in tree_roots(repo)):
-        lines += [f'{file.relative_to(repo)}: {size} words' for file, size in file_words(tree).items()]
         for node in nodes(tree):
             if node.children:
                 count = len(node.children)

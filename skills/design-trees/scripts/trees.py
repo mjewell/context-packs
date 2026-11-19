@@ -5,7 +5,7 @@ Usage:
   python3 scripts/trees.py check
   python3 scripts/trees.py stats
   python3 scripts/trees.py links-to <id>
-  python3 scripts/trees.py render <tree>.tree/<id>.md [-o out.html]
+  python3 scripts/trees.py render <id>.tree.md [-o out.html]
 
 Standard library only."""
 import argparse
@@ -39,7 +39,7 @@ def run_links_to(args):
 
 
 def render(args):
-    """Writes the page beside the tree's root file, as <id>.html, unless the tree doesn't read as a tree."""
+    """Writes the page beside the tree's file, as <id>.tree.html, unless the tree doesn't read as a tree."""
     path = args.tree.resolve()
     tree = parse(path)
     if tree.problems:
@@ -61,13 +61,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     commands = parser.add_subparsers(dest='command', required=True)
     commands.add_parser('check', help="check every tree in the repo against the spec's rules").set_defaults(run=run_check)
-    commands.add_parser('stats', help='print the size of each file and view').set_defaults(run=run_stats)
+    commands.add_parser('stats', help='print the size of each view').set_defaults(run=run_stats)
     links = commands.add_parser('links-to', help='list the nodes that link to an ID')
     links.add_argument('id')
     links.set_defaults(run=run_links_to)
     r = commands.add_parser('render', help='write a tree as one HTML page')
     r.add_argument('tree', type=Path)
-    r.add_argument('-o', '--out', type=Path, help='default: <id>.html beside the root file')
+    r.add_argument('-o', '--out', type=Path, help='default: <id>.tree.html beside the tree file')
     r.set_defaults(run=render)
     args = parser.parse_args()
     args.run(args)
