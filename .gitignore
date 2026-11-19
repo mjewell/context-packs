@@ -1,2 +1,4 @@
 __pycache__/
 node_modules/
+# The page skills/design-trees/scripts/trees.py render writes beside each design tree.
+**/*.tree/*.html
