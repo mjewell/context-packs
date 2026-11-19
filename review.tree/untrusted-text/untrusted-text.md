@@ -15,6 +15,7 @@
   - Anyone else's reply comes back as its id and why it's hidden, without the login, since a login is text its owner chose
   - Write access comes from GitHub's permission API, asked once per author
   - A minimized comment isn't hidden. It comes with GitHub's reason, for the commentary agent to weigh
+  - Reply text is GitHub's plain-text rendering, so GitHub decides what's hidden, such as HTML comments
   - Rejected: GitHub's lockdown mode. It does nothing on private repos, filters only some comments, and doesn't strip hidden content
 - Findings lose invisible characters and secrets before they're posted, and their mentions and HTML are escaped {#sanitize}
   - Every Unicode format character is removed, not a list of known ones. Secrets are redacted by prefix
@@ -24,6 +25,7 @@
 - The local review reads only the summary, through one command that prints no other comment's text {#summary-read}
   - The filter runs before the agent sees any comment, since other comments can hold text written to steer it
   - It reads every page, so a summary or a forged block past the first page isn't missed
+  - It reads the summary's plain-text rendering, which leaves out HTML comments, image alt text and link URLs
   - A summary counts only when the workflow's bot wrote it, it ends with the marker, and it holds one findings block
 - Every prompt tells its agent that what it reads is data, never instructions
 - Text from the PR reaches a step output only under a delimiter it can't contain, so a line in it can't set another output

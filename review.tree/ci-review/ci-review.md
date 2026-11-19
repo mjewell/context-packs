@@ -18,6 +18,7 @@
   - claude-code-action checks the merging agent's answer against the findings schema
   - A thread opens on the first deviating spot the diff shows, or else the first spot it shows, since a review comment needs a line in the diff
 - The threads job pairs findings with earlier threads and writes commentary, see [[review-threads]]
+  - It checks out the PR though its agents read no files, since claude-code-action restores `.claude/` from the base branch with git
 - The post job opens new threads and posts the summary. It runs no agent {#post-job}
   - It reads the threads again itself, through the trust filter, and stops if a pair names any other thread
   - It plans every write and checks the plan first. A PR that moved on, a summary too long for a comment, or a second summary each stop it with nothing written
@@ -25,6 +26,7 @@
     - Why: a pending review left by a failed run would block the next, since GitHub allows one per user on a PR
   - Posts on one PR wait for each other rather than cancel
     - Why: two at once could each find no summary and add one
+  - It reads the PR's comments as one page of 100, and more is an error, since a summary that missed an earlier one would post a second
 - GitHub enforces each job's permissions, and only the post job can write to the PR {#job-permissions}
   - Why: a composite action can't start a job or set its permissions, so the jobs live in a reusable workflow that a repo calls with one job
   - Each job checks out the review at the commit the caller pinned, so the actions and the workflow always match

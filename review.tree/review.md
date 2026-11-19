@@ -24,6 +24,7 @@ A review checks a change against the repo's packs and instruction file, and repo
   - A unit is the docs one finder checks: the instruction file, or the docs one pack's table points at. Each file is in exactly one unit {#unit}
     - The instruction file is the first unit. It holds the pack rules of every pack inlined in the block
     - A nested pack's index is a doc in its parent's unit, and holds that pack's pack rules
+    - The units come from `context-packs docs`, which reads the committed tables, not the packs, since a pack's origin can be a private repo CI can't read
     - Why: splitting by pack would leave a finder to pick an inlined pack's rules out of a file other packs share
   - The uncovered finder has no unit. It reads the whole diff for choices no rule covers, and searches every unit's docs for a rule that settles each {#uncovered-finder}
     - It runs alongside the units' finders, so the merge doesn't have to read the diff for it afterwards
@@ -59,6 +60,7 @@ A review checks a change against the repo's packs and instruction file, and repo
     - The agent sees only this run's findings and the comment each thread opened with, never a reply
       - Why: no comment can move a finding to another thread, by mistake or on purpose
     - A check refuses a pair that names no finding, a thread that isn't pack-review's, or either one twice
+    - The agent's only tool returns its structured answer. With no tools at all, it answers in text, which fails the step
   - A new finding opens a thread on its anchor. A finding with no line in the diff appears in the summary only {#new-thread}
     - The thread opens with the finding written for people: its headline, the rules it quotes, its other spots, signs it's deliberate, and the take
     - It marks any rule whose doc wasn't routed, and for an uncovered choice, says how the code makes it now
@@ -112,6 +114,7 @@ A review checks a change against the repo's packs and instruction file, and repo
 - The author goes through the findings locally, decides each one, and records the rules they want {#local-review}
   - The author runs /pack-review on a PR, which reads CI's findings or finds them itself {#pack-review}
     - Findings come from the first source that has them: this conversation, CI's summary, then a fresh run of pack-findings
+    - It loads pack-findings with the Skill tool, which can't load a skill that sets `disable-model-invocation`, so pack-findings is the one skill that doesn't
   - CI's summary carries every finding as JSON, so the author works through exactly what CI found {#summary-json}
     - Rejected: a CI artifact. It would expire, and reviewing again locally costs a second review that could find different things
     - The summary holds at most 65,536 characters, GitHub's limit for a comment. A summary that doesn't fit stops the run
