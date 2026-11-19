@@ -98,7 +98,8 @@ TEMPLATE = '''<!doctype html>
 <title>{title}</title>
 <style>
 :root {{ --bg:#fbfaf8; --fg:#1d1d1f; --muted:#6b6b70; --line:#e2e0db; --accent:#3b5bdb; --why:#2b8a3e;
-  --rejected:#c92a2a; --hl:#fff3bf; --chip:#f1efea; --focus:#e5eaff; }}
+  --rejected:#c92a2a; --hl:#fff3bf; --chip:#f1efea; --focus:#e5eaff;
+  --chevron:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6 4l4 4-4 4' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }}
 @media (prefers-color-scheme: dark) {{ :root {{ --bg:#17171a; --fg:#e8e6e3; --muted:#9a9aa0; --line:#2e2e33;
   --accent:#91a7ff; --why:#69db7c; --rejected:#ff8787; --hl:#4a3f12; --chip:#26262b;
   --focus:#283052; }} }}
@@ -118,11 +119,12 @@ li.leaf::before {{ content:""; position:absolute; left:6px; top:14px; width:4px;
   background:var(--muted); opacity:.6; }}
 summary {{ cursor:pointer; padding:3px 0; list-style:none; display:block; position:relative; padding-left:24px; }}
 summary::-webkit-details-marker {{ display:none; }}
-summary::before {{ content:""; position:absolute; left:0; top:7px; width:14px; height:14px; border-radius:4px;
-  background:var(--chip); border:1px solid var(--line); }}
-summary::after {{ content:""; position:absolute; left:4px; top:11px; width:5px; height:5px; border-right:2px solid var(--fg);
-  border-bottom:2px solid var(--fg); transform:rotate(-45deg); transition:transform .12s; }}
-details[open] > summary::after {{ transform:translate(0,-1px) rotate(45deg); }}
+summary::before, summary::after {{ content:""; position:absolute; left:0; top:7px; width:16px; height:16px;
+  box-sizing:border-box; }}
+summary::before {{ border-radius:4px; background:var(--chip); border:1px solid var(--line); }}
+summary::after {{ background:var(--fg); -webkit-mask:var(--chevron) center/contain no-repeat; mask:var(--chevron) center/contain no-repeat;
+  transition:transform .12s; }}
+details[open] > summary::after {{ transform:rotate(90deg); }}
 summary:hover::before {{ border-color:var(--accent); }}
 summary:hover .text {{ color:var(--accent); }}
 .count {{ margin-left:8px; font-size:12px; color:var(--muted); background:var(--chip); border-radius:10px; padding:0 7px; }}
