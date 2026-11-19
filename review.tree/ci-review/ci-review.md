@@ -1,0 +1,33 @@
+# CI review
+
+- Why: each finding needs a person to decide it, and a run in CI can't wait. So CI only reports, and nothing in it commits or pushes
+- The units job lists the units, and reads the PR's head and base now, not from the event {#units-job}
+  - Why: GitHub doesn't promise to queue runs in the order of their events, so the run left after cancellations can be an older one
+  - Drafts, PRs from forks, and edits that don't change the base branch get no review {#review-trigger}
+    - Why: a fork's PR gets no secrets. An edit reviews again only when it changed the base, so the findings match the new diff
+  - A newer run cancels the one before it, through one concurrency group per PR {#run-cancel}
+    - A run that won't review gets a group of its own, since GitHub cancels a run waiting in a group when another joins
+    - A run cancelled during post leaves only comments it fully posted
+- The find job runs one finder per unit, started by the workflow, so no agent decides a unit isn't worth checking {#find-job}
+  - Why: an agent left to decide skipped units on small diffs
+  - It can only read the repo, so GitHub, not the agent's tool list, keeps it from writing
+  - It reads the change through the git server, see [[git-server]]
+  - The run's log lists each tool call's input, and only whether its result was an error
+    - Why: a call's full output can hold file contents and secrets
+- The merge job merges the finders' answers, then a script picks the line in the diff each finding's thread opens on {#merge-job}
+  - claude-code-action checks the merging agent's answer against the findings schema
+  - A thread opens on the first deviating spot the diff shows, or else the first spot it shows, since a review comment needs a line in the diff
+- The threads job pairs findings with earlier threads and writes commentary, see [[review-threads]]
+- The post job opens new threads and posts the summary. It runs no agent {#post-job}
+  - It reads the threads again itself, through the trust filter, and stops if a pair names any other thread
+  - It plans every write and checks the plan first. A PR that moved on, a summary too long for a comment, or a second summary each stop it with nothing written
+  - New threads open in one review, submitted as it's created. Replies post one at a time
+    - Why: a pending review left by a failed run would block the next, since GitHub allows one per user on a PR
+  - Posts on one PR wait for each other rather than cancel
+    - Why: two at once could each find no summary and add one
+- GitHub enforces each job's permissions, and only the post job can write to the PR {#job-permissions}
+  - Why: a composite action can't start a job or set its permissions, so the jobs live in a reusable workflow that a repo calls with one job
+  - Each job checks out the review at the commit the caller pinned, so the actions and the workflow always match
+  - The jobs hand their results on as artifacts, kept for one day
+  - It needs GitHub.com, since GitHub Enterprise Server doesn't give a job the pinned commit
+  - claude-code-action is pinned by commit, since the review relies on how it passes arguments, the prompt and the token
