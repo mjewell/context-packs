@@ -113,12 +113,17 @@ button {{ font:inherit; font-size:13px; padding:4px 10px; border:1px solid var(-
 ul {{ list-style:none; margin:0; padding:0 0 0 22px; border-left:1px solid var(--line); }}
 main > ul {{ padding-left:0; border-left:none; }}
 li {{ margin:2px 0; }}
-li.leaf {{ padding:3px 0 3px 18px; position:relative; }}
-li.leaf::before {{ content:""; position:absolute; left:5px; top:13px; width:5px; height:5px; border-radius:50%; background:var(--muted); }}
-summary {{ cursor:pointer; padding:3px 0; list-style:none; display:block; position:relative; padding-left:18px; }}
+li.leaf {{ padding:3px 0 3px 24px; position:relative; }}
+li.leaf::before {{ content:""; position:absolute; left:6px; top:14px; width:4px; height:4px; border-radius:50%;
+  background:var(--muted); opacity:.6; }}
+summary {{ cursor:pointer; padding:3px 0; list-style:none; display:block; position:relative; padding-left:24px; }}
 summary::-webkit-details-marker {{ display:none; }}
-summary::before {{ content:"▸"; position:absolute; left:0; top:3px; color:var(--muted); transition:transform .12s; }}
-details[open] > summary::before {{ transform:rotate(90deg); }}
+summary::before {{ content:""; position:absolute; left:0; top:7px; width:14px; height:14px; border-radius:4px;
+  background:var(--chip); border:1px solid var(--line); }}
+summary::after {{ content:""; position:absolute; left:4px; top:11px; width:5px; height:5px; border-right:2px solid var(--fg);
+  border-bottom:2px solid var(--fg); transform:rotate(-45deg); transition:transform .12s; }}
+details[open] > summary::after {{ transform:translate(0,-1px) rotate(45deg); }}
+summary:hover::before {{ border-color:var(--accent); }}
 summary:hover .text {{ color:var(--accent); }}
 .count {{ margin-left:8px; font-size:12px; color:var(--muted); background:var(--chip); border-radius:10px; padding:0 7px; }}
 .label {{ font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; margin-right:7px;
@@ -131,10 +136,10 @@ a {{ color:var(--accent); }}
 li:hover > .anchor, summary:hover .anchor, li.leaf:hover .anchor {{ opacity:1; }}
 .jump.missing {{ color:var(--muted); border-bottom:1px dashed var(--muted); }}
 .flash > details > summary, li.leaf.flash {{ background:var(--hl); border-radius:4px; }}
-pre {{ margin:6px 0 10px 18px; overflow-x:auto; }}
+pre {{ margin:6px 0 10px 24px; overflow-x:auto; }}
 pre.mermaid {{ background:transparent; }}
 pre.block {{ background:var(--chip); padding:10px; border-radius:6px; }}
-.d2 {{ margin:6px 0 12px 18px; overflow-x:auto; }}
+.d2 {{ margin:6px 0 12px 24px; overflow-x:auto; }}
 .d2 > svg {{ max-width:100%; max-height:360px; width:auto; height:auto; display:block; }}
 .row:focus {{ outline:none; background:var(--focus); border-radius:4px; }}
 </style></head>
