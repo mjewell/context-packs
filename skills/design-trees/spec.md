@@ -49,8 +49,6 @@ Size rules decide when the structure changes. They are approximate and checked w
 - **Leave it alone** between those thresholds. A subtree of 60 to 150 words may be flat or nested, and doesn't change shape until a threshold is crossed. This gap is the hysteresis: it stops a node near the line from flipping shape on every edit.
 - **New content starts flat.** Nest only when a threshold forces it.
 
-Files have a coarser budget with the same hysteresis. Promote a subtree into its own file when a file passes \~1,500 words (CI fails at 2,250), and merge it back when it falls under \~500.
-
 The numbers are v0 starting points, to tune after a few real trees exist.
 
 ## What stays up
@@ -72,7 +70,7 @@ An edit deep in the tree can make an ancestor wrong, so a content change is fini
 
 ## Format
 
-A tree is a directory named `<id>.tree/`, kept next to the code it describes. It holds only Markdown, plus the page the renderer writes beside the root file: most trees are one file of nested bullets, and large ones spread across files that mirror the tree (see Files below).
+A tree is one Markdown file of nested bullets, named `<id>.tree.md` and kept next to the code it describes.
 
 ```markdown
 # Review agent {#review-agent}
@@ -87,30 +85,22 @@ Every PR gets an automated first-pass review before a human looks.
 
 - **Root:** an H1 title with the tree's ID, then one sentence on what the tree covers, then the top-level bullets. Front matter is allowed but ignored, and the spec reserves no keys.
 - **Nesting:** two-space indent per level.
-- **Labels:** a node may start with `Why:` or `Rejected:`. Unlabeled nodes say what something is or how it works. Labels let readers and tooling spot decisions. A labeled node is about its parent. `Why:` gives a reason for the parent's claim, and `Rejected:` names an alternative to it. In a promoted file, a top-level labeled node is about the promoted node.
+- **Labels:** a node may start with `Why:` or `Rejected:`. Unlabeled nodes say what something is or how it works. Labels let readers and tooling spot decisions. A labeled node is about its parent. `Why:` gives a reason for the parent's claim, and `Rejected:` names an alternative to it.
 - **Reasons:** a short reason the claim doesn't read without stays inline, as in "…, since a review comment needs a line in the diff". A reason gets its own `Why:` node when it's evidence or history, such as what went wrong before, or when inline it would push the node past its size.
 - **One decision per node:** a node may have several `Why:` children when they're separate reasons for the same claim. When they justify different decisions in one node, split it so each decision has its own node.
 - **IDs:** `{#slug}` at the end of a node's text. A node has at most one, and only nodes that something links to need one. IDs are unique across the repo and stay with the node when it moves. When a node's meaning changes, rename its ID: every incoming link breaks, and the checks force each one to be revisited.
 - **Links:** `[[slug]]` points at a node in any tree in the repo. Links target IDs, never positions or files, so moving a node never breaks a link. A link is a jump, not an expansion: expanding a node shows its own children, never a linked node's children. Depth follows parent-child edges only, so cycles through links are harmless.
 - **Merges and deletes:** when two nodes merge, the merged node keeps whichever existing ID fits it, or gets a new one when neither does. Merging, deleting or renaming a node means fixing its inbound links in the same commit. `links-to <id>` lists them, and the link check fails on any left over.
 - **Diagrams:** a node may hold a diagram as a fenced code block, indented under its text. The diagram belongs to the node and isn't one of its children. Put it on the node whose structure it shows, so expanding that node shows the picture beside the children it describes. Any diagram language works. Mermaid renders on GitHub, and other languages show as code. No check reads diagrams in v0.
-- **Viewing:** the source stays plain nested bullets, with no HTML. A renderer turns a tree into a page where every level below the top starts collapsed, and writes it beside the root file as `<id>.tree/<id>.html`. Git ignores that page, so only the Markdown is reviewed. Collapsing lives in the renderer, not the source, so the tree's diff stays readable prose.
+- **Viewing:** the source stays plain nested bullets, with no HTML. A renderer turns a tree into a page where every level below the top starts collapsed, and writes it beside the tree's file as `<id>.tree.html`. Git ignores that page, so only the Markdown is reviewed. Collapsing lives in the renderer, not the source, so the tree's diff stays readable prose.
 
-### Files
+### One file
 
-```
-review-agent.tree/
-  review-agent.md
-  review-output/
-    review-output.md
-```
+A tree stays one file however large it grows.
 
-- **Root file:** `<id>.tree/<id>.md` holds the root and the top levels. Small trees never need another file.
-- **Promoting a subtree:** when a file passes its size budget, its largest subtree moves to `<id>/<id>.md`, in a directory beside that file named for the node's ID. A node needs an ID to be promoted.
-- **The node stays put:** its own text remains in the parent file, so skimming the parent still reads normally. Its children are replaced by one line linking to the new file: `- More: [review-output](review-output/review-output.md)`. `More:` lines don't count toward sizes.
-- **Promoted files:** start with an H1 title for orientation, then the node's children as top-level bullets.
-- **Directories mirror the tree:** each directory holds one node's file plus directories for that node's own promoted descendants. Nothing else goes inside a `.tree` directory, apart from the rendered page.
-- **Unique names:** IDs are global, so every file name is unique across the repo. Renaming an ID renames its directory and file.
+- **Why:** the rendered page does the collapsing, and a diff shows only the lines that changed, whatever the file's size. Splitting a tree across files would add rules without helping anyone reading the page or reviewing a diff.
+- **No size cap:** nothing limits how large a tree gets. People decide when a tree should become separate trees (see Multiple trees).
+- **Rejected:** promoting large subtrees into their own files, linked from the parent by a `More:` line. It kept raw files small, but nobody reads a tree's raw Markdown except in a diff.
 
 ## Multiple trees
 
@@ -127,7 +117,7 @@ A single repo-wide tree would force one root to summarize unrelated things, and 
 
 Structural changes and content changes go in separate commits, with the structural commit first.
 
-- **Structural commit:** moves nodes, adds or removes grouping nodes, nests or flattens, promotes or merges files, and rewrites summaries to fit. It must not add, remove or change any claim. IDs move with their nodes. Prefix the message with `tree(structure):` so reviewers only have to check that meaning was preserved.
+- **Structural commit:** moves nodes, adds or removes grouping nodes, nests or flattens, and rewrites summaries to fit. It must not add, remove or change any claim. IDs move with their nodes. Prefix the message with `tree(structure):` so reviewers only have to check that meaning was preserved.
 - **Content commit:** adds, removes or changes claims, usually in the same commit as the code change it describes. It doesn't move existing nodes.
 - **Intermediate commits may break size rules.** A split can land before the content that justifies it. Only the PR's last commit has to pass checks.
 - **Edits by people** follow the same rules. When a person's edit breaks one, such as a view over its size, the next agent change to the tree fixes it.
@@ -138,11 +128,11 @@ Objective breakage fails CI. Sizes only warn until they're far off, and judgment
 
 | Check | Kind | Run by |
 | --- | --- | --- |
-| Every link resolves, including More: links to files | Hard | CI |
+| Every link resolves | Hard | CI |
 | IDs are unique across the repo | Hard | CI |
-| Files parse as a tree, hold only Markdown and are named for their node's ID | Hard | CI |
-| Node text, view size, child count, file size | Soft: warn at target, fail at 1.5× | CI |
-| Nested subtree under 60 words, promoted file under 500 | Warn only | CI |
+| Each tree file parses as a tree | Hard | CI |
+| Node text, view size, child count | Soft: warn at target, fail at 1.5× | CI |
+| Nested subtree of 60 words or fewer | Warn only | CI |
 | Parent doesn't contradict or overclaim | Judgment | Review agent |
 | Priority order followed | Judgment | Review agent |
 | Structural commits change no claims | Judgment | Review agent |
@@ -176,6 +166,6 @@ The root view is about 50 words, so a reader gets the whole pipeline at a glance
 
 ## Open questions
 
-- **Numbers:** do 40 / 7 / 150 / 60 and the file budgets of 1,500 / 500 hold up? Tune after two or three real trees.
+- **Numbers:** do 40 / 7 / 150 / 60 hold up? Tune after two or three real trees.
 - **Drift detection (not v0):** trees go stale like any other docs, and v0 doesn't try to solve that. A review agent could match each diff against the trees' root sentences, and per-tree path globs would make the match deterministic.
 - **Existing docs:** do READMEs and ADRs link into trees, get absorbed into them, or stay as they are?

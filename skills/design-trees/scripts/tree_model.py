@@ -1,5 +1,5 @@
-"""A design tree read from its Markdown: nodes with their text, ID, children and diagrams. `More:` links are
-followed into promoted files, so a parsed tree is the whole tree. Standard library only."""
+"""A design tree read from its Markdown file: nodes with their text, ID, children and diagrams. Standard library
+only."""
 import re
 
 LABELS = ('Why', 'Rejected')
@@ -7,7 +7,6 @@ ID = re.compile(r'\s*\{#([\w-]+)\}\s*$')
 # Anything else in braces at the end of a node's text, such as `{#a #b}`, which the spec no longer allows.
 BAD_ID = re.compile(r'\{#[^}]*\}\s*$')
 LINK = re.compile(r'\[\[([\w-]+)\]\]')
-MORE = re.compile(r'^More:\s*\[[^\]]*\]\(([^)]+)\)\s*$')
 
 
 class Node:
@@ -23,7 +22,7 @@ def parse(path):
     """The root (title, intro, id) and its top-level nodes. A fenced block belongs to the node above it. What stops a
     file reading as a tree is kept in the root's `problems`, as (file, message), and the rest of it is still read."""
     root = Node('', -1)
-    root.title, root.intro, root.file, root.problems, root.files = path.stem, [], path, [], [path]
+    root.title, root.intro, root.file, root.problems = path.name.removesuffix('.tree.md'), [], path, []
     stack, fence, lines = [root], None, path.read_text(encoding='utf-8').splitlines()
     for line in lines:
         stripped = line.strip()
@@ -51,25 +50,6 @@ def parse(path):
         depth = len(m.group(1)) // 2
         while stack[-1].depth >= depth:
             stack.pop()
-        more = MORE.match(m.group(2))
-        if more:
-            target, parent = path.parent / more.group(1), stack[-1]
-            if not parent.id:
-                root.problems.append((path, f'a node with a More: line needs an ID, under "{where(parent)}"'))
-            elif more.group(1) != f'{parent.id}/{parent.id}.md':
-                root.problems.append((path, f'More: under {{#{parent.id}}} points at {more.group(1)}, not '
-                                            f'{parent.id}/{parent.id}.md'))
-            if not target.is_file():
-                root.problems.append((path, f"More: points at {more.group(1)}, which doesn't exist"))
-                continue
-            promoted = parse(target)
-            root.problems += promoted.problems
-            root.files += promoted.files
-            for child in promoted.children:
-                shift(child, parent.depth + 1)
-                parent.children.append(child)
-            parent.diagrams += promoted.diagrams
-            continue
         node = Node(m.group(2), depth)
         node.file = path
         if not node.id and BAD_ID.search(node.text):
@@ -79,12 +59,6 @@ def parse(path):
     for d in all_diagrams(root):
         d['source'] = '\n'.join(l[d['indent']:] for l in d['lines'])
     return root
-
-
-def shift(node, depth):
-    node.depth = depth
-    for child in node.children:
-        shift(child, depth + 1)
 
 
 def all_diagrams(node):
