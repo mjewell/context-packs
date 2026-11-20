@@ -22,7 +22,7 @@ Take them from the first source that has them:
 
 - **This conversation**, when `pack-findings` already ran in it on the same base and head.
 - **A summary CI posted**, when the user names a PR, by number or as `owner/repo#number`. Fetch it as described in [From a CI review](#from-a-ci-review). A PR with no summary from pack-review goes to the next source.
-- **`pack-findings`**, run with the Skill tool on what the user named. It hands the findings back without showing them. Then carry on at step 2 here.
+- **`pack-findings`**, run with the Skill tool on what the user named. It hands the findings back to this skill, which shows them in step 2. Then carry on at step 2 here.
 
 ## 2. Report
 
