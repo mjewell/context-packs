@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tools for design trees, as the spec beside this folder, ../spec.md, defines them.
+"""Tools for spec trees, as the spec beside this folder, ../spec.md, defines them.
 
 Usage:
   python3 scripts/trees.py check

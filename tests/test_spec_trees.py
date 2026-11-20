@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-TOOLS = REPO / 'skills' / 'design-trees' / 'scripts'
+TOOLS = REPO / 'skills' / 'spec-trees' / 'scripts'
 
 SMALL = '''
     # Review {#review}
@@ -31,7 +31,7 @@ def tree(*bullets):
 
 
 class TreeCase(unittest.TestCase):
-    """A repo in a temporary folder, with design trees written into it, and the trees CLI run from its root."""
+    """A repo in a temporary folder, with spec trees written into it, and the trees CLI run from its root."""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

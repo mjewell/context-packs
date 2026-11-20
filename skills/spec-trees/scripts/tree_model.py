@@ -1,4 +1,4 @@
-"""A design tree read from its Markdown file: nodes with their text, ID, children and diagrams. Standard library
+"""A spec tree read from its Markdown file: nodes with their text, ID, children and diagrams. Standard library
 only."""
 import re
 

@@ -1,4 +1,4 @@
-"""A parsed design tree as one HTML page, with every level below the top collapsed. `[[slug]]` links jump to the
+"""A parsed spec tree as one HTML page, with every level below the top collapsed. `[[slug]]` links jump to the
 node with that ID and open its ancestors. Mermaid blocks render in the browser when their node is opened. D2 blocks
 render to SVG here, through the `d2` CLI, which must be installed when a tree has one. Standard library only."""
 import html
