@@ -223,6 +223,42 @@ class RenderTests(TreeCase):
         self.assertIn('a node has one ID, written {#slug}', run.stderr)
         self.assertFalse((self.root / 'review.tree.html').exists())
 
+    def test_escapes_a_quote_in_a_links_url(self):
+        self.write('review.tree.md', SMALL.replace('see [[finders]]', 'see [docs](https://e.com/a"onclick=x)'))
+
+        run = self.trees('render', 'review.tree.md')
+
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn('<a href="https://e.com/a&quot;onclick=x">docs</a>', (self.root / 'review.tree.html').read_text())
+
+    def test_renders_relative_anchor_http_and_mailto_links(self):
+        links = '[a](docs/review.md) [b](#finders) [c](HTTPS://e.com) [d](mailto:me@e.com)'
+        self.write('review.tree.md', SMALL.replace('see [[finders]]', 'see ' + links))
+
+        run = self.trees('render', 'review.tree.md')
+
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn('<a href="docs/review.md">a</a> <a href="#finders">b</a> <a href="HTTPS://e.com">c</a> '
+                      '<a href="mailto:me@e.com">d</a>', (self.root / 'review.tree.html').read_text())
+
+    def test_refuses_a_link_to_a_url_scheme_that_can_run_script(self):
+        self.write('review.tree.md', SMALL.replace('see [[finders]]', 'see [docs](javascript:alert(1))'))
+
+        run = self.trees('render', 'review.tree.md')
+
+        self.assertEqual(run.returncode, 1)
+        self.assertIn('javascript:alert(1', run.stderr)
+        self.assertFalse((self.root / 'review.tree.html').exists())
+
+    def test_refuses_a_link_that_starts_with_a_control_character(self):
+        # Browsers drop a URL's leading control characters, so this one would still run as javascript:.
+        self.write('review.tree.md', SMALL.replace('see [[finders]]', 'see [docs](\x01javascript:alert(1))'))
+
+        run = self.trees('render', 'review.tree.md')
+
+        self.assertEqual(run.returncode, 1)
+        self.assertFalse((self.root / 'review.tree.html').exists())
+
 
 class RepoTreesTests(unittest.TestCase):
     """This repo's own trees follow the spec's rules, so the test suite checks them until a CI workflow does."""

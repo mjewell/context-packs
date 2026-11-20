@@ -3,7 +3,7 @@ when: Releasing a new version to npm
 ---
 # Releasing
 
-`package.json` and `.claude-plugin/plugin.json` carry the same version: npm reads the first and Claude Code the second, so bump both in one commit. While the version is below 1.0, bump the minor version for a breaking change and the patch version otherwise.
+`package.json` and `.claude-plugin/plugin.json` carry the same version: npm reads the first and Claude Code the second, so bump both in one commit. Each `npx context-packs@<version>` in `skills/` names that version too, so the skills run the CLI they were written for: bump them in the same commit, and the tests fail if one is missed. While the version is below 1.0, bump the minor version for a breaking change and the patch version otherwise.
 
 `main` is protected, so the version commit lands through a PR. Merge it with a merge commit, not a squash, so the tagged commit itself ends up on `main`.
 

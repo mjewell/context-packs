@@ -18,6 +18,8 @@ D2_ARGS = ['--layout', 'elk', '--elk-nodeNodeBetweenLayers', '30', '--elk-edgeNo
            '-', '-']
 # Smaller text than D2's 16px default, set here so a tree's diagrams don't each repeat it.
 D2_STYLE = '**.style.font-size: 13\n(** -> **)[*].style.font-size: 12\n'
+SCHEME = re.compile(r'[a-z][a-z0-9+.-]*:', re.IGNORECASE)
+SAFE_SCHEMES = {'http:', 'https:', 'mailto:'}
 
 
 def inline(text, ids):
@@ -27,12 +29,24 @@ def inline(text, ids):
         if part.startswith('`') and part.endswith('`') and len(part) > 1:
             out.append(f'<code>{html.escape(part[1:-1])}</code>')
             continue
-        part = html.escape(part, quote=False)
+        # Quotes too, since a link's URL lands in an href.
+        part = html.escape(part)
         part = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', part)
-        part = re.sub(r'\[([^\]]+)\]\(([^)\s]+)\)', r'<a href="\2">\1</a>', part)
+        part = re.sub(r'\[([^\]]+)\]\(([^)\s]+)\)', lambda m: f'<a href="{href(m.group(2))}">{m.group(1)}</a>', part)
         part = re.sub(r'\[\[([\w-]+)\]\]', lambda m: link(m.group(1), ids), part)
         out.append(part)
     return ''.join(out)
+
+
+def href(url):
+    """A Markdown link's URL, already escaped. A tree can come from anyone who sends a PR, so a scheme that can run
+    script, such as javascript:, stops the render rather than reaching the page. So does a control character, since
+    browsers drop one at the start of a URL and read the scheme after it."""
+    scheme = SCHEME.match(url)
+    if not url.isprintable() or (scheme and scheme.group().lower() not in SAFE_SCHEMES):
+        sys.exit(f'trees.py: a link goes to {html.unescape(url)!r}, and a page links only to relative, http(s): and '
+                 'mailto: URLs.')
+    return url
 
 
 def link(slug, ids):
@@ -69,6 +83,9 @@ def d2_svg(source, node):
     if result.returncode != 0:
         where = node.text.strip()[:60] or 'the root'
         sys.exit(f'trees.py: the D2 diagram under "{where}" failed:\n{result.stderr.strip()}')
+    # Inline, so the SVG keeps D2's links and selectable text. Unlike a Markdown link, a D2 link isn't checked, so it
+    # can be javascript:. That's left on purpose: its script runs only on a click, and Chrome and Firefox isolate a
+    # page opened from a file:// path, so it can't read other local files.
     return re.sub(r'^<\?xml[^>]*\?>', '', result.stdout)
 
 

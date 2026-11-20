@@ -2,7 +2,7 @@ import json
 import shlex
 import sys
 
-from review_case import REVIEW
+from review_case import REVIEW, SCHEMA
 from test_review_units import UnitsCase
 
 INPUTS = '/runner/temp/pack-review.abc123'
@@ -34,7 +34,7 @@ class MergeTests(UnitsCase):
 
         self.assertNotIn('--plugin-dir', args)
         self.assertEqual(json.loads(self.flag(args, '--json-schema')),
-                         json.loads((REVIEW / 'findings.schema.json').read_text()))
+                         json.loads(SCHEMA.read_text()))
 
     def test_gives_the_agent_only_the_git_server_for_the_change(self):
         args = self.args()

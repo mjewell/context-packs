@@ -8,6 +8,7 @@ import unittest
 from fake_github import FakeGitHub, comment
 
 REVIEW = Path(__file__).resolve().parents[1] / 'review'
+SCHEMA = REVIEW.parent / 'skills' / 'pack-findings' / 'findings.schema.json'
 MARKER = '<!-- pack-review -->'
 HEAD = 'h' * 40
 
