@@ -168,4 +168,5 @@ The root view is about 50 words, so a reader gets the whole pipeline at a glance
 
 - **Numbers:** do 40 / 7 / 150 / 60 hold up? Tune after two or three real trees.
 - **Drift detection (not v0):** trees go stale like any other docs, and v0 doesn't try to solve that. A review agent could match each diff against the trees' root sentences, and per-tree path globs would make the match deterministic.
+- **Diff mode (not v0):** a page that shows how a tree changed between two commits. It marks each added, removed and changed node, and opens the branches above them. It could be rendered for two given commits, or hold every version and let the reader pick two. Matching nodes across versions is the hard part, since only some nodes have IDs and structural commits move them. Wait until a tree has history to try it on.
 - **Existing docs:** do READMEs and ADRs link into trees, get absorbed into them, or stay as they are?
