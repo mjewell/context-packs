@@ -1,12 +1,12 @@
-# Design Trees: spec v0
+# Spec trees, v0
 
 Nov 18, 2026 · @Michael Jewell
 
 ## Purpose
 
-A design tree is a nested outline of how one part of a system works and why, kept small enough at every level to skim. You read the top level for the overall shape and expand only the branches you care about, down to the finest details of behavior and decisions at the leaves.
+A spec tree is a nested outline of how one part of a system works and why, kept small enough at every level to skim. You read the top level for the overall shape and expand only the branches you care about, down to the finest details of behavior and decisions at the leaves.
 
-Design trees exist so a person can keep up with code that agents write. Agents update the tree in the same PR as the code, so the tree's diff is a readable changelog of design changes.
+Spec trees exist so a person can keep up with code that agents write. Agents update the tree in the same PR as the code, so the tree's diff is a readable changelog of design changes.
 
 Agents maintain the trees, not people. Rebalancing nodes on every change is too tedious for humans, so these rules assume an agent does it, with tooling to measure sizes. People read, review and occasionally edit.
 
@@ -80,7 +80,7 @@ Every PR gets an automated first-pass review before a human looks.
 - Runs as a GitHub Action when a PR is opened or updated {#review-trigger}
   - Why: reviewing every push was noisy and expensive
   - Rejected: a nightly batch, because feedback came too late
-- Reads the design trees for the files it touches, see [[tree-lookup]]
+- Reads the spec trees for the files it touches, see [[tree-lookup]]
 ```
 
 - **Root:** an H1 title with the tree's ID, then one sentence on what the tree covers, then the top-level bullets. Front matter is allowed but ignored, and the spec reserves no keys.
@@ -152,7 +152,7 @@ Every PR gets an automated first-pass review, posted as inline comments, before 
   - Skips drafts and PRs that only change docs
   - Why: reviewing every push was noisy and expensive
   - Rejected: a nightly batch, because feedback arrived after the author moved on
-- Builds context from the diff plus the design trees it touches {#review-context}
+- Builds context from the diff plus the spec trees it touches {#review-context}
   - Finds the trees a diff touches from each tree's root sentence
   - Why: trees state intent, so the agent can flag code that drifts from it
 - Posts findings as inline comments, deduplicated across runs

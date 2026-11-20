@@ -1,4 +1,4 @@
-"""The checks the design trees spec gives CI: what breaks a tree fails, and sizes warn until they're far off.
+"""The checks ../spec.md gives CI: what breaks a tree fails, and sizes warn until they're far off.
 Standard library only."""
 import os
 from pathlib import Path
