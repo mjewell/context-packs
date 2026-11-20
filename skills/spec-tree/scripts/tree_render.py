@@ -39,14 +39,18 @@ def inline(text, ids):
 
 
 def href(url):
-    """A Markdown link's URL, already escaped. A tree can come from anyone who sends a PR, so a scheme that can run
-    script, such as javascript:, stops the render rather than reaching the page. So does a control character, since
+    """A Markdown link's URL, already escaped, once `check_link` allows it."""
+    check_link(html.unescape(url), 'a link')
+    return url
+
+
+def check_link(url, what):
+    """Stops the render on a link the page mustn't hold. A tree can come from anyone who sends a PR, so a scheme that
+    can run script, such as javascript:, stops it rather than reaching the page. So does a control character, since
     browsers drop one at the start of a URL and read the scheme after it."""
     scheme = SCHEME.match(url)
     if not url.isprintable() or (scheme and scheme.group().lower() not in SAFE_SCHEMES):
-        sys.exit(f'trees.py: a link goes to {html.unescape(url)!r}, and a page links only to relative, http(s): and '
-                 'mailto: URLs.')
-    return url
+        sys.exit(f'trees.py: {what} goes to {url!r}, and a page links only to relative, http(s): and mailto: URLs.')
 
 
 def link(slug, ids):
@@ -83,9 +87,10 @@ def d2_svg(source, node):
     if result.returncode != 0:
         where = node.text.strip()[:60] or 'the root'
         sys.exit(f'trees.py: the D2 diagram under "{where}" failed:\n{result.stderr.strip()}')
-    # Inline, so the SVG keeps D2's links and selectable text. Unlike a Markdown link, a D2 link isn't checked, so it
-    # can be javascript:. That's left on purpose: its script runs only on a click, and Chrome and Firefox isolate a
-    # page opened from a file:// path, so it can't read other local files.
+    # Inline, so the SVG keeps D2's links and selectable text. So every href in it, which d2 writes as both href and
+    # xlink:href, is held to the rule a Markdown link follows.
+    for _, value in re.findall(r'\bhref\s*=\s*(["\'])(.*?)\1', result.stdout):
+        check_link(html.unescape(value), f'a link in the D2 diagram under "{node.text.strip()[:60] or "the root"}"')
     return re.sub(r'^<\?xml[^>]*\?>', '', result.stdout)
 
 

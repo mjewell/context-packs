@@ -1,3 +1,4 @@
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -257,6 +258,40 @@ class RenderTests(TreeCase):
         run = self.trees('render', 'review.tree.md')
 
         self.assertEqual(run.returncode, 1)
+        self.assertFalse((self.root / 'review.tree.html').exists())
+
+
+@unittest.skipUnless(shutil.which('d2'), 'renders D2 diagrams through the d2 CLI')
+class D2RenderTests(TreeCase):
+    """`trees.py render` holds a D2 diagram's links to the rule Markdown links follow."""
+
+    def diagram(self, source):
+        self.write('review.tree.md', f'''
+            # Review {{#review}}
+
+            A review checks a change against the repo's rules.
+
+            - Finders check the diff {{#finders}}
+              ```d2
+              {source}
+              ```
+            ''')
+
+    def test_renders_a_diagram_with_an_https_link(self):
+        self.diagram('x.link: "https://e.com/docs"')
+
+        run = self.trees('render', 'review.tree.md')
+
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn('href="https://e.com/docs"', (self.root / 'review.tree.html').read_text())
+
+    def test_refuses_a_diagram_link_to_a_url_scheme_that_can_run_script(self):
+        self.diagram('x.link: "javascript:alert(1)"')
+
+        run = self.trees('render', 'review.tree.md')
+
+        self.assertEqual(run.returncode, 1)
+        self.assertIn('javascript:alert(1)', run.stderr)
         self.assertFalse((self.root / 'review.tree.html').exists())
 
 
