@@ -11,7 +11,7 @@ Done when:
 - every doc the repo puts in front of an agent was read in full against the diff;
 - every deviation from a rule quotes the rule and the line that deviates from it, says whether the rule's doc was routed to the work, and gives any signs the deviation is deliberate;
 - the diff was read for choices no rule covers, and each uncovered choice says how the existing code makes it;
-- every finding was handed over in the shape [findings.schema.json](https://github.com/mjewell/context-packs/blob/main/review/findings.schema.json) sets, to whoever ran this skill, as described in [Where it runs](#where-it-runs).
+- every finding was handed over in the shape [findings.schema.json](findings.schema.json) sets, to whoever ran this skill, as described in [Where it runs](#where-it-runs).
 
 This checks the change only against what the repo's packs and instruction file say. Bugs, and whether the change does what it set out to do, are for other reviews. Deciding what to do about each finding is for `pack-review`.
 

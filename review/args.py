@@ -11,6 +11,8 @@ import sys
 import uuid
 
 REVIEW = Path(__file__).resolve().parent
+# The schema lives with the pack-findings skill, so a local review and CI read one copy.
+SCHEMA = REVIEW.parent / 'skills' / 'pack-findings' / 'findings.schema.json'
 # The diff and the repo's files can hold text written to steer the agent, so its tools only read: confined by
 # --restricted to the checkout, without .git/config, where claude-code-action keeps its token, and to any folder it's
 # given. It gets no shell, since an allowed git command such as git log --output=<file> writes any file. It reads the
@@ -46,7 +48,7 @@ def output(name, value):
 
 def reading(base, head, model):
     """The arguments every agent that reads the change gets."""
-    schema = json.loads((REVIEW / 'findings.schema.json').read_text(encoding='utf-8'))
+    schema = json.loads(SCHEMA.read_text(encoding='utf-8'))
     servers = {'mcpServers': {'git': {'type': 'stdio', 'command': sys.executable,
                                       'args': [str(REVIEW / 'git_server.py'), '--base', base, '--head', head]}}}
     return ['--json-schema', compact(schema), '--tools', ','.join(TOOLS), '--allowedTools', ','.join([*TOOLS, SERVER]),

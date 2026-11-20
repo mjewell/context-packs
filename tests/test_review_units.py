@@ -1,7 +1,7 @@
 import json
 import shlex
 
-from review_case import REVIEW, ReviewCase
+from review_case import SCHEMA, ReviewCase
 from test_review_pairing import PairingCase
 
 DOCS = 'context-packs/project/a.md\ncontext-packs/project/b.md\n\ncontext-packs/gen/core/c.md\n'
@@ -97,7 +97,7 @@ class PromptTests(UnitsCase):
         servers = json.loads(args[args.index('--mcp-config') + 1])
         self.assertEqual(servers['mcpServers']['git']['args'][1:], ['--base', 'b' * 40, '--head', 'h' * 40])
         self.assertEqual(json.loads(args[args.index('--json-schema') + 1]),
-                         json.loads((REVIEW / 'findings.schema.json').read_text()))
+                         json.loads(SCHEMA.read_text()))
         self.assertIn('--restricted', args)
         self.assertNotIn('--plugin-dir', args)
 

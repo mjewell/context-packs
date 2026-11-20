@@ -2,15 +2,15 @@
 JSON for the author's local run. post.py posts it. Only the report's text reaches it, so the only text it holds from
 the agent is what the report holds."""
 import json
-from pathlib import Path
 
+from args import SCHEMA
 import finding_comment
 import github
 
 # GitHub's limit on a comment's length.
 LIMIT = 65536
 # The finding kinds, in the order the summary counts them. Each is a noun that takes an s for more than one.
-KINDS = json.loads((Path(__file__).resolve().parent / 'findings.schema.json').read_text(encoding='utf-8'))[
+KINDS = json.loads(SCHEMA.read_text(encoding='utf-8'))[
     'properties']['findings']['items']['properties']['kind']['enum']
 
 
