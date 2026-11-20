@@ -43,7 +43,7 @@ Every later step reads the packs and the existing code from the checkout. So the
 
 ## 2. List the units
 
-Run `npx context-packs docs` in the repo. It prints every doc the tables point at, with a blank line between packs. The units are the instruction file, whole, then the docs each pack's table points at, in the order it prints them. Each file is read by exactly one unit. One more subagent, the uncovered finder, has no unit: it reads the whole diff for choices no rule covers, and searches every unit's docs. The instruction file holds its own rules, and the pack rules of every pack inlined in the context-packs block. A nested pack's index holds that pack's pack rules, and the pack rules of any pack inlined in it. Done when you have the units' paths.
+Run `npx context-packs@0.10.0 docs` in the repo. It prints every doc the tables point at, with a blank line between packs. The units are the instruction file, whole, then the docs each pack's table points at, in the order it prints them. Each file is read by exactly one unit. One more subagent, the uncovered finder, has no unit: it reads the whole diff for choices no rule covers, and searches every unit's docs. The instruction file holds its own rules, and the pack rules of every pack inlined in the context-packs block. A nested pack's index holds that pack's pack rules, and the pack rules of any pack inlined in it. Done when you have the units' paths.
 
 ## 3. Dispatch the units
 
