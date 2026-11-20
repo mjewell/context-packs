@@ -1,5 +1,5 @@
 ---
-name: spec-trees
+name: spec-tree
 description: Write, update or check a spec tree, a nested outline of how one part of a system works and why, kept in a `<id>.tree.md` file. Every level follows the same size rules, so any node you expand reads like a small tree. Use when asked to create, update or render a spec tree, or when a change touches behavior a repo's spec tree describes.
 ---
 

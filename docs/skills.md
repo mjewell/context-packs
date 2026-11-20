@@ -9,4 +9,4 @@ Four skills help write and apply the rules themselves. `npx skills add mjewell/c
 
 ## Spec trees
 
-**`spec-trees`** keeps a spec tree: a nested outline of how one part of a system works and why, which you read from the top and expand where you need detail. Agents update the tree in the same PR as the code, so its diff shows what changed in the design. The skill holds the spec and a CLI that checks a tree against it, measures it, and renders it as a page that starts collapsed. Install just this one with `npx skills add mjewell/context-packs -g -s spec-trees`.
+**`spec-tree`** keeps a spec tree: a nested outline of how one part of a system works and why, which you read from the top and expand where you need detail. Agents update the tree in the same PR as the code, so its diff shows what changed in the design. The skill holds the spec and a CLI that checks a tree against it, measures it, and renders it as a page that starts collapsed. Install just this one with `npx skills add mjewell/context-packs -g -s spec-tree`.
