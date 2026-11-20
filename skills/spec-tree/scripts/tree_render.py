@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import sys
 
-from tree_model import collect_ids, label_of
+from tree_model import collect_ids, label_of, nodes
 
 MERMAID = 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs'
 # ELK lays out nested containers more tidily than D2's default, and its spacing is tightened so a diagram stays
@@ -99,8 +99,11 @@ def render_node(node, ids):
     text = render_text(node, ids)
     if not node.children and not node.diagrams:
         return f'<li class="leaf row" tabindex="-1"{id_attr}>{text}</li>'
-    count = len(node.children)
-    meta = f'<span class="count">{count}</span>' if count else ''
+    # Every node below, not just the children: the size rules keep a node's children to about 7, so that count would
+    # barely vary, and the children show as soon as the branch opens.
+    below = sum(1 for _ in nodes(node)) - 1
+    title = f'{below} node{"" if below == 1 else "s"} below'
+    meta = f'<span class="count" title="{title}">{below}</span>' if below else ''
     kids = ''.join(render_node(c, ids) for c in node.children)
     return (f'<li class="branch"{id_attr}><details><summary class="row" tabindex="-1">{text}{meta}</summary>'
             f'{render_diagrams(node)}<ul>{kids}</ul></details></li>')

@@ -215,6 +215,21 @@ class RenderTests(TreeCase):
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertIn('<title>Review</title>', (self.root / 'review.tree.html').read_text())
 
+    def test_counts_every_node_below_a_branch(self):
+        self.write('review.tree.md', tree(
+            '- Branch with two children and one grandchild',
+            '  - Child',
+            '    - Grandchild',
+            '  - Child',
+        ))
+
+        run = self.trees('render', 'review.tree.md')
+
+        self.assertEqual(run.returncode, 0, run.stderr)
+        page = (self.root / 'review.tree.html').read_text()
+        self.assertIn('<span class="count" title="3 nodes below">3</span>', page)
+        self.assertIn('<span class="count" title="1 node below">1</span>', page)
+
     def test_refuses_a_tree_that_doesnt_read_as_a_tree(self):
         self.write('review.tree.md', SMALL.replace('{#finders}', '{#finders #finder}'))
 
