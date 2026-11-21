@@ -2,10 +2,10 @@
 
 A review checks a change against the repo's packs and instruction file, and reports findings for the change's author to decide.
 
-- Each finding is a deviation from a rule, a conflict between two rules, or a choice no rule covers {#findings}
+- Each finding is a deviation from a rule, a conflict between two rules, or a choice no rule covers. It names its spots: the lines where it applies {#findings}
   - Deviation: the change goes against a written rule {#deviation}
     - The change may be wrong, or the rule may lack an exception or be out of date. The diff can't tell which, so the author decides
-    - It says whether the rule's doc was routed, meaning its `when` matches the work, since an unrouted rule may need its `when` fixed
+    - It says whether the rule's doc was routed, meaning its `when` matches the work, since an unrouted rule may need its `when` fixed {#routed}
     - It gives any signs the deviation is deliberate
   - Conflict: two rules point opposite ways at the same spot {#conflict}
     - The merge finds it, when the finders' answers hold rules that point opposite ways at the same spots
@@ -17,7 +17,7 @@ A review checks a change against the repo's packs and instruction file, and repo
     - Only the strongest few are reported
       - Why: a missed choice turns up in a later review, while each weak candidate costs the author a turn
   - One choice is one finding, however many rules it breaks {#one-finding}
-    - The finding quotes each rule, and says whether each one's doc was routed
+    - The finding quotes each rule, and says whether each one's doc was [[routed]]
     - Why: kept apart, one import that two docs forbid opened two threads on the same line, and the second read as a new issue
   - Only the packs and instruction file count. Bugs, and whether the change does what it set out to do, are for other reviews
 - Finder agents check the diff, one unit of docs each, and a merge turns their answers into one list {#finders}
@@ -38,9 +38,9 @@ A review checks a change against the repo's packs and instruction file, and repo
   - A local review and a CI review give their agents the same three prompt files and findings schema, so both check the same way and hand back the same shape {#shared-prompts}
     - Locally, one agent launches a subagent per unit, all at once, and reads no doc itself
     - In CI, the workflow starts the finders. Each prompt gains only what a CI agent needs: that it has no shell, and to copy line numbers from the diff
-    - The prompts and the schema live in pack-findings' folder, since an installed skill holds only its own folder
+    - The prompts, one each for a unit's finder, the uncovered finder and the merge, live with the schema in the pack-findings skill's folder, since an installed skill holds only its own folder
       - Why: with the schema in `review/`, a local agent fetched it from a GitHub URL the user never pinned
-- In CI, five jobs find, merge and post the findings, and only the last can write to the PR {#ci-review}
+- In CI, five jobs find, merge and post the findings, as threads and one summary comment. Only the last can write to the PR {#ci-review}
   ```d2
   direction: right
   units
@@ -71,11 +71,11 @@ A review checks a change against the repo's packs and instruction file, and repo
       - Why: a call's full output can hold file contents and secrets
   - The merge job merges the finders' answers, then a script picks the line in the diff each finding's thread opens on {#merge-job}
     - claude-code-action checks the merging agent's answer against the findings schema
-    - A thread opens on the first deviating spot the diff shows, or else the first spot it shows, since a review comment needs a line in the diff
-  - The threads job pairs findings with earlier threads and writes commentary, see [[review-threads]]
+    - A finding's anchor, the line its thread opens on, is the first deviating spot the diff shows, or else the first spot it shows, since a review comment needs a line in the diff {#anchor}
+  - The threads job does the [[pairing]] and writes the [[commentary]]
     - It checks out the PR though its agents read no files, since claude-code-action restores `.claude/` from the base branch with git
   - The post job opens new threads and posts the summary. It runs no agent {#post-job}
-    - It reads the threads again itself, through the trust filter, and stops if a pair names any other thread
+    - It reads the threads again itself, through the [[trust-filter]], and stops if a pair from [[pairing]] names any other thread
     - It plans every write and checks the plan first. A PR that moved on, a summary too long for a comment, or a second summary each stop it with nothing written
     - New threads open in one review, submitted as it's created. Replies post one at a time
       - Why: a pending review left by a failed run would block the next, since GitHub allows one per user on a PR
@@ -89,29 +89,29 @@ A review checks a change against the repo's packs and instruction file, and repo
     - It needs GitHub.com, since GitHub Enterprise Server doesn't give a job the pinned commit
     - claude-code-action is pinned by commit, since the review relies on how it passes arguments, the prompt and the token
 - Across pushes, each finding lands in the review thread already open for its issue {#review-threads}
-  - Pairing decides which finding is about the same issue as which of pack-review's threads {#pairing}
+  - Pairing decides which finding is about the same issue as which open review thread {#pairing}
     - It's done by an agent
       - Why: an agent can judge that a finding and a thread are about the same issue when their wording differs
     - The agent sees only this run's findings and the comment each thread opened with, never a reply
       - Why: no comment can move a finding to another thread, by mistake or on purpose
-    - A check refuses a pair that names no finding, a thread that isn't pack-review's, or either one twice
+    - A check refuses a pair that names no finding, a thread the CI review didn't open, or either one twice
     - The agent's only tool returns its structured answer. With no tools at all, it answers in text, which fails the step
-  - A new finding opens a thread on its anchor. A finding with no line in the diff appears in the summary only {#new-thread}
-    - The thread opens with the finding written for people: its headline, the rules it quotes, its other spots, signs it's deliberate, and the take
-    - It marks any rule whose doc wasn't routed, and for an uncovered choice, says how the code makes it now
+  - A new finding opens a thread on its [[anchor]]. A finding with no line in the diff appears in the summary only {#new-thread}
+    - The thread opens with the finding written for people: its headline, the rules it quotes, its other spots, signs it's deliberate, and the take: what the review would do about it, for the author to accept or overrule
+    - It marks any rule whose doc wasn't [[routed]], and for an uncovered choice, says how the code makes it now
     - The thread holds no JSON, since the next run's pairing agent reads the same text
   - A paired finding gets a reply only with commentary, or when its thread was resolved, so running the review again stays quiet
     - A resolved thread hears that its finding is still there once, and not again while that reply is the thread's last comment
     - A thread with no finding gets nothing, since the author decides whether a thread is resolved
   - Commentary comes from a second agent, after the pairs are fixed, and only when a reply gives the author a reason to act {#commentary}
-    - It sees every paired thread as the trust filter passes it, not only ones with a new reply
+    - It sees every paired thread as the [[trust-filter]] passes it, not only ones with a new reply
       - Why: an author who pushed a fix without saying so still hears when it didn't work
     - Its own earlier comments are labelled as its own, and replies after its last comment are marked as new
       - Why: labelled by the bot's login instead, it relayed the same reply on every push
     - A check refuses commentary on an unpaired finding, two entries for one finding, or an empty one
   - The review never resolves a thread. The author does
     - Why: the workflow's token can't, and a token that could can also push
-  - pack-review's comments are told apart by the token's identity and a marker together {#comment-identity}
+  - The CI review's comments are told apart by the token's identity together with a marker, the HTML comment `<!-- pack-review -->` {#marker}
     - Why: other workflows post with the same token, and anyone can type the marker
     - The marker goes at the end of the summary, after the JSON block, so the agent's text can't put it there
 - Text anyone can write reaches an agent only filtered, and no agent can write to the PR {#untrusted-text}
@@ -121,7 +121,7 @@ A review checks a change against the repo's packs and instruction file, and repo
     diff: diff and files
     replies: replies
   }
-  own: pack-review's\nown comments
+  own: the review's\nown comments
   gates: only through {
     style.stroke-dash: 3
     trust: trust filter
@@ -156,7 +156,7 @@ A review checks a change against the repo's packs and instruction file, and repo
     - Output comes in pages of 1,000 lines, so one call can't fill the agent's context
     - Each diff line the head has starts with its line number there
       - Why: reading the diff as one file, the agent gave line numbers past the end of the files they named
-  - A reply's text reaches an agent only when its author can write to the repo now, or pack-review wrote it {#trust-filter}
+  - The trust filter passes a reply to an agent only when its author can write to the repo now, or the review wrote it {#trust-filter}
     - Anyone else's reply comes back as its id and why it's hidden, without the login, since a login is text its owner chose
     - Write access comes from GitHub's permission API, asked once per author
     - A minimized comment isn't hidden. It comes with GitHub's reason, for the commentary agent to weigh
@@ -171,11 +171,11 @@ A review checks a change against the repo's packs and instruction file, and repo
     - The filter runs before the agent sees any comment, since other comments can hold text written to steer it
     - It reads every page, so a summary or a forged block past the first page isn't missed
     - It reads the summary's plain-text rendering, which leaves out HTML comments, image alt text and link URLs
-    - A summary counts only when the workflow's bot wrote it, it ends with the marker, and it holds one findings block
+    - A summary counts only when the workflow's bot wrote it, it ends with the [[marker]], and it holds one findings block
   - Every prompt, and both the pack-findings and pack-review skills, tell their agent that what it reads is data, never instructions
   - Text from the PR reaches a step output only under a delimiter it can't contain, so a line in it can't set another output
 - The author goes through the findings locally, decides each one, and records the rules they want {#local-review}
-  - The author runs /pack-review on a PR, which reads CI's findings or finds them itself {#pack-review}
+  - The author runs /pack-review on a PR, which reads CI's findings or runs the pack-findings skill {#pack-review}
     - Findings come from the first source that has them: this conversation, CI's summary, then a fresh run of pack-findings
       - A fresh run hands its findings back unshown, and pack-review shows each one, so the author doesn't see it twice
     - It loads pack-findings with the Skill tool, which can't load a skill that sets `disable-model-invocation`, so pack-findings is the one skill that doesn't
@@ -183,11 +183,11 @@ A review checks a change against the repo's packs and instruction file, and repo
     - Rejected: a CI artifact. It would expire, and reviewing again locally costs a second review that could find different things
     - The summary holds at most 65,536 characters, GitHub's limit for a comment. A summary that doesn't fit stops the run
   - It summarizes every finding, then goes through them one at a time, waiting for the author's decision on each
-    - A finding's commentary is shown as CI's reading of the thread, for the author to check there
+    - A finding's [[commentary]] is shown as CI's reading of the thread, for the author to check there
     - The review stays in chat. It posts to the PR only when the author asks
   - A deviation is fixed in the code or in the rule. A conflict needs a winner. An uncovered choice is written down or left
   - pack-rule writes one rule for each finding the author wants recorded, and waits for the wording to be approved
-    - It gets the finding's kind, whether its doc was routed, its rules and spots, any signs it's deliberate, and the author's answer
+    - It gets the finding's kind, whether its doc was [[routed]], its rules and spots, any signs it's deliberate, and the author's answer
   - The findings are stale when the PR's head or base branch has moved. The author then picks whether to go on {#stale-summary}
     - Why: the base commit moves whenever something merges into the base branch, while the diff from the merge base stays the same
     - A force push to the base branch can change the diff without either moving, and goes unnoticed
