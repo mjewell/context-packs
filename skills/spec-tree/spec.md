@@ -68,7 +68,7 @@ An edit deep in the tree can make an ancestor wrong, so a content change is fini
 
 **Parallel rule.** When a node lists cases of one kind, such as the kinds of a thing or the steps of a flow, each case is its own child. Anything said about one case goes under that case, not beside the cases as a sibling, so every case expands the same way.
 
-**Term rule.** A term is a name the project coined, or an ordinary word used in a narrower sense, such as "view" in this spec. Each node that uses a term links its first use to the node that defines it, as in `[[findings|finding]]`. Only the defining node leaves its own term unlinked. A term the tree defines nowhere gets defined in the highest node that uses it.
+**Term rule.** A term is a name the project coined, or an ordinary word used in a narrower sense, such as "view" in this spec. Each node that uses a term links its first use to the node that defines it, as in `[[findings|finding]]`. Only the defining node leaves its own term unlinked. The tree's subject, the term its root names, stays unlinked too, since a link to the root only jumps to the top of the page. A term the tree defines nowhere gets defined in the highest node that uses it.
 
 - **Why:** a reader can reach any node without reading what's above or before it. They skim, pick a branch, or arrive by a link. A link costs a reader who already knows the term almost nothing, since the page shows links quietly.
 - **Rejected:** linking only where the definition isn't on the reader's way down to the node. Which nodes a reader has read depends on how they read, so no rule about position holds.
