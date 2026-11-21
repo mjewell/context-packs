@@ -31,7 +31,7 @@ A tree is a hierarchy of nodes, where each node has a short text, zero or more c
 - **View:** a node's own text plus the text of its direct children, which is what a reader sees after expanding it once.
 - **Subtree size:** total words in a node and all its descendants.
 - **Leaf:** a node with no children.
-- **Word count:** whitespace-separated words after removing markup. Labels, IDs, links, code paths and diagrams don't count.
+- **Word count:** whitespace-separated words after removing markup. Labels, IDs, link slugs, code paths and diagrams don't count. A link's display text counts.
 
 ## Size rules
 
@@ -68,6 +68,11 @@ An edit deep in the tree can make an ancestor wrong, so a content change is fini
 
 **Parallel rule.** When a node lists cases of one kind, such as the kinds of a thing or the steps of a flow, each case is its own child. Anything said about one case goes under that case, not beside the cases as a sibling, so every case expands the same way.
 
+**Term rule.** A term is a name the project coined, or an ordinary word used in a narrower sense, such as "view" in this spec. Each node that uses a term links its first use to the node that defines it, as in `[[findings|finding]]`. Only the defining node leaves its own term unlinked. A term the tree defines nowhere gets defined in the highest node that uses it.
+
+- **Why:** a reader can reach any node without reading what's above or before it. They skim, pick a branch, or arrive by a link. A link costs a reader who already knows the term almost nothing, since the page shows links quietly.
+- **Rejected:** linking only where the definition isn't on the reader's way down to the node. Which nodes a reader has read depends on how they read, so no rule about position holds.
+
 ## Format
 
 A tree is one Markdown file of nested bullets, named `<id>.tree.md` and kept next to the code it describes.
@@ -89,7 +94,7 @@ Every PR gets an automated first-pass review before a human looks.
 - **Reasons:** a short reason the claim doesn't read without stays inline, as in "…, since a review comment needs a line in the diff". A reason gets its own `Why:` node when it's evidence or history, such as what went wrong before, or when inline it would push the node past its size.
 - **One decision per node:** a node may have several `Why:` children when they're separate reasons for the same claim. When they justify different decisions in one node, split it so each decision has its own node.
 - **IDs:** `{#slug}` at the end of a node's text. A node has at most one, and only nodes that something links to need one. IDs are unique across the repo and stay with the node when it moves. When a node's meaning changes, rename its ID: every incoming link breaks, and the checks force each one to be revisited.
-- **Links:** `[[slug]]` points at a node in any tree in the repo. Links target IDs, never positions or files, so moving a node never breaks a link. A link is a jump, not an expansion: expanding a node shows its own children, never a linked node's children. Depth follows parent-child edges only, so cycles through links are harmless.
+- **Links:** `[[slug]]` points at a node in any tree in the repo. `[[slug|text]]` shows the text in place of the slug, for a term whose form differs from the ID, such as a plural. Links target IDs, never positions or files, so moving a node never breaks a link. A link is a jump, not an expansion: expanding a node shows its own children, never a linked node's children. Depth follows parent-child edges only, so cycles through links are harmless.
 - **Merges and deletes:** when two nodes merge, the merged node keeps whichever existing ID fits it, or gets a new one when neither does. Merging, deleting or renaming a node means fixing its inbound links in the same commit. `links-to <id>` lists them, and the link check fails on any left over.
 - **Diagrams:** a node may hold a diagram as a fenced code block, indented under its text. The diagram belongs to the node and isn't one of its children. Put it on the node whose structure it shows, so expanding that node shows the picture beside the children it describes. Any diagram language works. Mermaid renders on GitHub, and other languages show as code. No check reads diagrams in v0.
 - **Viewing:** the source stays plain nested bullets, with no HTML. A renderer turns a tree into a page where every level below the top starts collapsed, and writes it beside the tree's file as `<id>.tree.html`. Git ignores that page, so only the Markdown is reviewed. Collapsing lives in the renderer, not the source, so the tree's diff stays readable prose.
@@ -135,6 +140,7 @@ Objective breakage fails CI. Sizes only warn until they're far off, and judgment
 | Nested subtree of 60 words or fewer | Warn only | CI |
 | Parent doesn't contradict or overclaim | Judgment | Review agent |
 | Priority order followed | Judgment | Review agent |
+| Each node links its terms | Judgment | Review agent |
 | Structural commits change no claims | Judgment | Review agent |
 
 One CLI, `scripts/trees.py` in this skill's folder, provides these checks plus the lookups agents need instead of guessing: `check` (the CI checks above), `stats` (sizes per node), `links-to <id>` (inbound links) and `render` (the page).
