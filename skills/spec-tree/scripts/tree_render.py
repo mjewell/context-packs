@@ -265,7 +265,8 @@ function goBack() {
   focusRow(row, { keepBack: true });
   row.scrollIntoView({ block: 'center' });
 }
-const linkIn = row => row.querySelector('.text a.jump');
+// Links are followed with Tab and Enter, as on any page. → used to follow a row's first link, which made it jump
+// on most rows once a tree linked every term.
 
 document.addEventListener('keydown', e => {
   if (e.altKey || e.ctrlKey || e.metaKey) return;
@@ -283,8 +284,6 @@ document.addEventListener('keydown', e => {
   if (e.key === 'End') return focusRow(visible[visible.length - 1]);
   if (e.key === 'ArrowRight') {
     if (isBranch(row) && !detailsOf(row).open) { back.length = 0; detailsOf(row).open = true; return; }
-    const link = linkIn(row);
-    if (link) return jump(link.getAttribute('href').slice(1), row);
     const next = visible[i + 1];
     if (next && parentRow(next) === row) focusRow(next);
     return;
