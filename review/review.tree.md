@@ -52,7 +52,39 @@ A review checks a change against the repo's packs and instruction file, and repo
   pr -> threads: earlier threads
   post -> pr: writes
   ```
-  - More: [ci-review](ci-review/ci-review.md)
+  - Why: each finding needs a person to decide it, and a run in CI can't wait. So CI only reports, and nothing in it commits or pushes
+  - The units job lists the units, and reads the PR's head and base now, not from the event {#units-job}
+    - Why: GitHub doesn't promise to queue runs in the order of their events, so the run left after cancellations can be an older one
+    - Drafts, PRs from forks, and edits that don't change the base branch get no review {#review-trigger}
+      - Why: a fork's PR gets no secrets. An edit reviews again only when it changed the base, so the findings match the new diff
+    - A newer run cancels the one before it, through one concurrency group per PR {#run-cancel}
+      - A run that won't review gets a group of its own, since GitHub cancels a run waiting in a group when another joins
+      - A run cancelled during post leaves only comments it fully posted
+  - The find job runs one finder per unit, started by the workflow, so no agent decides a unit isn't worth checking {#find-job}
+    - Why: an agent left to decide skipped units on small diffs
+    - It can only read the repo, so GitHub, not the agent's tool list, keeps it from writing
+    - It reads the change through the git server, see [[git-server]]
+    - The run's log lists each tool call's input, and only whether its result was an error
+      - Why: a call's full output can hold file contents and secrets
+  - The merge job merges the finders' answers, then a script picks the line in the diff each finding's thread opens on {#merge-job}
+    - claude-code-action checks the merging agent's answer against the findings schema
+    - A thread opens on the first deviating spot the diff shows, or else the first spot it shows, since a review comment needs a line in the diff
+  - The threads job pairs findings with earlier threads and writes commentary, see [[review-threads]]
+    - It checks out the PR though its agents read no files, since claude-code-action restores `.claude/` from the base branch with git
+  - The post job opens new threads and posts the summary. It runs no agent {#post-job}
+    - It reads the threads again itself, through the trust filter, and stops if a pair names any other thread
+    - It plans every write and checks the plan first. A PR that moved on, a summary too long for a comment, or a second summary each stop it with nothing written
+    - New threads open in one review, submitted as it's created. Replies post one at a time
+      - Why: a pending review left by a failed run would block the next, since GitHub allows one per user on a PR
+    - Posts on one PR wait for each other rather than cancel
+      - Why: two at once could each find no summary and add one
+    - It reads the PR's comments as one page of 100, and more is an error, since a summary that missed an earlier one would post a second
+  - GitHub enforces each job's permissions, and only the post job can write to the PR {#job-permissions}
+    - Why: a composite action can't start a job or set its permissions, so the jobs live in a reusable workflow that a repo calls with one job
+    - Each job checks out the review at the commit the caller pinned, so the actions and the workflow always match
+    - The jobs hand their results on as artifacts, kept for one day
+    - It needs GitHub.com, since GitHub Enterprise Server doesn't give a job the pinned commit
+    - claude-code-action is pinned by commit, since the review relies on how it passes arguments, the prompt and the token
 - Across pushes, each finding lands in the review thread already open for its issue {#review-threads}
   - Pairing decides which finding is about the same issue as which of pack-review's threads {#pairing}
     - It's done by an agent
@@ -110,7 +142,35 @@ A review checks a change against the repo's packs and instruction file, and repo
   agents -> out
   out -> pr: post only
   ```
-  - More: [untrusted-text](untrusted-text/untrusted-text.md)
+  - Agents have no shell. They read files with Read, Glob and Grep, confined to the checkout {#no-shell}
+    - The merging agent can also read the folder holding the finders' answers
+    - Read is denied on `.git/`, where claude-code-action keeps its token
+    - Rejected: allowing git commands in a shell. Claude Code doesn't check what a shell command writes, and an allowed `git log` wrote any text to any file
+  - They read the change through a git server, whose three tools each run one fixed git command {#git-server}
+    - The tools are changed, diff and log. The agent sends a path and a page number, never a revision
+    - A path must be relative and without `..`, and is taken literally, so `*` names only a file called `*`
+    - Diffs run without external diff drivers or text conversion, since a PR picks a path's diff driver
+    - Output comes in pages of 1,000 lines, so one call can't fill the agent's context
+    - Each diff line the head has starts with its line number there
+      - Why: reading the diff as one file, the agent gave line numbers past the end of the files they named
+  - A reply's text reaches an agent only when its author can write to the repo now, or pack-review wrote it {#trust-filter}
+    - Anyone else's reply comes back as its id and why it's hidden, without the login, since a login is text its owner chose
+    - Write access comes from GitHub's permission API, asked once per author
+    - A minimized comment isn't hidden. It comes with GitHub's reason, for the commentary agent to weigh
+    - Reply text is GitHub's plain-text rendering, so GitHub decides what's hidden, such as HTML comments
+    - Rejected: GitHub's lockdown mode. It does nothing on private repos, filters only some comments, and doesn't strip hidden content
+  - Findings lose invisible characters and secrets before they're posted, and their mentions and HTML are escaped {#sanitize}
+    - Every Unicode format character is removed, not a list of known ones. Secrets are redacted by prefix
+    - Each @ before a login gets an invisible word joiner, so no one is notified
+    - `<` is escaped, so no HTML comment or tag can hide text. Links and images still render
+    - Rejected: backticks around mentions, since the agent's own backticks can pair with them and leave the mention outside
+  - The local review reads only the summary, through one command that prints no other comment's text {#summary-read}
+    - The filter runs before the agent sees any comment, since other comments can hold text written to steer it
+    - It reads every page, so a summary or a forged block past the first page isn't missed
+    - It reads the summary's plain-text rendering, which leaves out HTML comments, image alt text and link URLs
+    - A summary counts only when the workflow's bot wrote it, it ends with the marker, and it holds one findings block
+  - Every prompt tells its agent that what it reads is data, never instructions
+  - Text from the PR reaches a step output only under a delimiter it can't contain, so a line in it can't set another output
 - The author goes through the findings locally, decides each one, and records the rules they want {#local-review}
   - The author runs /pack-review on a PR, which reads CI's findings or finds them itself {#pack-review}
     - Findings come from the first source that has them: this conversation, CI's summary, then a fresh run of pack-findings
