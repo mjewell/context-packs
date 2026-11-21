@@ -3,7 +3,7 @@ Standard library only."""
 import os
 from pathlib import Path
 
-from tree_model import nodes, own_words, parse, slugs, where
+from tree_model import BAD_LABEL, label_of, nodes, own_words, parse, slugs, where
 
 # The spec's targets. A size past its target warns, and past 1.5 times it fails.
 NODE_WORDS = 40
@@ -41,6 +41,9 @@ def check(repo):
                     problems.append((node.file, 'fail', f"[[{slug}]] doesn't resolve, under \"{where(node)}\""))
     for tree in trees:
         for node in nodes(tree):
+            text = node.text.strip()
+            if node.depth >= 0 and not label_of(text)[0] and BAD_LABEL.match(text):
+                problems.append((node.file, 'fail', f'a label is written Why: or Rejected:, under "{where(node)}"'))
             problems += sized(node.file, 'node text is {} words', own_words(node), NODE_WORDS, where(node))
             problems += sized(node.file, 'has {} children', len(node.children), CHILDREN, where(node))
             view = own_words(node) + sum(own_words(child) for child in node.children)
