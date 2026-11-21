@@ -23,7 +23,7 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
   - One choice is one [[findings|finding]], however many [[rules]] it breaks {#one-finding}
     - The [[findings|finding]] quotes each [[rules|rule]], and says whether each one's [[doc]] was [[routed]]
     - Why: kept apart, one import that two [[doc|docs]] forbid opened two [[review-threads|threads]] on the same line, and the second read as a new issue
-  - Only the [[pack|packs]] and [[instruction-file|instruction file]] count. Bugs, and whether the change does what it set out to do, are for other reviews
+  - Only the [[pack|packs]] and [[instruction-file|instruction file]] count. Bugs, and whether the change does what it set out to do, are for other kinds of code review
 - Finder agents check the diff, one [[unit]] of [[doc|docs]] each, and a [[merge]] turns their answers into one list {#finders}
   - A unit is the [[doc|docs]] one [[finders|finder]] checks: the [[instruction-file|instruction file]], or the docs one [[pack]]'s table, its list of what to read for which work, points at. Each file is in exactly one unit {#unit}
     - The [[instruction-file|instruction file]] is the first [[unit]]. Its block is the part a sync writes. An inlined [[pack]] has its pack rules, the [[rules]] in its `pack.md`, written into the block {#inlined}
@@ -75,7 +75,7 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
       - Why: a call's full output can hold file contents and secrets
   - The merge job merges the [[finders|finders']] answers, then a script picks the line in the diff each [[findings|finding's]] [[review-threads|thread]] opens on {#merge-job}
     - claude-code-action checks the merging agent's answer against the findings schema
-    - A [[findings|finding's]] anchor, the line its [[review-threads|thread]] opens on, is the first deviating [[findings|spot]] the diff shows, or else the first spot it shows, since a review comment needs a line in the diff {#anchor}
+    - A [[findings|finding's]] anchor, the line its [[review-threads|thread]] opens on, is the first deviating [[findings|spot]] the diff shows, or else the first spot it shows, since a GitHub review comment needs a line in the diff {#anchor}
   - The threads job does the [[pairing]] and writes the [[commentary]]
     - It checks out the PR though its agents read no files, since claude-code-action restores `.claude/` from the base branch with git
   - The post job opens new [[review-threads|threads]] and posts the [[ci-review|summary]]. It runs no agent {#post-job}
@@ -88,7 +88,7 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     - It reads the PR's comments as one page of 100, and more is an error, since a [[ci-review|summary]] that missed an earlier one would post a second
   - GitHub enforces each job's permissions, and only the post job can write to the PR {#job-permissions}
     - Why: a composite action can't start a job or set its permissions, so the jobs live in a reusable workflow that a repo calls with one job
-    - Each job checks out the review at the commit the caller pinned, so the actions and the workflow always match
+    - Each job checks out the review's code at the commit the caller pinned, so the actions and the workflow always match
     - The jobs hand their results on as artifacts, kept for one day
     - It needs GitHub.com, since GitHub Enterprise Server doesn't give a job the pinned commit
     - claude-code-action is pinned by commit, since the review relies on how it passes arguments, the prompt and the token
@@ -188,7 +188,7 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     - The [[ci-review|summary]] holds at most 65,536 characters, GitHub's limit for a comment. A summary that doesn't fit stops the run
   - It summarizes every [[findings|finding]], then goes through them one at a time, waiting for the author's decision on each
     - A [[findings|finding's]] [[commentary]] is shown as CI's reading of the [[review-threads|thread]], for the author to check there
-    - The review stays in chat. It posts to the PR only when the author asks
+    - [[pack-review]] stays in chat, and posts to the PR only when the author asks
   - A [[deviation]] is fixed in the code or in the [[rules|rule]]. A [[conflict]] needs a winner. An [[uncovered-choice|uncovered choice]] is written down or left
   - pack-rule writes one [[rules|rule]] for each [[findings|finding]] the author wants recorded, and waits for the wording to be approved
     - It gets the [[findings|finding's]] kind, whether its [[doc]] was [[routed]], its [[rules]] and [[findings|spots]], any signs it's deliberate, and the author's answer
