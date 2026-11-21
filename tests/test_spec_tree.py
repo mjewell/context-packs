@@ -71,6 +71,15 @@ class CheckTests(TreeCase):
         self.assertEqual(run.stdout, 'review.tree.md: fail: [[findres]] doesn\'t resolve, under "The author '
                                      'decides each finding, see [[findres]]"\n')
 
+    def test_fails_a_link_with_display_text_to_an_id_no_tree_has(self):
+        self.write('review.tree.md', SMALL.replace('see [[finders]]', 'by the [[findres|finders]]'))
+
+        run = self.trees('check')
+
+        self.assertEqual(run.returncode, 1)
+        self.assertEqual(run.stdout, 'review.tree.md: fail: [[findres]] doesn\'t resolve, under "The author '
+                                     'decides each finding, by the [[findres…"\n')
+
     def test_resolves_a_link_into_another_tree(self):
         self.write('review.tree.md', SMALL.replace('[[finders]]', '[[packs]]'))
         self.write('docs/packs.tree.md', '''
@@ -120,6 +129,14 @@ class SizeTests(TreeCase):
 
     def test_warns_on_node_text_over_40_words(self):
         self.write('sizes.tree.md', tree(f'- {words(41)}'))
+
+        run = self.trees('check')
+
+        self.assertEqual((run.returncode, run.stdout), (0, 'sizes.tree.md: warn: node text is 41 words (target '
+                                                           '40), under "w0 w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14…"\n'))
+
+    def test_counts_a_links_display_text_but_not_its_slug(self):
+        self.write('sizes.tree.md', tree(f'- {words(39)} [[sizes|w39 w40]] [[sizes]]'))
 
         run = self.trees('check')
 
@@ -203,6 +220,14 @@ class LinksToTests(TreeCase):
 
         self.assertEqual((run.returncode, run.stderr), (1, 'trees.py: no node has the ID findres\n'))
 
+    def test_lists_a_link_with_display_text(self):
+        self.write('review.tree.md', SMALL.replace('see [[finders]]', 'by the [[finders|finders]]'))
+
+        run = self.trees('links-to', 'finders')
+
+        self.assertEqual((run.returncode, run.stdout), (0, 'review.tree.md: The author decides each finding, by the '
+                                                           '[[finders|finders]]\n'))
+
 
 class RenderTests(TreeCase):
     """`trees.py render` writes a tree's page beside its file."""
@@ -214,6 +239,16 @@ class RenderTests(TreeCase):
 
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertIn('<title>Review</title>', (self.root / 'review.tree.html').read_text())
+
+    def test_renders_a_links_display_text_escaped(self):
+        self.write('review.tree.md', SMALL.replace('see [[finders]]', 'by [[finders|the <finders>]] and [[nope|x]]'))
+
+        run = self.trees('render', 'review.tree.md')
+
+        self.assertEqual(run.returncode, 0, run.stderr)
+        page = (self.root / 'review.tree.html').read_text()
+        self.assertIn('by <a class="jump" href="#finders">the &lt;finders&gt;</a> and '
+                      '<span class="jump missing" title="Not in this tree">x</span>', page)
 
     def test_counts_every_node_below_a_branch(self):
         self.write('review.tree.md', tree(

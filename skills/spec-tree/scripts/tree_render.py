@@ -23,7 +23,7 @@ SAFE_SCHEMES = {'http:', 'https:', 'mailto:'}
 
 
 def inline(text, ids):
-    """Escape, then render code spans, bold, Markdown links and [[slug]] links."""
+    """Escape, then render code spans, bold, Markdown links, and [[slug]] and [[slug|text]] links."""
     out, parts = [], re.split(r'(`[^`]*`)', text)
     for part in parts:
         if part.startswith('`') and part.endswith('`') and len(part) > 1:
@@ -33,7 +33,8 @@ def inline(text, ids):
         part = html.escape(part)
         part = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', part)
         part = re.sub(r'\[([^\]]+)\]\(([^)\s]+)\)', lambda m: f'<a href="{href(m.group(2))}">{m.group(1)}</a>', part)
-        part = re.sub(r'\[\[([\w-]+)\]\]', lambda m: link(m.group(1), ids), part)
+        part = re.sub(r'\[\[([\w-]+)(?:\|([^\]|]+))?\]\]', lambda m: link(m.group(1), m.group(2) or m.group(1), ids),
+                      part)
         out.append(part)
     return ''.join(out)
 
@@ -53,10 +54,11 @@ def check_link(url, what):
         sys.exit(f'trees.py: {what} goes to {url!r}, and a page links only to relative, http(s): and mailto: URLs.')
 
 
-def link(slug, ids):
+def link(slug, text, ids):
+    """A jump to the node with the ID, showing text, which is already escaped."""
     if slug in ids:
-        return f'<a class="jump" href="#{slug}">{slug}</a>'
-    return f'<span class="jump missing" title="Not in this tree">{slug}</span>'
+        return f'<a class="jump" href="#{slug}">{text}</a>'
+    return f'<span class="jump missing" title="Not in this tree">{text}</span>'
 
 
 
@@ -161,6 +163,9 @@ code {{ font:13px ui-monospace, SFMono-Regular, Menlo, monospace; background:var
 a {{ color:var(--accent); }}
 .anchor {{ margin-left:6px; color:var(--muted); text-decoration:none; opacity:0; font-size:13px; }}
 li:hover > .anchor, summary:hover .anchor, li.leaf:hover .anchor {{ opacity:1; }}
+/* A tree links each use of a term, so a jump stays quiet until it's pointed at. */
+a.jump {{ color:inherit; text-decoration:underline dotted var(--muted); text-underline-offset:3px; }}
+a.jump:hover {{ color:var(--accent); text-decoration-color:var(--accent); }}
 .jump.missing {{ color:var(--muted); border-bottom:1px dashed var(--muted); }}
 .flash > details > summary, li.leaf.flash {{ background:var(--hl); border-radius:4px; }}
 pre {{ margin:6px 0 10px 24px; overflow-x:auto; }}
@@ -260,7 +265,8 @@ function goBack() {
   focusRow(row, { keepBack: true });
   row.scrollIntoView({ block: 'center' });
 }
-const linkIn = row => row.querySelector('.text a.jump');
+// Links are followed with Tab and Enter, as on any page. → used to follow a row's first link, which made it jump
+// on most rows once a tree linked every term.
 
 document.addEventListener('keydown', e => {
   if (e.altKey || e.ctrlKey || e.metaKey) return;
@@ -278,8 +284,6 @@ document.addEventListener('keydown', e => {
   if (e.key === 'End') return focusRow(visible[visible.length - 1]);
   if (e.key === 'ArrowRight') {
     if (isBranch(row) && !detailsOf(row).open) { back.length = 0; detailsOf(row).open = true; return; }
-    const link = linkIn(row);
-    if (link) return jump(link.getAttribute('href').slice(1), row);
     const next = visible[i + 1];
     if (next && parentRow(next) === row) focusRow(next);
     return;
