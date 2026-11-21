@@ -1,0 +1,26 @@
+/* Comments on a spec tree page, styled by tree_comments_ui.js's classes. */
+:root { --note:#e8590c; --note-bg:#fff4e6; }
+@media (prefers-color-scheme: dark) { :root { --note:#ffa94d; --note-bg:#33261a; } }
+.note-add { margin-left:8px; padding:0 7px; font-size:12px; line-height:18px; opacity:0; }
+.row:hover > .note-add, .row:focus > .note-add, .note-add:focus { opacity:1; }
+.notes { cursor:auto; }
+.notes:empty { display:none; }
+.note { display:flex; gap:10px; align-items:flex-start; margin:4px 0 2px; padding:6px 8px; border-radius:4px;
+  border-left:3px solid var(--note); background:var(--note-bg); }
+.note-body { flex:1; min-width:0; }
+.note-text { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font-size:14px; }
+.note-path { color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+.note button { font-size:12px; padding:1px 7px; }
+button[data-armed] { color:var(--rejected); border-color:var(--rejected); }
+button:disabled { opacity:.5; cursor:default; }
+.orphans { margin:0 0 18px; padding:10px 12px; border:1px dashed var(--note); border-radius:6px; }
+.orphans h2 { font-size:15px; margin:0 0 2px; }
+.orphans > p { margin:0 0 6px; color:var(--muted); font-size:14px; }
+dialog.note-editor { width:min(560px, calc(100vw - 32px)); padding:16px; border:1px solid var(--line); border-radius:8px;
+  background:var(--bg); color:var(--fg); }
+dialog.note-editor::backdrop { background:rgb(0 0 0 / .35); }
+.note-target { margin:0 0 8px; color:var(--muted); font-size:14px; overflow-wrap:anywhere; }
+.note-editor textarea { display:block; width:100%; padding:8px; font:inherit; font-size:14px; color:var(--fg);
+  background:var(--chip); border:1px solid var(--line); border-radius:6px; resize:vertical; }
+.note-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-top:10px; }
+.note-hint { margin-right:auto; color:var(--muted); font-size:12px; }
