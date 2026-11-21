@@ -45,7 +45,7 @@ def render(args):
     if tree.problems:
         sys.exit('\n'.join(f'trees.py: {file}: {message}' for file, message in tree.problems))
     out = args.out or path.with_suffix('.html')
-    out.write_text(page(tree), encoding='utf-8')
+    out.write_text(page(tree, path.relative_to(repo_root(path.parent)).as_posix()), encoding='utf-8')
     print(out)
 
 
