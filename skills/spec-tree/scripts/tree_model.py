@@ -6,7 +6,8 @@ LABELS = ('Why', 'Rejected')
 ID = re.compile(r'\s*\{#([\w-]+)\}\s*$')
 # Anything else in braces at the end of a node's text, such as `{#a #b}`, which the spec no longer allows.
 BAD_ID = re.compile(r'\{#[^}]*\}\s*$')
-LINK = re.compile(r'\[\[([\w-]+)\]\]')
+# `[[slug]]`, or `[[slug|text]]` to show text in place of the slug.
+LINK = re.compile(r'\[\[([\w-]+)(?:\|([^\]|]+))?\]\]')
 
 
 class Node:
@@ -74,6 +75,11 @@ def label_of(text):
     return None, text
 
 
+def slugs(text):
+    """The ID each link in the text points at."""
+    return [m.group(1) for m in LINK.finditer(text)]
+
+
 def collect_ids(node, out):
     if node.id:
         out.add(node.id)
@@ -96,9 +102,10 @@ def where(node):
 
 
 def words(text):
-    """Words in a node's text, as the spec counts them: labels, IDs, links and code spans don't count."""
+    """Words in a node's text, as the spec counts them: labels, IDs, link slugs and code spans don't count, and a
+    link's display text does."""
     text = re.sub(r'^(Why|Rejected):', ' ', text.strip())
-    text = re.sub(r'`[^`]*`', ' ', LINK.sub(' ', text))
+    text = re.sub(r'`[^`]*`', ' ', LINK.sub(lambda m: f' {m.group(2) or ""} ', text))
     text = re.sub(r'\[([^\]]*)\]\([^)]*\)', r'\1', text)
     return len([w for w in re.sub(r'[*_]', ' ', text).split() if re.search(r'\w', w)])
 

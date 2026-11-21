@@ -3,7 +3,7 @@ Standard library only."""
 import os
 from pathlib import Path
 
-from tree_model import LINK, nodes, own_words, parse, where
+from tree_model import nodes, own_words, parse, slugs, where
 
 # The spec's targets. A size past its target warns, and past 1.5 times it fails.
 NODE_WORDS = 40
@@ -36,7 +36,7 @@ def check(repo):
     ids = set(by_id)
     for tree in trees:
         for node in nodes(tree):
-            for slug in LINK.findall(node.text):
+            for slug in slugs(node.text):
                 if slug not in ids:
                     problems.append((node.file, 'fail', f"[[{slug}]] doesn't resolve, under \"{where(node)}\""))
     for tree in trees:
@@ -86,4 +86,4 @@ def links_to(repo, slug):
     every = [node for tree in trees for node in nodes(tree)]
     if not any(node.id == slug for node in every):
         return None
-    return sorted((node.file, node.text.strip()) for node in every if slug in LINK.findall(node.text))
+    return sorted((node.file, node.text.strip()) for node in every if slug in slugs(node.text))
