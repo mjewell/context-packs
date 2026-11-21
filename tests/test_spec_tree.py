@@ -124,6 +124,22 @@ class CheckTests(TreeCase):
                       '{#finders #finder}"\n', run.stdout)
 
 
+    def test_fails_a_label_written_any_other_way(self):
+        for text in ('Rejected, since it was slow', 'why: it was slow', '**Rejected:** a cron job', 'Why - it was slow'):
+            with self.subTest(text=text):
+                self.write('review.tree.md', SMALL.replace('Why: one finder per unit reads each file whole', text))
+
+                run = self.trees('check')
+
+                self.assertEqual(run.returncode, 1)
+                self.assertIn(f'review.tree.md: fail: a label is written Why: or Rejected:, under "{text}"\n', run.stdout)
+
+    def test_passes_a_node_that_only_starts_with_a_word_like_a_label(self):
+        self.write('review.tree.md', SMALL.replace('Why: one finder per unit reads each file whole',
+                                                   'Whyte\'s rule says one finder reads each file whole'))
+
+        self.assertEqual(self.trees('check').stdout, '')
+
 class SizeTests(TreeCase):
     """`trees.py check` warns when a size passes its target, and fails at 1.5 times it."""
 

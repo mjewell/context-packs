@@ -3,6 +3,9 @@ only."""
 import re
 
 LABELS = ('Why', 'Rejected')
+# A node that starts with a label's word in any other form, such as `Rejected, since…` or `**Why:**`, which would show as
+# plain text rather than a label.
+BAD_LABEL = re.compile(r'[*_]*(?:why|rejected)\b', re.IGNORECASE)
 ID = re.compile(r'\s*\{#([\w-]+)\}\s*$')
 # Anything else in braces at the end of a node's text, such as `{#a #b}`, which the spec no longer allows.
 BAD_ID = re.compile(r'\{#[^}]*\}\s*$')

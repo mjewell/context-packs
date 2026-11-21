@@ -90,7 +90,8 @@ Every PR gets an automated first-pass review before a human looks.
 
 - **Root:** an H1 title with the tree's ID, then one sentence on what the tree covers, then the top-level bullets. Front matter is allowed but ignored, and the spec reserves no keys.
 - **Nesting:** two-space indent per level.
-- **Labels:** a node may start with `Why:` or `Rejected:`. Unlabeled nodes say what something is or how it works. Labels let readers and tooling spot decisions. A labeled node is about its parent. `Why:` gives a reason for the parent's claim, and `Rejected:` names an alternative to it.
+- **Labels:** a node may start with a label, written exactly `Why:` or `Rejected:`. A node that starts with either word in another form, such as "Rejected, since…", fails `check`, since it shows as plain text instead of a label. Unlabeled nodes say what something is or how it works. Labels let readers and tooling spot decisions. A labeled node is about its parent. `Why:` gives a reason for the parent's claim, and `Rejected:` names an alternative to it.
+- **Rejections:** a rejected alternative always gets its own `Rejected:` node, never an inline "rather than" or "instead of", so every rejection shows as a label.
 - **Reasons:** a short reason the claim doesn't read without stays inline, as in "…, since a review comment needs a line in the diff". A reason gets its own `Why:` node when it's evidence or history, such as what went wrong before, or when inline it would push the node past its size.
 - **One decision per node:** a node may have several `Why:` children when they're separate reasons for the same claim. When they justify different decisions in one node, split it so each decision has its own node.
 - **IDs:** `{#slug}` at the end of a node's text. A node has at most one, and only nodes that something links to need one. IDs are unique across the repo and stay with the node when it moves. When a node's meaning changes, rename its ID: every incoming link breaks, and the checks force each one to be revisited.
@@ -136,10 +137,12 @@ Objective breakage fails CI. Sizes only warn until they're far off, and judgment
 | Every link resolves | Hard | CI |
 | IDs are unique across the repo | Hard | CI |
 | Each tree file parses as a tree | Hard | CI |
+| Labels are written `Why:` or `Rejected:` | Hard | CI |
 | Node text, view size, child count | Soft: warn at target, fail at 1.5× | CI |
 | Nested subtree of 60 words or fewer | Warn only | CI |
 | Parent doesn't contradict or overclaim | Judgment | Review agent |
 | Priority order followed | Judgment | Review agent |
+| Every rejection has its own `Rejected:` node | Judgment | Review agent |
 | Each node links its terms | Judgment | Review agent |
 | Structural commits change no claims | Judgment | Review agent |
 
