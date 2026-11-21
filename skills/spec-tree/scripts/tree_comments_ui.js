@@ -31,16 +31,45 @@ const boxes = nodes.map(li => {
   row.append(el('button', { type: 'button', class: 'note-add', title: 'Comment on this node (c)' }, '+ Comment'), box);
   return box;
 });
+// A branch's marker counts the comments on the nodes below it. It shows only while the branch is collapsed, since
+// an open branch shows those comments' rows.
+const markers = nodes.map(li => {
+  if (li.classList.contains('leaf')) return null;
+  const marker = el('span', { class: 'note-count', title: 'Comments on the nodes below' });
+  noteRow(li).querySelector('.note-add').before(marker);
+  return marker;
+});
 
+// The sidebar floats at the right. On a wide window the open sidebar pushes the tree aside, and on a narrow one it
+// covers part of it. It starts open only on a wide window, and then keeps whatever its toggle last chose. The width
+// matches the CSS's @media rule that moves the tree aside.
+const wide = matchMedia('(min-width: 1200px)');
+const panelKey = 'spec-tree-comments-panel';
+const toggle = el('button', { type: 'button', class: 'panel-toggle', 'aria-expanded': 'false' });
 const copy = el('button', { type: 'button' });
-const clear = el('button', { type: 'button', 'data-confirm': 'Delete every comment?' }, 'Delete all comments');
-document.querySelector('.tools').append(copy, clear);
+const clear = el('button', { type: 'button', 'data-confirm': 'Delete every comment?' }, 'Delete all');
+const index = el('ol', { class: 'note-index' });
+const empty = el('p', { class: 'panel-empty' }, 'No comments yet. Hover a row and click "+ Comment", or press c on a focused row.');
 const orphanList = el('div');
 const orphans = el('section', { class: 'orphans' },
-  el('h2', {}, 'Comments on nodes that changed'),
+  el('h2', {}, 'On nodes that changed'),
   el('p', {}, "These nodes' text or place changed after the comment, so no node here matches them."),
   orphanList);
-main.querySelector(':scope > ul').before(orphans);
+const panel = el('aside', { class: 'notes-panel' }, toggle,
+  el('div', { class: 'panel-body' }, el('div', { class: 'panel-actions' }, copy, clear), empty, index, orphans));
+document.body.append(panel);
+function setPanel(open) {
+  panel.classList.toggle('open', open);
+  document.body.classList.toggle('panel-open', open);
+  toggle.setAttribute('aria-expanded', String(open));
+}
+const remembered = localStorage.getItem(panelKey);
+setPanel(remembered ? remembered === 'open' : wide.matches);
+// Where the open sidebar covers the tree, a click on the page collapses it, and still does what it landed on. It
+// isn't remembered, so a collapse on a narrow window doesn't make a wide one start collapsed.
+document.addEventListener('click', e => {
+  if (panel.classList.contains('open') && !wide.matches && !panel.contains(e.target)) setPanel(false);
+});
 
 function note(c, { withPath = false } = {}) {
   return el('div', { class: 'note' },
@@ -53,11 +82,33 @@ function note(c, { withPath = false } = {}) {
 function render() {
   const placed = placeComments(load(), paths);
   boxes.forEach((box, i) => box.replaceChildren(...placed.byRow[i].map(c => note(c))));
+  markers.forEach((marker, i) => {
+    if (!marker) return;
+    const below = nodes[i].querySelectorAll(':scope > details > ul .note').length;
+    marker.textContent = `💬 ${below}`;
+    marker.hidden = !below;
+  });
+  index.replaceChildren(...placed.byRow.flatMap((comments, i) => comments.map(c => el('li', {},
+    el('button', { type: 'button', class: 'index-entry', 'data-row': String(i) },
+      el('span', { class: 'index-node' }, nodes[i].dataset.src),
+      el('span', { class: 'index-text' }, c.text))))));
   orphanList.replaceChildren(...placed.orphans.map(c => note(c, { withPath: true })));
   orphans.hidden = !placed.orphans.length;
   const count = placed.byRow.flat().length + placed.orphans.length;
-  copy.textContent = `Copy comments for agent (${count})`;
+  empty.hidden = !!count;
+  toggle.textContent = `💬 Comments (${count})`;
+  copy.textContent = 'Copy for agent';
   copy.disabled = clear.disabled = !count;
+}
+
+// Opens the branches above a node and focuses its row, as a [[link]] jump does in the page's other script.
+function showNode(li) {
+  for (let d = li.parentElement.closest('details'); d; d = d.parentElement.closest('details')) d.open = true;
+  const row = noteRow(li);
+  row.focus({ preventScroll: true });
+  row.scrollIntoView({ block: 'center' });
+  li.classList.add('flash');
+  setTimeout(() => li.classList.remove('flash'), 1200);
 }
 
 // The first click arms the button and the second, within 3 seconds, acts. This works in any browser, unlike
@@ -126,6 +177,13 @@ document.addEventListener('keydown', e => {
 document.addEventListener('click', async e => {
   // A click on a comment, or on its buttons, sits inside a branch's <summary>, and mustn't open or close the branch.
   if (e.target.closest('.notes, .note-add')) e.preventDefault();
+  if (e.target === toggle) {
+    const open = !panel.classList.contains('open');
+    localStorage.setItem(panelKey, open ? 'open' : 'closed');
+    return setPanel(open);
+  }
+  const entry = e.target.closest('.index-entry');
+  if (entry) return showNode(nodes[Number(entry.dataset.row)]);
   const add = e.target.closest('.note-add');
   if (add) return openEditor(add.closest('li'));
   const del = e.target.closest('[data-note-delete]');
