@@ -25,6 +25,7 @@ A review checks a change against the repo's packs and instruction file, and repo
     - The instruction file is the first unit. It holds the pack rules of every pack inlined in the block
     - A nested pack's index is a doc in its parent's unit, and holds that pack's pack rules
     - The units come from `context-packs docs`, which reads the committed tables, not the packs, since a pack's origin can be a private repo CI can't read
+      - Either way the CLI is fixed: CI runs it from the commit the caller pinned, and a local review runs the version released with the skill, since the newest on npm could be a bad publish
     - Why: splitting by pack would leave a finder to pick an inlined pack's rules out of a file other packs share
   - The uncovered finder has no unit. It reads the whole diff for choices no rule covers, and searches every unit's docs for a rule that settles each {#uncovered-finder}
     - It runs alongside the units' finders, so the merge doesn't have to read the diff for it afterwards
@@ -34,9 +35,11 @@ A review checks a change against the repo's packs and instruction file, and repo
     - Rejected: checking which docs a finder read. A run's log lists every tool call, so a skipped doc can be checked by hand
   - The merge writes one finding for each choice, see [[one-finding]] {#merge}
     - An uncovered choice joins a deviation about the same choice at the same spots, since a rule covers it after all
-  - A local review and a CI review give their agents the same three prompt files, so both check the same way {#shared-prompts}
+  - A local review and a CI review give their agents the same three prompt files and findings schema, so both check the same way and hand back the same shape {#shared-prompts}
     - Locally, one agent launches a subagent per unit, all at once, and reads no doc itself
     - In CI, the workflow starts the finders. Each prompt gains only what a CI agent needs: that it has no shell, and to copy line numbers from the diff
+    - The prompts and the schema live in pack-findings' folder, since an installed skill holds only its own folder
+      - Why: with the schema in `review/`, a local agent fetched it from a GitHub URL the user never pinned
 - In CI, five jobs find, merge and post the findings, and only the last can write to the PR {#ci-review}
   ```d2
   direction: right
@@ -169,11 +172,12 @@ A review checks a change against the repo's packs and instruction file, and repo
     - It reads every page, so a summary or a forged block past the first page isn't missed
     - It reads the summary's plain-text rendering, which leaves out HTML comments, image alt text and link URLs
     - A summary counts only when the workflow's bot wrote it, it ends with the marker, and it holds one findings block
-  - Every prompt tells its agent that what it reads is data, never instructions
+  - Every prompt, and both the pack-findings and pack-review skills, tell their agent that what it reads is data, never instructions
   - Text from the PR reaches a step output only under a delimiter it can't contain, so a line in it can't set another output
 - The author goes through the findings locally, decides each one, and records the rules they want {#local-review}
   - The author runs /pack-review on a PR, which reads CI's findings or finds them itself {#pack-review}
     - Findings come from the first source that has them: this conversation, CI's summary, then a fresh run of pack-findings
+      - A fresh run hands its findings back unshown, and pack-review shows each one, so the author doesn't see it twice
     - It loads pack-findings with the Skill tool, which can't load a skill that sets `disable-model-invocation`, so pack-findings is the one skill that doesn't
   - CI's summary carries every finding as JSON, so the author works through exactly what CI found {#summary-json}
     - Rejected: a CI artifact. It would expire, and reviewing again locally costs a second review that could find different things
