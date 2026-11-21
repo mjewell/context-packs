@@ -240,6 +240,23 @@ class RenderTests(TreeCase):
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertIn('<title>Review</title>', (self.root / 'review.tree.html').read_text())
 
+    def test_renders_a_code_span_in_a_links_display_text(self):
+        self.write('review.tree.md', SMALL.replace('see [[finders]]', 'when its [[finders|`when` <x>]] matches'))
+
+        run = self.trees('render', 'review.tree.md')
+
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn('when its <a class="jump" href="#finders"><code>when</code> &lt;x&gt;</a> matches',
+                      (self.root / 'review.tree.html').read_text())
+
+    def test_leaves_a_link_inside_a_code_span_as_code(self):
+        self.write('review.tree.md', SMALL.replace('see [[finders]]', 'written `[[finders|x]]`'))
+
+        run = self.trees('render', 'review.tree.md')
+
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn('written <code>[[finders|x]]</code>', (self.root / 'review.tree.html').read_text())
+
     def test_renders_a_links_display_text_escaped(self):
         self.write('review.tree.md', SMALL.replace('see [[finders]]', 'by [[finders|the <finders>]] and [[nope|x]]'))
 

@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import sys
 
-from tree_model import collect_ids, label_of, nodes
+from tree_model import LINK, collect_ids, label_of, nodes
 
 MERMAID = 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs'
 # ELK lays out nested containers more tidily than D2's default, and its spacing is tightened so a diagram stays
@@ -24,19 +24,28 @@ SAFE_SCHEMES = {'http:', 'https:', 'mailto:'}
 
 def inline(text, ids):
     """Escape, then render code spans, bold, Markdown links, and [[slug]] and [[slug|text]] links."""
-    out, parts = [], re.split(r'(`[^`]*`)', text)
-    for part in parts:
-        if part.startswith('`') and part.endswith('`') and len(part) > 1:
+    out = []
+    # Whichever starts first wins, so a code span can hold a link's syntax and a link's text can hold a code span.
+    for part in re.split(r'(\[\[[\w-]+(?:\|[^\]|]+)?\]\]|`[^`]*`)', text):
+        m = LINK.fullmatch(part)
+        if m:
+            out.append(link(m.group(1), code_spans(m.group(2) or m.group(1)), ids))
+        elif part.startswith('`') and part.endswith('`') and len(part) > 1:
             out.append(f'<code>{html.escape(part[1:-1])}</code>')
-            continue
-        # Quotes too, since a link's URL lands in an href.
-        part = html.escape(part)
-        part = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', part)
-        part = re.sub(r'\[([^\]]+)\]\(([^)\s]+)\)', lambda m: f'<a href="{href(m.group(2))}">{m.group(1)}</a>', part)
-        part = re.sub(r'\[\[([\w-]+)(?:\|([^\]|]+))?\]\]', lambda m: link(m.group(1), m.group(2) or m.group(1), ids),
-                      part)
-        out.append(part)
+        else:
+            # Quotes too, since a link's URL lands in an href.
+            part = html.escape(part)
+            part = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', part)
+            part = re.sub(r'\[([^\]]+)\]\(([^)\s]+)\)', lambda m: f'<a href="{href(m.group(2))}">{m.group(1)}</a>',
+                          part)
+            out.append(part)
     return ''.join(out)
+
+
+def code_spans(text):
+    """A link's display text, escaped, with its code spans rendered."""
+    return ''.join(f'<code>{html.escape(p[1:-1])}</code>' if p.startswith('`') and p.endswith('`') and len(p) > 1
+                   else html.escape(p) for p in re.split(r'(`[^`]*`)', text))
 
 
 def href(url):
