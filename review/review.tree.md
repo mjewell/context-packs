@@ -42,7 +42,7 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
   - A [[local-review|local review]] and a [[ci-review|CI review]] give their agents the same three prompt files and findings schema, so both check the same way and hand back the same shape {#shared-prompts}
     - Locally, one agent launches a subagent per [[unit]], all at once, and reads no [[doc]] itself
     - In CI, the workflow starts the [[finders]]. Each prompt gains only what a CI agent needs: that it has no shell, and to copy line numbers from the diff
-    - The prompts, one each for a [[unit|unit's]] finder, the [[uncovered-finder|uncovered finder]] and the [[merge]], live with the schema in the pack-findings skill's folder, since an installed skill holds only its own folder
+    - The prompts, one each for a [[unit|unit's]] [[finders|finder]], the [[uncovered-finder|uncovered finder]] and the [[merge]], live with the schema in the pack-findings skill's folder, since an installed skill holds only its own folder
       - Why: with the schema in `review/`, a local agent fetched it from a GitHub URL the user never pinned
 - In CI, five jobs find, merge and post the [[findings]], as [[review-threads|threads]] and one summary comment. Only the last can write to the PR {#ci-review}
   ```d2
