@@ -63,8 +63,9 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
   post: post {style.stroke-width: 3}
   pr: PR {shape: page}
   units -> find: one per unit
-  find -> merge -> threads -> post
-  merge -> post
+  find -> merge -> threads
+  merge -> post: findings
+  threads -> post: pairs
   pr -> threads: earlier threads
   post -> pr: writes
   ```
