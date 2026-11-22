@@ -16,7 +16,8 @@ function el(tag, attrs = {}, ...children) {
   return e;
 }
 
-// Every node is an <li data-src>, and its row is the leaf <li> itself or the branch's <summary>.
+// Every node is an <li data-src>, and its row is the leaf <li> itself or the branch's <summary>. A comment is anchored
+// on data-src, the node's source text, and a person reads data-text, the text as the page shows it.
 const nodes = [...main.querySelectorAll('li[data-src]')];
 const pathOf = li => {
   const path = [];
@@ -90,7 +91,7 @@ function render() {
   });
   index.replaceChildren(...placed.byRow.flatMap((comments, i) => comments.map(c => el('li', {},
     el('button', { type: 'button', class: 'index-entry', 'data-row': String(i) },
-      el('span', { class: 'index-node' }, nodes[i].dataset.src),
+      el('span', { class: 'index-node' }, nodes[i].dataset.text),
       el('span', { class: 'index-text' }, c.text))))));
   orphanList.replaceChildren(...placed.orphans.map(c => note(c, { withPath: true })));
   orphans.hidden = !placed.orphans.length;
@@ -136,7 +137,7 @@ let editing = null;
 
 function openEditor(li) {
   editing = li;
-  target.textContent = `On "${li.dataset.src}"`;
+  target.textContent = `On "${li.dataset.text}"`;
   input.value = '';
   editor.returnValue = '';
   editor.showModal();
