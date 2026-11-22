@@ -1,5 +1,5 @@
 name: pack-review merge
-description: Merge the finders' answers into the review's findings with claude-code-action, and save the findings as the artifact pack-review-report, for the threads and post actions. Run it in a job with only contents read, after every finder.
+description: Group the finders' findings with claude-code-action, build the review's findings from the groups, and save them as the artifact pack-review-report, for the threads and post actions. Run it in a job with only contents read, after every finder.
 inputs:
   head:
     description: The PR's head commit to review, from the units job.
@@ -78,15 +78,16 @@ runs:
     - name: Write the report
       shell: bash
       env:
-        FINDINGS: ${{ steps.review.outputs.structured_output }}
+        GROUPS: ${{ steps.review.outputs.structured_output }}
+        INPUTS: ${{ steps.folder.outputs.inputs }}
         BASE: ${{ inputs.base }}
         BASE_REF: ${{ inputs.base-ref }}
         HEAD: ${{ inputs.head }}
       run: |
-        printf '%s' "$FINDINGS" > "$RUNNER_TEMP/pack-review-findings.json"
+        printf '%s' "$GROUPS" > "$RUNNER_TEMP/pack-review-groups.json"
         mkdir "$RUNNER_TEMP/pack-review-report"
         python3 "$GITHUB_ACTION_PATH/../report.py" --base "$BASE" --base-ref "$BASE_REF" --head "$HEAD" \
-          --findings "$RUNNER_TEMP/pack-review-findings.json" --shown "$RUNNER_TEMP/pack-review-shown.json" \
+          --sources "$INPUTS/sources.json" --groups "$RUNNER_TEMP/pack-review-groups.json" --shown "$RUNNER_TEMP/pack-review-shown.json" \
           --out "$RUNNER_TEMP/pack-review-report/report.json"
     - name: Save the report
       # v7.0.2, pinned by commit since a tag can move.

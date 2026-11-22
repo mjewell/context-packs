@@ -28,7 +28,9 @@ path's diff before you judge it. Answer in the shape the output schema sets. '''
 MERGE_IN_CI = '''
 
 You have no shell, and no way to read or write the pull request. The git server's `changed`, `diff` and `log` tools \
-read the change, if a spot needs checking. Answer in the shape the output schema sets.'''
+read the change, if a spot needs checking. Answer with groups, in the shape the output schema sets. Each group is one \
+finding: the ids of the finders' findings it merges, and its kind, headline and take. Put every id in exactly one \
+group. A script builds each finding's rules, spots, signs and exemplars from its group's findings.'''
 # The sentence after it, for a unit's finder and for the uncovered finder.
 RULE_KIND = 'Each rule with a deviating spot is one finding of kind `deviation`.'
 UNCOVERED_KIND = 'Each choice is one finding of kind `uncovered choice`, with no rules.'
@@ -61,7 +63,14 @@ def prompt(args):
 
 
 def merge(args):
-    answers = f"Each finder's answer is in `{args.inputs}` as `unit-<n>.json`, with its findings under `findings`."
+    # Every finder's findings, numbered as <finder>:<index>, so the agent can answer with ids and a script can build
+    # each finding from the ones it names.
+    inputs = Path(args.inputs)
+    answers = sorted(inputs.glob('unit-*.json'), key=lambda path: int(path.stem.split('-')[1]))
+    sources = [{'id': f"{path.stem.split('-')[1]}:{n}", 'finding': finding} for path in answers
+               for n, finding in enumerate(json.loads(path.read_text(encoding='utf-8'))['findings'])]
+    (inputs / 'sources.json').write_text(json.dumps(sources, ensure_ascii=False), encoding='utf-8')
+    answers = f"Every finder's findings are in `{inputs / 'sources.json'}`, each with an id."
     text = (PROMPTS / 'merge-prompt.md').read_text(encoding='utf-8').format(answers=answers)
     claude.output('prompt', text.rstrip('\n') + MERGE_IN_CI)
     claude.output('claude-args', claude.merger(args.inputs, args.base, args.head, args.model))
