@@ -31,7 +31,7 @@ Run `links-to` before renaming, merging or deleting a node with an ID, since eve
 
 ## Comments from the page
 
-A person can leave comments on the page's nodes, with "+ Comment" or `c` on a focused row. The comments stay in that browser's localStorage, so they outlive a re-render. The "💬 Comments" sidebar lists them, jumps to each one's node, and its "Copy for agent" puts them on the clipboard as a numbered Markdown list for the person to paste to you. Each item quotes its node's source text, and its ancestors' text after "under", so search the tree's file for that text to find the node. Items listed after "no longer match any node" were left on a node whose text or place has changed since. Find the node they meant by the closest text. Comments aren't replies or tasks to track: address each one in the tree, or answer it in chat, then re-render. The person deletes them on the page.
+A person can leave one comment on each of the page's nodes, with "+ Comment" or `c` on a focused row, and edits or deletes it the same way or by clicking it. The comments stay in that browser's localStorage, so they outlive a re-render. The "💬 Comments" sidebar lists them, jumps to each one's node, and its "Copy for agent" puts them on the clipboard as a numbered Markdown list for the person to paste to you. Each item quotes its node's source text, and its ancestors' text after "under", so search the tree's file for that text to find the node. Items listed after "no longer match any node" were left on a node whose text or place has changed since. Find the node they meant by the closest text. Comments aren't replies or tasks to track: address each one in the tree, or answer it in chat, then re-render. The person deletes them on the page.
 
 ## Writing a new tree
 
