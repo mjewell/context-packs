@@ -1,5 +1,5 @@
 name: pack-review merge
-description: Group the finders' findings with claude-code-action, build the review's findings from the groups, and save them as the artifact pack-review-report, for the threads and post actions. Run it in a job with only contents read, after every finder.
+description: Group the finders' findings with claude-code-action, build the review's findings from the groups, and save them as the artifact pack-review-report, for the pairing and post actions. Run it in a job with only contents read, after every finder.
 inputs:
   head:
     description: The PR's head commit to review, from the units job.

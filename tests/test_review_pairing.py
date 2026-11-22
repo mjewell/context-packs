@@ -26,7 +26,7 @@ ALICE = {'id': 'RC_2', 'author': 'alice', 'at': '2026-11-02T10:00:00Z', 'text': 
 
 
 class PairingCase(ReviewCase):
-    """The threads job, between find and post: the find job's report, and pack-review's threads as threads.py prints
+    """The pairing job, between find and post: the find job's report, and pack-review's threads as threads.py prints
     them."""
 
     def setUp(self):
@@ -143,7 +143,7 @@ LATER = {'id': 'RC_5', 'author': 'alice', 'at': '2026-11-04T10:00:00Z', 'text': 
 
 
 class CommentCase(PairingCase):
-    """The threads job after pairing: F1 continues T1. The review ran again at the head."""
+    """The pairing job once the pairs are checked: F1 continues T1. The review ran again at the head."""
 
     def setUp(self):
         super().setUp()

@@ -35,7 +35,7 @@ class SummaryCase(ReviewCase):
             'AddReply': ok({'addPullRequestReviewThreadReply': {'comment': {'id': 'RC_9'}}})})
 
     def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', pairs=(), commentary=(), shown=None):
-        """Post the summary of the merging agent's output, with pairs as the threads job checked them."""
+        """Post the summary of the merging agent's output, with pairs as the pairing job checked them."""
         # Each finding is one finder's, in a group of its own, so the report builds it back as it was.
         (self.root / 'sources.json').write_text(json.dumps([{'id': f'0:{n}', 'finding': f}
                                                             for n, f in enumerate(findings)]))
@@ -47,7 +47,7 @@ class SummaryCase(ReviewCase):
         if report.returncode:
             return report
         (self.root / 'paired.json').write_text(json.dumps({'pairs': list(pairs), 'commentary': list(commentary)}))
-        # Each pair names one of pack-review's threads, as the threads job checked.
+        # Each pair names one of pack-review's threads, as the pairing job checked.
         self.github.responses['Threads'] = ok({'repository': {'pullRequest': {'reviewThreads': connection(
             [thread(pair['thread']) for pair in pairs])}}})
         post = self.script('post', '--pr', 7, '--report', 'report.json', '--paired', 'paired.json')
