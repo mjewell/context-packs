@@ -11,8 +11,12 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     - The change may be wrong, or the [[rules|rule]] may lack an exception or be out of date. The diff can't tell which, so the author decides
     - It says whether the [[rules|rule]]'s [[doc]] was routed, meaning its [[doc|when]] matches the work, since an unrouted rule may need its `when` fixed {#routed}
     - It gives any signs the [[deviation]] is deliberate
+    - A [[findings|spot]] deviates when a careful reader would agree it breaks the [[rules|rule]]. A spot that could only be made better still follows it
+      - Why: a [[rules|rule]] that calls for judgment, such as one on how text is written, can always be applied more strictly, and each run then found a new problem in the same lines
   - Conflict: two [[rules]] point opposite ways at the same [[findings|spot]] {#conflict}
     - The [[merge]] finds it, when the [[finders|finders']] answers hold [[rules]] that point opposite ways at the same [[findings|spots]]
+    - It can't see one where the code follows one [[unit|unit's]] [[rules|rule]] and breaks another's, since a [[finders|finder]] reports only the rules a spot breaks. That reads as a [[deviation]]
+      - Rejected: having the [[merge]] look for the opposing [[rules|rule]], since the agent would write rule text again, which its groups exist to prevent
     - The author decides which [[rules|rule]] wins
   - Uncovered choice: a kind of decision that will come up again, where another way would be reasonable and no [[rules|rule]] covers it {#uncovered-choice}
     - It shows how the existing code makes the choice, with two or three exemplars of each way
@@ -37,11 +41,16 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     - Why: with every [[doc]]'s text in the prompt, 5 of 5 runs read no doc and found nothing. They treated having the text as having checked it
     - Rejected: hooks that counted [[doc]] reads in Claude Code's transcripts. They tied the review to that format, and a crash in one passed the answer as if every doc was read
     - Rejected: checking which [[doc|docs]] a [[finders|finder]] read. A run's log lists every tool call, so a skipped doc can be checked by hand
-  - The merge writes one [[findings|finding]] for each choice, see [[one-finding]] {#merge}
+  - The merge groups the [[finders|finders']] findings, one group for each choice, see [[one-finding]], and each [[findings|finding]] is built from its group {#merge}
+    - Each [[finders|finder's]] finding is numbered. A group gives the numbers it merges, with the [[findings|finding's]] kind, headline and take
+    - The finding's [[rules]], [[findings|spots]], signs of deliberateness and exemplars all come from its group. A spot the group's findings disagree on deviates, since it goes against at least one [[rules|rule]]
+      - Why: when the agent rewrote every [[findings|finding]], it could drop a [[rules|rule]] or a spot, and nothing noticed
+    - Groups that leave out a [[finders|finder's]] finding, name one twice, or name one no finder reported stop the run
     - An [[uncovered-choice|uncovered choice]] joins a [[deviation]] about the same choice at the same [[findings|spots]], since a [[rules|rule]] covers it after all
-  - A [[local-review|local review]] and a [[ci-review|CI review]] give their agents the same three prompt files and findings schema, so both check the same way and hand back the same shape {#shared-prompts}
+  - A [[local-review|local review]] and a [[ci-review|CI review]] give their agents the same three prompt files, so both check the same way. Finders answer in the findings schema in both {#shared-prompts}
     - Locally, one agent launches a subagent per [[unit]], all at once, and reads no [[doc]] itself
-    - In CI, the workflow starts the [[finders]]. Each prompt gains only what a CI agent needs: that it has no shell, and to copy line numbers from the diff
+    - In CI, the workflow starts the [[finders]]. Each prompt gains only what a CI agent needs: that it has no shell, to copy line numbers from the diff, and for the [[merge]], to answer with groups
+    - Locally, no script runs, so the [[merge|merging]] agent writes each [[findings|finding]] out in full, with everything its group's findings hold
     - The prompts, one each for a [[unit|unit's]] [[finders|finder]], the [[uncovered-finder|uncovered finder]] and the [[merge]], live with the schema in the pack-findings skill's folder, since an installed skill holds only its own folder
       - Why: with the schema in `review/`, a local agent fetched it from a GitHub URL the user never pinned
 - In CI, five jobs find, merge and post the [[findings]], as [[review-threads|threads]] and one summary comment. Only the last can write to the PR {#ci-review}
@@ -73,8 +82,10 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     - It reads the change through the [[git-server|git server]]
     - The run's log lists each tool call's input, and only whether its result was an error
       - Why: a call's full output can hold file contents and secrets
-  - The merge job merges the [[finders|finders']] answers, then a script picks the line in the diff each [[findings|finding's]] [[review-threads|thread]] opens on {#merge-job}
-    - claude-code-action checks the merging agent's answer against the findings schema
+  - The merge job groups the [[finders|finders']] findings, then a script builds the [[findings]] and picks the line in the diff each one's [[review-threads|thread]] opens on {#merge-job}
+    - claude-code-action checks the merging agent's answer against a groups schema, whose kinds, headlines and takes come from the findings schema
+    - When the groups fail the script's checks, the job fails. Re-running failed jobs reruns only the [[merge]], with the answers the [[finders]] saved
+      - Rejected: sending the error back to the agent for a second try, which adds a step for a case that may be rare
     - A [[findings|finding's]] anchor, the line its [[review-threads|thread]] opens on, is the first deviating [[findings|spot]] the diff shows, or else the first spot it shows, since a GitHub review comment needs a line in the diff {#anchor}
   - The threads job does the [[pairing]] and writes the [[commentary]]
     - It checks out the PR though its agents read no files, since claude-code-action restores `.claude/` from the base branch with git
