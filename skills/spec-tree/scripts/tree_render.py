@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 from tree_model import LINK, collect_ids, label_of, nodes
 
@@ -20,6 +21,11 @@ D2_ARGS = ['--layout', 'elk', '--elk-nodeNodeBetweenLayers', '30', '--elk-edgeNo
 D2_STYLE = '**.style.font-size: 13\n(** -> **)[*].style.font-size: 12\n'
 SCHEME = re.compile(r'[a-z][a-z0-9+.-]*:', re.IGNORECASE)
 SAFE_SCHEMES = {'http:', 'https:', 'mailto:'}
+# The page's comments, which a person leaves on nodes and copies to an agent. The pure logic is a module node can
+# test, and the page inlines it ahead of the code that wires it to the page.
+HERE = Path(__file__).parent
+COMMENTS_SCRIPT = (HERE / 'tree_comments.mjs').read_text() + (HERE / 'tree_comments_ui.js').read_text()
+COMMENTS_CSS = (HERE / 'tree_comments.css').read_text()
 
 
 def inline(text, ids):
@@ -106,7 +112,8 @@ def d2_svg(source, node):
 
 
 def render_node(node, ids):
-    id_attr = f' id="{node.id}"' if node.id else ''
+    # The node's source text, which a comment is anchored on and an agent searches the tree's file for.
+    id_attr = (f' id="{node.id}"' if node.id else '') + f' data-src="{html.escape(node.text.strip())}"'
     text = render_text(node, ids)
     if not node.children and not node.diagrams:
         return f'<li class="leaf row" tabindex="-1"{id_attr}>{text}</li>'
@@ -120,13 +127,15 @@ def render_node(node, ids):
             f'{render_diagrams(node)}<ul>{kids}</ul></details></li>')
 
 
-def page(root):
+def page(root, file):
+    """The page for a parsed tree, whose file is named by its path from the repo root."""
     ids = collect_ids(root, set())
     title = html.escape(root.title)
     intro = inline(' '.join(root.intro), ids)
     tree = ''.join(render_node(c, ids) for c in root.children)
-    return TEMPLATE.format(title=title, intro=intro, root_diagrams=render_diagrams(root), tree=tree,
-                           script=SCRIPT.replace('__MERMAID__', json.dumps(MERMAID)))
+    return TEMPLATE.format(title=title, intro=intro, root_diagrams=render_diagrams(root), tree=tree, file=html.escape(file),
+                           script=SCRIPT.replace('__MERMAID__', json.dumps(MERMAID)), comments_css=COMMENTS_CSS,
+                           comments_script=COMMENTS_SCRIPT)
 
 
 TEMPLATE = '''<!doctype html>
@@ -183,8 +192,8 @@ pre.block {{ background:var(--chip); padding:10px; border-radius:6px; }}
 .d2 {{ margin:6px 0 12px 24px; overflow-x:auto; }}
 .d2 > svg {{ max-width:100%; max-height:360px; width:auto; height:auto; display:block; }}
 .row:focus {{ outline:none; background:var(--focus); border-radius:4px; }}
-</style></head>
-<body><main>
+{comments_css}</style></head>
+<body><main data-tree="{file}">
 <h1>{title}</h1>
 <p class="intro">{intro}</p>
 {root_diagrams}
@@ -192,6 +201,7 @@ pre.block {{ background:var(--chip); padding:10px; border-radius:6px; }}
 <ul>{tree}</ul>
 </main>
 <script type="module">{script}</script>
+<script type="module">{comments_script}</script>
 </body></html>
 '''
 
@@ -279,6 +289,8 @@ function goBack() {
 
 document.addEventListener('keydown', e => {
   if (e.altKey || e.ctrlKey || e.metaKey) return;
+  // Keys typed into a text field, such as a comment's, move its cursor instead.
+  if (e.target.matches('textarea, input')) return;
   const keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'];
   if (!keys.includes(e.key)) return;
   e.preventDefault();
