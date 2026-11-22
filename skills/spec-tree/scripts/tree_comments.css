@@ -5,12 +5,11 @@
 .row:hover > .note-add, .row:focus > .note-add, .note-add:focus { opacity:1; }
 .notes { cursor:auto; }
 .notes:empty { display:none; }
-.note { display:flex; gap:10px; align-items:flex-start; margin:4px 0 2px; padding:6px 8px; border-radius:4px;
-  border-left:3px solid var(--note); background:var(--note-bg); }
-.note-body { flex:1; min-width:0; }
+.note { margin:4px 0 2px; padding:6px 8px; border-radius:4px; border-left:3px solid var(--note);
+  background:var(--note-bg); cursor:pointer; }
+.note:hover { box-shadow:inset 0 0 0 1px var(--note); }
 .note-text { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font-size:14px; }
 .note-path { color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
-.note button { font-size:12px; padding:1px 7px; }
 button[data-armed] { color:var(--rejected); border-color:var(--rejected); }
 button:disabled { opacity:.5; cursor:default; }
 .note-count { margin-left:8px; font-size:12px; color:var(--note); }

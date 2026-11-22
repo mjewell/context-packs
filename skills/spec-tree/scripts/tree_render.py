@@ -111,9 +111,18 @@ def d2_svg(source, node):
     return re.sub(r'^<\?xml[^>]*\?>', '', result.stdout)
 
 
+def shown_text(node, ids):
+    """The node's text as the page shows it, as plain text: its label, then its rendered text without the markup."""
+    label, rest = label_of(node.text.strip())
+    shown = html.unescape(re.sub(r'<[^>]+>', '', inline(rest, ids)))
+    return f'{label}: {shown}' if label else shown
+
+
 def render_node(node, ids):
-    # The node's source text, which a comment is anchored on and an agent searches the tree's file for.
+    # The node's source text, which a comment is anchored on and an agent searches the tree's file for, and the text
+    # the comment editor and sidebar show a person.
     id_attr = (f' id="{node.id}"' if node.id else '') + f' data-src="{html.escape(node.text.strip())}"'
+    id_attr += f' data-text="{html.escape(shown_text(node, ids))}"'
     text = render_text(node, ids)
     if not node.children and not node.diagrams:
         return f'<li class="leaf row" tabindex="-1"{id_attr}>{text}</li>'

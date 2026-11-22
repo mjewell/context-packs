@@ -16,7 +16,8 @@ function el(tag, attrs = {}, ...children) {
   return e;
 }
 
-// Every node is an <li data-src>, and its row is the leaf <li> itself or the branch's <summary>.
+// Every node is an <li data-src>, and its row is the leaf <li> itself or the branch's <summary>. A comment is anchored
+// on data-src, the node's source text, and a person reads data-text, the text as the page shows it.
 const nodes = [...main.querySelectorAll('li[data-src]')];
 const pathOf = li => {
   const path = [];
@@ -25,12 +26,16 @@ const pathOf = li => {
 };
 const paths = nodes.map(pathOf);
 const noteRow = li => li.classList.contains('leaf') ? li : li.querySelector(':scope > details > summary');
-const boxes = nodes.map(li => {
-  const row = noteRow(li);
+// A node holds one comment. Its button, and c on its row, start the comment or open the one it has. Comments stored
+// before that rule can still put two on a node, and both show until the person deletes one.
+const addButtons = nodes.map(() =>
+  el('button', { type: 'button', class: 'note-add', title: 'Comment on this node (c)' }));
+const boxes = nodes.map((li, i) => {
   const box = el('div', { class: 'notes' });
-  row.append(el('button', { type: 'button', class: 'note-add', title: 'Comment on this node (c)' }, '+ Comment'), box);
+  noteRow(li).append(addButtons[i], box);
   return box;
 });
+const commentOn = li => placeComments(load(), paths).byRow[nodes.indexOf(li)][0] || null;
 // A branch's marker counts the comments on the nodes below it. It shows only while the branch is collapsed, since
 // an open branch shows those comments' rows.
 const markers = nodes.map(li => {
@@ -71,17 +76,18 @@ document.addEventListener('click', e => {
   if (panel.classList.contains('open') && !wide.matches && !panel.contains(e.target)) setPanel(false);
 });
 
+// A comment opens the editor when clicked, to edit or delete it. It takes no keyboard focus, since c on its node's
+// row opens the same editor.
 function note(c, { withPath = false } = {}) {
-  return el('div', { class: 'note' },
-    el('div', { class: 'note-body' },
-      ...(withPath ? [el('div', { class: 'note-path' }, c.path.join(' › '))] : []),
-      el('p', { class: 'note-text' }, c.text)),
-    el('button', { type: 'button', 'data-note-delete': c.id, 'data-confirm': 'Delete?' }, 'Delete'));
+  return el('div', { class: 'note', 'data-note': c.id, title: 'Edit or delete' },
+    ...(withPath ? [el('div', { class: 'note-path' }, c.path.join(' › '))] : []),
+    el('p', { class: 'note-text' }, c.text));
 }
 
 function render() {
   const placed = placeComments(load(), paths);
   boxes.forEach((box, i) => box.replaceChildren(...placed.byRow[i].map(c => note(c))));
+  addButtons.forEach((button, i) => { button.textContent = placed.byRow[i].length ? 'Edit comment' : '+ Comment'; });
   markers.forEach((marker, i) => {
     if (!marker) return;
     const below = nodes[i].querySelectorAll(':scope > details > ul .note').length;
@@ -90,7 +96,7 @@ function render() {
   });
   index.replaceChildren(...placed.byRow.flatMap((comments, i) => comments.map(c => el('li', {},
     el('button', { type: 'button', class: 'index-entry', 'data-row': String(i) },
-      el('span', { class: 'index-node' }, nodes[i].dataset.src),
+      el('span', { class: 'index-node' }, nodes[i].dataset.text),
       el('span', { class: 'index-text' }, c.text))))));
   orphanList.replaceChildren(...placed.orphans.map(c => note(c, { withPath: true })));
   orphans.hidden = !placed.orphans.length;
@@ -113,44 +119,70 @@ function showNode(li) {
 
 // The first click arms the button and the second, within 3 seconds, acts. This works in any browser, unlike
 // confirm(), which a page shown inside an editor may block, and a blocked confirm() returns false with no error.
+const disarms = new Map();
 function confirmed(button) {
   if (button.dataset.armed) return true;
   const label = button.textContent;
   button.dataset.armed = '1';
   button.textContent = button.dataset.confirm;
-  setTimeout(() => { delete button.dataset.armed; button.textContent = label; }, 3000);
+  const reset = () => {
+    clearTimeout(timer);
+    disarms.delete(button);
+    delete button.dataset.armed;
+    button.textContent = label;
+  };
+  disarms.set(button, reset);
+  const timer = setTimeout(reset, 3000);
   return false;
 }
+const disarm = button => disarms.get(button)?.();
 
 const editor = el('dialog', { class: 'note-editor' });
 const target = el('p', { class: 'note-target' });
 const input = el('textarea', { rows: '5', placeholder: 'Comment for the agent' });
 const saveButton = el('button', { value: 'save' }, 'Save');
+const deleteButton = el('button', { type: 'button', 'data-confirm': 'Delete?' }, 'Delete');
 const form = el('form', { method: 'dialog' }, target, input, el('div', { class: 'note-actions' },
+  deleteButton,
   el('span', { class: 'note-hint' }, '↩ to save, ⇧↩ for a new line, Esc to cancel'),
   el('button', { value: 'cancel' }, 'Cancel'),
   saveButton));
 editor.append(form);
 document.body.append(editor);
+// What the open editor works on: the node's <li>, or null for an orphan, and the comment, or null for a new one.
 let editing = null;
 
-function openEditor(li) {
-  editing = li;
-  target.textContent = `On "${li.dataset.src}"`;
-  input.value = '';
+// Save stays disabled while the text is empty, so a comment is only ever removed through Delete.
+const syncSave = () => { saveButton.disabled = !input.value.trim(); };
+input.addEventListener('input', syncSave);
+
+function openEditor(li, comment = null) {
+  editing = { li, comment };
+  // An orphan's node is gone, so it's named by the source text it was left on.
+  target.textContent = `On "${li ? li.dataset.text : comment.path[comment.path.length - 1]}"`;
+  input.value = comment ? comment.text : '';
+  deleteButton.hidden = !comment;
+  disarm(deleteButton);
+  syncSave();
   editor.returnValue = '';
   editor.showModal();
   input.focus();
 }
 editor.addEventListener('close', () => {
+  const { li, comment } = editing;
   const text = input.value.trim();
-  if (editor.returnValue === 'save' && text) {
+  if (editor.returnValue === 'save' && comment) {
+    save(load().map(c => c.id === comment.id ? { ...c, text } : c));
+  } else if (editor.returnValue === 'save') {
     const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-    save([...load(), { id, path: pathOf(editing), text }]);
-    render();
+    save([...load(), { id, path: pathOf(li), text }]);
+  } else if (editor.returnValue === 'delete') {
+    save(load().filter(c => c.id !== comment.id));
   }
-  noteRow(editing).focus();
+  render();
+  if (li) noteRow(li).focus();
 });
+deleteButton.addEventListener('click', () => { if (confirmed(deleteButton)) editor.close('delete'); });
 // A click on the backdrop lands on the dialog itself, outside its box. It closes an empty editor, and leaves one
 // with text open, so a stray click can't lose a comment.
 editor.addEventListener('click', e => {
@@ -165,17 +197,30 @@ editor.addEventListener('keydown', e => {
 input.addEventListener('keydown', e => {
   // Enter saves and Shift+Enter adds a line, as in a chat box. An Enter that confirms an input method's composition
   // belongs to it. Submitted as the Save button would be, so both close the editor the same way.
-  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(saveButton); }
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    if (!saveButton.disabled) form.requestSubmit(saveButton);
+  }
 });
+
+// Opens the editor on the comment a note shows. An orphan's note sits in the sidebar, under no node's <li>.
+function editNote(noteEl) {
+  const comment = load().find(c => c.id === noteEl.dataset.note);
+  // Another tab of this page can delete it. Opened anyway, the editor would save the text as a new comment.
+  if (!comment) throw new Error(`comment ${noteEl.dataset.note} is no longer stored; reload the page`);
+  openEditor(noteEl.closest('li[data-src]'), comment);
+}
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'c' || e.altKey || e.ctrlKey || e.metaKey || !document.activeElement.matches('.row')) return;
   e.preventDefault();
-  openEditor(document.activeElement.closest('li'));
+  const li = document.activeElement.closest('li');
+  openEditor(li, commentOn(li));
 });
 
 document.addEventListener('click', async e => {
-  // A click on a comment, or on its buttons, sits inside a branch's <summary>, and mustn't open or close the branch.
+  // A click on a comment, or on the button that adds one, sits inside a branch's <summary>, and mustn't open or close
+  // the branch.
   if (e.target.closest('.notes, .note-add')) e.preventDefault();
   if (e.target === toggle) {
     const open = !panel.classList.contains('open');
@@ -185,12 +230,9 @@ document.addEventListener('click', async e => {
   const entry = e.target.closest('.index-entry');
   if (entry) return showNode(nodes[Number(entry.dataset.row)]);
   const add = e.target.closest('.note-add');
-  if (add) return openEditor(add.closest('li'));
-  const del = e.target.closest('[data-note-delete]');
-  if (del && confirmed(del)) {
-    save(load().filter(c => c.id !== del.dataset.noteDelete));
-    return render();
-  }
+  if (add) return openEditor(add.closest('li'), commentOn(add.closest('li')));
+  const noteEl = e.target.closest('.note');
+  if (noteEl) return editNote(noteEl);
   if (e.target === clear && confirmed(clear)) {
     localStorage.removeItem(storeKey);
     return render();

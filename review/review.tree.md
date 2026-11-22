@@ -63,8 +63,9 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
   post: post {style.stroke-width: 3}
   pr: PR {shape: page}
   units -> find: one per unit
-  find -> merge -> threads -> post
-  merge -> post
+  find -> merge -> threads
+  merge -> post: findings
+  threads -> post: pairs
   pr -> threads: earlier threads
   post -> pr: writes
   ```
@@ -88,9 +89,12 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
       - Rejected: sending the error back to the agent for a second try, which adds a step for a case that may be rare
     - A [[findings|finding's]] anchor, the line its [[review-threads|thread]] opens on, is the first deviating [[findings|spot]] the diff shows, or else the first spot it shows, since a GitHub review comment needs a line in the diff {#anchor}
   - The threads job does the [[pairing]] and writes the [[commentary]]
+    - It reads the [[review-threads|threads]] through the [[trust-filter|trust filter]]
     - It checks out the PR though its agents read no files, since claude-code-action restores `.claude/` from the base branch with git
   - The post job opens new [[review-threads|threads]] and posts the [[ci-review|summary]]. It runs no agent {#post-job}
     - It reads the [[review-threads|threads]] again itself, through the [[trust-filter|trust filter]], and stops if a [[pairing|pair]] names any other thread
+      - Why: the threads job hands on only the pairs and commentary, and post needs each thread's state now: whether it's resolved, and whether the review's last reply is still the thread's last comment
+      - Why: the pairs come from an agent's answer, and post is the one job that can write, so it checks them against a read of its own
     - It plans every write and checks the plan first. A PR that moved on, a [[ci-review|summary]] too long for a comment, or a second summary each stop it with nothing written
     - New [[review-threads|threads]] open in one GitHub review, submitted as it's created. Replies post one at a time
       - Why: a pending review left by a failed run would block the next, since GitHub allows one per user on a PR

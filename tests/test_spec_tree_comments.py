@@ -22,10 +22,20 @@ class CommentAnchorTests(TreeCase):
 
         page = self.render()
 
-        self.assertIn('<li class="branch" id="finders" data-src="Finders check `the diff` &amp; &quot;more&quot;">',
+        self.assertIn('<li class="branch" id="finders" data-src="Finders check `the diff` &amp; &quot;more&quot;"',
                       page)
-        self.assertIn('<li class="leaf row" tabindex="-1" data-src="Why: one finder per unit reads each file whole">',
+        self.assertIn('<li class="leaf row" tabindex="-1" data-src="Why: one finder per unit reads each file whole"',
                       page)
+
+    def test_each_node_carries_the_text_it_shows_for_a_person_to_read(self):
+        self.write('review.tree.md', SMALL.replace(
+            'Why: one finder per unit reads each file whole',
+            'Why: [[finders|a finder]] reads `a.py` & **each** [file](a.md), see [[finders]] and [[gone]]'))
+
+        page = self.render()
+
+        self.assertIn('data-src="Why: [[finders|a finder]] reads `a.py` &amp; **each** [file](a.md), see [[finders]] '
+                      'and [[gone]]" data-text="Why: a finder reads a.py &amp; each file, see finders and gone">', page)
 
     def test_the_page_names_its_tree_file_from_the_repo_root(self):
         self.write('review/review.tree.md', SMALL)
