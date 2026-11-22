@@ -15,7 +15,7 @@ def thread(id, resolved=False, replies=()):
 
 
 class PostCase(ReviewCase):
-    """The post job: the find job's report, the threads job's pairs and commentary, and the PR on the fake GitHub."""
+    """The post job: the find job's report, the pairing job's pairs and commentary, and the PR on the fake GitHub."""
 
     def setUp(self):
         super().setUp()

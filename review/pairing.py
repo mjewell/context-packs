@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The threads job's scripts, for its two agent calls. `pair-prompt` writes, as step outputs, the prompt and claude_args
+"""The pairing job's scripts, for its two agent calls. `pair-prompt` writes, as step outputs, the prompt and claude_args
 for the agent that pairs this run's findings with pack-review's threads, and whether it needs to run. `pair-check`
 checks the pairs it answered and writes them for the post job. The pairing agent gets only findings and the comment
 pack-review opened each thread with, all of which pack-review wrote, so no one's reply can bias which thread a

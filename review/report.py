@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write the merge job's report for the threads and post jobs: the findings, built from the finders' findings each of
+"""Write the merge job's report for the pairing and post jobs: the findings, built from the finders' findings each of
 the merging agent's groups names, cleaned, and the line each one's thread can open on. It reaches nothing outside the
 runner."""
 import argparse
