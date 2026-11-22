@@ -118,7 +118,9 @@ function showNode(li) {
 }
 
 // The first click arms the button and the second, within 3 seconds, acts. This works in any browser, unlike
-// confirm(), which a page shown inside an editor may block, and a blocked confirm() returns false with no error.
+// confirm(), which a page shown inside an editor may block, and a blocked confirm() returns false with no error. A
+// button that stays on the page across uses, such as the editor's Delete, calls disarm() each time it's shown again,
+// or it would still be armed from its last use and act on one click.
 const disarms = new Map();
 function confirmed(button) {
   if (button.dataset.armed) return true;
@@ -172,7 +174,12 @@ editor.addEventListener('close', () => {
   const { li, comment } = editing;
   const text = input.value.trim();
   if (editor.returnValue === 'save' && comment) {
-    save(load().map(c => c.id === comment.id ? { ...c, text } : c));
+    // Another tab can delete the comment while this editor has it open. The save is the later write, so it puts the
+    // comment back, as the later of two edits from two tabs wins.
+    const stored = load();
+    save(stored.some(c => c.id === comment.id)
+      ? stored.map(c => c.id === comment.id ? { ...c, text } : c)
+      : [...stored, { ...comment, text }]);
   } else if (editor.returnValue === 'save') {
     const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     save([...load(), { id, path: pathOf(li), text }]);
@@ -206,7 +213,8 @@ input.addEventListener('keydown', e => {
 // Opens the editor on the comment a note shows. An orphan's note sits in the sidebar, under no node's <li>.
 function editNote(noteEl) {
   const comment = load().find(c => c.id === noteEl.dataset.note);
-  // Another tab of this page can delete it. Opened anyway, the editor would save the text as a new comment.
+  // Another tab can delete it in the moment before the storage event re-renders this one. Opened anyway, the editor
+  // would save the text as a new comment.
   if (!comment) throw new Error(`comment ${noteEl.dataset.note} is no longer stored; reload the page`);
   openEditor(noteEl.closest('li[data-src]'), comment);
 }
@@ -249,5 +257,9 @@ document.addEventListener('click', async e => {
     setTimeout(render, 1500);
   }
 });
+
+// A change another tab of this page makes to the comments reaches this one as a storage event, so the page shows
+// what's stored rather than a comment that tab deleted. A tab doesn't get the event for its own writes.
+addEventListener('storage', e => { if (e.key === storeKey) render(); });
 
 render();
