@@ -174,7 +174,12 @@ editor.addEventListener('close', () => {
   const { li, comment } = editing;
   const text = input.value.trim();
   if (editor.returnValue === 'save' && comment) {
-    save(load().map(c => c.id === comment.id ? { ...c, text } : c));
+    // Another tab can delete the comment while this editor has it open. The save is the later write, so it puts the
+    // comment back, as the later of two edits from two tabs wins.
+    const stored = load();
+    save(stored.some(c => c.id === comment.id)
+      ? stored.map(c => c.id === comment.id ? { ...c, text } : c)
+      : [...stored, { ...comment, text }]);
   } else if (editor.returnValue === 'save') {
     const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     save([...load(), { id, path: pathOf(li), text }]);
