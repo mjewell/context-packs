@@ -38,7 +38,7 @@ The review reads the packs and the existing code from the checkout, so a change 
 
 ## 2. Run the wizard
 
-The wizard runs the review: it lists the finders, gives each one its brief, checks every answer, and builds the findings from the merge. A CI review runs the same steps, so a local review and a CI review check the same way. Start it with exactly this command, with the base and head from step 1:
+The wizard runs the review: it lists the finders, gives each one its brief, checks every answer, and builds the findings from the merge. A CI review runs the same steps, so a local review and a CI review check the same way. Start it with this command, with the base and head from step 1, as one Bash call written out in full, with no shell variables:
 
 ```bash
 npx context-packs@0.10.0 review init --base <base> --head <head> --command "npx context-packs@0.10.0 review"
