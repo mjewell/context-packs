@@ -118,8 +118,9 @@ class BriefTests(WizardCase):
                       '`&&` around it.', brief)
         self.assertIn('Read the code at the head in the current folder.', brief)
         self.assertNotIn('Grep', brief)
-        self.assertIn('Write your answer as JSON to a new file in your scratchpad, then run exactly this command, with '
-                      "that file's path in place of `<file>`, and do what it prints:\n\n"
+        self.assertIn('Write your answer as JSON to a new file in your scratchpad, with your tool for writing '
+                      "files, not the shell. Then run exactly this command, with that file's path in place of "
+                      '`<file>`, and do what it prints:\n\n'
                       f"{self.command('submit', '1')} < <file>\n\n"
                       'Your answer must fit this JSON Schema:\n\n{\n "type": "object",', brief)
         self.assertIn('"take"', brief)
@@ -377,8 +378,9 @@ class MergeTests(SubmitCase):
         self.assertTrue(run.stdout.startswith("You're merging the finders' answers in a pack review"), run.stdout[:80])
         self.assertIn(f"Every finder's findings, each with an id, are what `{self.command('sources')}` prints.",
                       run.stdout)
-        self.assertIn('Write your groups as JSON to a new file in your scratchpad, then run exactly this command, with '
-                      "that file's path in place of `<file>`, and do what it prints:\n\n"
+        self.assertIn('Write your groups as JSON to a new file in your scratchpad, with your tool for writing '
+                      "files, not the shell. Then run exactly this command, with that file's path in place of "
+                      '`<file>`, and do what it prints:\n\n'
                       f"{self.command('submit-groups')} < <file>\n\n"
                       'Your groups must fit this JSON Schema:\n\n{\n "type": "object",', run.stdout)
         self.assertIn('Run each command exactly as it is printed here', run.stdout)

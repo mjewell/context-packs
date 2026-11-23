@@ -152,9 +152,11 @@ def brief(args):
 def handing(noun, submit, shape):
     """How an agent hands its answer to the wizard, and the schema the answer fits. The answer goes in a file of the
     agent's own, and reaches the wizard on stdin, so no agent touches the run folder. It can't go in the command
-    itself: Claude Code refuses a command with a brace before a quote, which every JSON object starts with."""
-    return (f'Write your {noun} as JSON to a new file in your scratchpad, then run exactly this command, with that '
-            f"file's path in place of `<file>`, and do what it prints:\n\n{submit} < <file>\n\n"
+    itself, nor be written to the file through the shell: Claude Code refuses a command with a brace before a quote,
+    which every JSON object starts with."""
+    return (f'Write your {noun} as JSON to a new file in your scratchpad, with your tool for writing files, not the '
+            "shell. Then run exactly this command, with that file's path in place of `<file>`, and do what it prints:"
+            f'\n\n{submit} < <file>\n\n'
             f'Your {noun} must fit this JSON Schema:\n\n{json.dumps(shape, indent=1)}')
 
 
