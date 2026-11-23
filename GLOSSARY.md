@@ -82,7 +82,7 @@ The finder with no unit, which reads the whole diff for uncovered choices and se
 The merging agent's answer for one finding: the ids of the finders' findings it merges, with its kind, headline and take.
 
 **Wizard**:
-The command an agent runs a review through, one step at a time: `context-packs review` locally, `review/wizard.py` in CI. Each step prints what to do next, with every command in full.
+The command an agent runs a review through, one step at a time: `context-packs review`, which the pack-findings skill runs in a local review and in CI alike. Each step prints what to do next, with every command in full.
 _Avoid_: script, orchestrator (the agent that runs it)
 
 **Orchestrator**:

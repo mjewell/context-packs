@@ -35,7 +35,7 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     - The [[unit|units]] come from `context-packs docs`, which reads the committed [[unit|tables]], not the [[pack|packs]], since a pack's origin can be a private repo CI can't read
       - Either way the CLI is fixed: CI runs it from the commit the caller pinned, and a [[local-review|local review]] runs the version released with the skill, since the newest on npm could be a bad publish
     - Why: splitting by [[pack]] would leave a [[finders|finder]] to pick an [[inlined]] pack's [[inlined|pack rules]] out of a file other packs share
-  - The uncovered finder has no [[unit]]. It reads the whole diff for [[uncovered-choice|choices no rule covers]], and searches every unit's [[doc|docs]] for a [[rules|rule]] that settles each {#uncovered-finder}
+  - The uncovered finder has no [[unit]]: it reads the whole diff for [[uncovered-choice|choices no rule covers]], and searches every unit's [[doc|docs]] for a [[rules|rule]] settling each {#uncovered-finder}
     - It runs alongside the [[unit|units']] [[finders]], so the [[merge]] doesn't have to read the diff for it afterwards
   - A [[finders|finder]] gets its [[doc|docs]]' names, not their text {#doc-names}
     - Why: with every [[doc]]'s text in the prompt, 5 of 5 runs read no doc and found nothing. They treated having the text as having checked it
@@ -49,10 +49,10 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     - Groups that leave out a [[finders|finder's]] finding, name one twice, or name one no finder reported stop the run
     - An [[uncovered-choice|uncovered choice]] joins a [[deviation]] about the same choice at the same [[findings|spots]], since a [[rules|rule]] covers it after all
   - A [[local-review|local review]] and a [[ci-review|CI review]] give their agents the same three prompt files, so both check the same way, with answers in the findings schema {#shared-prompts}
-    - In CI, the workflow starts the [[finders]]. Each prompt gains only what a CI agent needs: that it has no shell, to copy line numbers from the diff, and for the [[merge]], to answer with groups
+    - The [[wizard]] fills each one with the commands that read the [[doc|docs]] and the change, and how to hand in an answer, in a [[local-review|local review]] and in CI alike
     - The prompts, one each for a [[unit|unit's]] [[finders|finder]], the [[uncovered-finder|uncovered finder]] and the [[merge]], live with the schema in the pack-findings skill's folder, since an installed skill holds only its own folder
       - Why: with the schema in `review/`, a local agent fetched it from a GitHub URL the user never pinned
-  - Locally, the wizard runs the review: a command that agents run one step at a time {#wizard}
+  - The wizard runs every review, local or CI: a command agents run one step at a time {#wizard}
     ```d2
     shape: sequence_diagram
     o: orchestrator
@@ -97,9 +97,9 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     - A finder's brief is the skill's prompt for its kind, with the commands that read its docs and the change, and its answer's schema {#brief}
       - `doc` prints one of the unit's docs and marks it served. `submit` takes a unit's answer only once every doc in it was served, and only in the schema's shape
         - Why: the wizard keeps its own record of what it printed, so the check needs no transcript, see [[doc-names]]
-      - `files`, `diff` and `log` read the change from the merge base, through the same fixed git commands as the [[git-server|git server]]. `diff` takes only a path the change touches
+      - `files`, `diff` and `log` read the change from the merge base, through fixed git commands, see [[change-commands]]. `diff` takes only a path the change touches
       - A refusal says what's missing and the command to run next. Once the [[merge]] starts, no finder's answer can change
-    - The merging agent reads the numbered findings through `sources`, and `submit-groups` builds the [[findings]] from its groups with the [[merge-job|merge job's]] checks
+    - The merging agent reads the numbered findings through `sources`, and `submit-groups` builds the [[findings]] from its groups, see [[merge]]
     - An agent writes each answer to a file in its scratchpad and passes it on stdin, so it needs only the wizard's command
       - The skill allows that command for the turn the finders start in. A headless run allows it at startup, and an interactive session asks about the [[orchestrator|orchestrator's]] later calls
       - Why: the subagents run in the author's session, which would otherwise ask about each call, and about each file outside the repo
@@ -107,40 +107,37 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     - Agents run each command exactly as printed, and the wizard takes only the arguments it names, spelled out
       - Why: Claude Code refused commands that wrapped one in a shell variable or a `cd`, and each refusal cost the agent a turn
       - Why: an allowed command prefix passes any arguments after it, and a shortened option would otherwise count as the full one
-- In CI, five jobs find, merge and post the [[findings]], as [[review-threads|threads]] and one summary comment. Only the last can write to the PR {#ci-review}
+- In CI, four jobs find, pair and post the [[findings]], as [[review-threads|threads]] and one summary comment. Only the last can write to the PR {#ci-review}
   ```d2
   direction: right
-  units
-  find: find {style.multiple: true}
-  merge
+  pr
+  review
   pairing
   post: post {style.stroke-width: 3}
-  pr: PR {shape: page}
-  units -> find: one per unit
-  find -> merge -> pairing
-  merge -> post: findings
+  pull: PR {shape: page}
+  pr -> review: head and base
+  review -> pairing
+  review -> post: findings
   pairing -> post: pairs
-  pr -> pairing: earlier threads
-  post -> pr: writes
+  pull -> pairing: earlier threads
+  post -> pull: writes
   ```
   - Why: each [[findings|finding]] needs a person to decide it, and a run in CI can't wait. So CI only reports, and nothing in it commits or pushes
-  - The units job lists the [[unit|units]], and reads the PR's head and base now, not from the event {#units-job}
+  - The pr job reads the PR's head and base now, not from the event. It runs no agent {#pr-job}
     - Why: GitHub doesn't promise to queue runs in the order of their events, so the run left after cancellations can be an older one
     - Drafts, PRs from forks, and edits that don't change the base branch get no review {#review-trigger}
       - Why: a fork's PR gets no secrets. An edit reviews again only when it changed the base, so the [[findings]] match the new diff
     - A newer run cancels the one before it, through one concurrency group per PR {#run-cancel}
       - A run that won't review gets a group of its own, since GitHub cancels a run waiting in a group when another joins
       - A run cancelled during post leaves only comments it fully posted
-  - The find job runs one [[finders|finder]] per [[unit]], started by the workflow, so no agent decides a unit isn't worth checking {#find-job}
-    - Why: an agent left to decide skipped [[unit|units]] on small diffs
+  - The review job runs the pack-findings skill on the PR's range, as a [[local-review|local review]] does, and builds the report from the [[findings]] its [[wizard]] built {#review-job}
     - It can only read the repo, so GitHub, not the agent's tool list, keeps it from writing
-    - It reads the change through the [[git-server|git server]]
+    - It loads the skill from the review's checkout, which runs the CLI version released with the pinned commit
+    - The report reads the one run that reached its findings, from a new temporary folder the job gave the agent. Any other count fails the job
+      - Why: a review that didn't finish, or ran twice, would otherwise post findings nobody checked
+    - The report refuses findings for a head other than the PR's
     - The run's log lists each tool call's input, and only whether its result was an error
       - Why: a call's full output can hold file contents and secrets
-  - The merge job groups the [[finders|finders']] findings, then a script builds the [[findings]] and picks the line in the diff each one's [[review-threads|thread]] opens on {#merge-job}
-    - claude-code-action checks the merging agent's answer against a groups schema, whose kinds, headlines and takes come from the findings schema
-    - When the groups fail the script's checks, the job fails. Re-running failed jobs reruns only the [[merge]], with the answers the [[finders]] saved
-      - Rejected: sending the error back to the agent for a second try, which adds a step for a case that may be rare
     - A [[findings|finding's]] anchor, the line its [[review-threads|thread]] opens on, is the first deviating [[findings|spot]] the diff shows, or else the first spot it shows, since a GitHub review comment needs a line in the diff {#anchor}
   - The pairing job does the [[pairing]] and writes the [[commentary]]
     - It reads the [[review-threads|threads]] through the [[trust-filter|trust filter]]
@@ -199,7 +196,7 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     style.stroke-dash: 3
     trust: trust filter
     read: read the checkout
-    git: git server
+    wizard: wizard
   }
   agents: agents {
     pairer: pairing {shape: hexagon}
@@ -211,20 +208,20 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
   pr: PR {shape: page}
   written.replies -> gates.trust -> agents.commenter
   written.diff -> gates.read -> agents.finder
-  written.diff -> gates.git
-  gates.git -> agents.finder
-  gates.git -> agents.merger
+  written.diff -> gates.wizard
+  gates.wizard -> agents.finder
+  gates.wizard -> agents.merger
   own -> agents.pairer
   agents -> out
   out -> pr: post only
   ```
-  - Agents have no shell. They read files with Read, Glob and Grep, confined to the checkout {#no-shell}
-    - The merging agent can also read the folder holding the [[finders|finders']] answers
-    - Read is denied on `.git/`, where claude-code-action keeps its token
-    - Rejected: allowing git commands in a shell. Claude Code doesn't check what a shell command writes, and an allowed `git log` wrote any text to any file
-  - They read the change through a git server, whose three tools each run one fixed git command {#git-server}
-    - The tools are changed, diff and log. The agent sends a path and a page number, never a revision
-    - A path must be relative and without `..`, and is taken literally, so `*` names only a file called `*`
+  - A CI agent's shell runs only the skill's commands, each allowed as a prefix: the [[wizard|wizard's]], `git rev-parse` and `git status` {#allowed-commands}
+    - An allowed prefix refused redirects, command substitution, env prefixes and chained commands after it, but let options through, so the wizard takes only the options it names
+    - `git rev-parse` and `git status` have no option that writes a file
+      - Rejected: other git commands. Claude Code doesn't check what a shell command writes, and an allowed `git log` wrote any text to any file through `--output`
+    - It reads files with Read, Glob and Grep, confined to the checkout, and writes only its answers, in its scratchpad. Read is denied on `.git/`, where claude-code-action keeps its token
+  - Agents read the change through the wizard, which runs one fixed git command for each of `files`, `diff` and `log` {#change-commands}
+    - The agent sends a path and a page number, never a revision. A path must be one the change touches, and is taken literally, so `*` names only a file called `*`
     - Diffs run without external diff drivers or text conversion, since a PR picks a path's diff driver
     - Output comes in pages of 1,000 lines, so one call can't fill the agent's context
     - Each diff line the head has starts with its line number there
