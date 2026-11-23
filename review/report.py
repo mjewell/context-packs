@@ -21,13 +21,17 @@ def cleaned(value):
     return value
 
 
+class Rejected(Exception):
+    """Groups the report can't be built from, with the reason."""
+
+
 def groups_in(path):
     try:
         output = json.loads(path.read_text(encoding='utf-8'))
     except ValueError:
         output = None
     if not isinstance(output, dict) or not isinstance(output.get('groups'), list):
-        sys.exit(f'pack-review: the merge returned no groups: {path.read_text(encoding="utf-8")[:500]!r}')
+        raise Rejected(f'the merge returned no groups: {path.read_text(encoding="utf-8")[:500]!r}')
     return output['groups']
 
 
@@ -56,13 +60,13 @@ def checked(groups, sources):
     named = [id for group in groups for id in group['ids']]
     invented = unique([id for id in named if id not in sources])
     if invented:
-        sys.exit(f"pack-review: the merge's groups name {', '.join(invented)}, which no finder reported.")
+        raise Rejected(f"the merge's groups name {', '.join(invented)}, which no finder reported")
     repeated = unique([id for n, id in enumerate(named) if id in named[:n]])
     if repeated:
-        sys.exit(f"pack-review: the merge's groups put {', '.join(repeated)} in more than one group.")
+        raise Rejected(f"the merge's groups put {', '.join(repeated)} in more than one group")
     left = [id for id in sources if id not in named]
     if left:
-        sys.exit(f"pack-review: the merge's groups leave out {', '.join(left)}.")
+        raise Rejected(f"the merge's groups leave out {', '.join(left)}")
     return groups
 
 
@@ -94,7 +98,10 @@ def main():
                         help='the head lines each diff shows, as `git_server.py shown` prints them')
     parser.add_argument('--out', type=Path, required=True, help='where to write the report')
     args = parser.parse_args()
-    findings = findings_in(args.groups, args.sources)
+    try:
+        findings = findings_in(args.groups, args.sources)
+    except Rejected as rejected:
+        sys.exit(f'pack-review: {rejected}.')
     report = {'base': args.base, 'base_ref': args.base_ref, 'head': args.head, 'findings': findings,
               'anchors': anchors(findings, json.loads(args.shown.read_text(encoding='utf-8')))}
     args.out.write_text(json.dumps(report, ensure_ascii=False), encoding='utf-8')

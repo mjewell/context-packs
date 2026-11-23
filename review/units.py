@@ -62,14 +62,17 @@ def prompt(args):
     claude.output('claude-args', claude.finder(args.base, args.head, args.model))
 
 
+def sources(folder):
+    """Every finder's findings, from the unit-<n>.json answers in folder, numbered as <finder>:<index>, so the merging
+    agent can answer with ids and a script can build each finding from the ones it names."""
+    answers = sorted(Path(folder).glob('unit-*.json'), key=lambda path: int(path.stem.split('-')[1]))
+    return [{'id': f"{path.stem.split('-')[1]}:{n}", 'finding': finding} for path in answers
+            for n, finding in enumerate(json.loads(path.read_text(encoding='utf-8'))['findings'])]
+
+
 def merge(args):
-    # Every finder's findings, numbered as <finder>:<index>, so the agent can answer with ids and a script can build
-    # each finding from the ones it names.
     inputs = Path(args.inputs)
-    answers = sorted(inputs.glob('unit-*.json'), key=lambda path: int(path.stem.split('-')[1]))
-    sources = [{'id': f"{path.stem.split('-')[1]}:{n}", 'finding': finding} for path in answers
-               for n, finding in enumerate(json.loads(path.read_text(encoding='utf-8'))['findings'])]
-    (inputs / 'sources.json').write_text(json.dumps(sources, ensure_ascii=False), encoding='utf-8')
+    (inputs / 'sources.json').write_text(json.dumps(sources(inputs), ensure_ascii=False), encoding='utf-8')
     answers = f"Every finder's findings are in `{inputs / 'sources.json'}`, each with an id."
     text = (PROMPTS / 'merge-prompt.md').read_text(encoding='utf-8').format(answers=answers)
     claude.output('prompt', text.rstrip('\n') + MERGE_IN_CI)
