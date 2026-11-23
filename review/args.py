@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""The claude_args the review hands claude-code-action, as one line, and the schemas the wizard checks answers
-against. The reviewer runs the pack-findings skill, whose wizard starts the finders and the merge. claude-code-action
-splits the line the way a shell would. output() writes a prompt or a claude_args line as a GitHub step output."""
+"""The claude_args the review hands claude-code-action, as one line. The reviewer runs the pack-findings skill, whose
+wizard starts the finders and the merge. claude-code-action splits the line the way a shell would. output() writes a
+prompt or a claude_args line as a GitHub step output."""
 import json
 import os
 from pathlib import Path
@@ -10,8 +10,6 @@ import sys
 import uuid
 
 REVIEW = Path(__file__).resolve().parent
-# The schema lives with the pack-findings skill, so a local review and CI read one copy.
-SCHEMA = REVIEW.parent / 'skills' / 'pack-findings' / 'findings.schema.json'
 
 
 def compact(value):
@@ -34,22 +32,6 @@ def output(name, value):
     assert delimiter not in value
     with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
         out.write(f'{name}<<{delimiter}\n{value}\n{delimiter}\n')
-
-
-def findings_schema():
-    return json.loads(SCHEMA.read_text(encoding='utf-8'))
-
-
-def groups_schema():
-    """The merging agent's answer: which of the finders' findings make each finding, with its kind, headline and take,
-    from the findings schema. A script builds the rest of each finding from its group's findings."""
-    finding = findings_schema()['properties']['findings']['items']['properties']
-    group = {'type': 'object', 'additionalProperties': False, 'required': ['ids', 'kind', 'headline', 'take'],
-             'properties': {'ids': {'type': 'array', 'minItems': 1, 'items': {'type': 'string'},
-                                    'description': "The ids of the finders' findings this one merges."},
-                            'kind': finding['kind'], 'headline': finding['headline'], 'take': finding['take']}}
-    return {'type': 'object', 'additionalProperties': False, 'required': ['groups'],
-            'properties': {'groups': {'type': 'array', 'items': group}}}
 
 
 def reviewer(model):

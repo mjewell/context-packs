@@ -14,7 +14,6 @@ import tempfile
 REVIEW = Path(__file__).resolve().parent
 sys.path.insert(0, str(REVIEW.parent / 'src'))
 from blocks import instructions, region  # noqa: E402
-import args as claude  # noqa: E402
 from change import Change, Refused, commit, git  # noqa: E402
 import report  # noqa: E402
 import schema  # noqa: E402
@@ -30,7 +29,7 @@ STATE = 'state.json'
 # shell variable, so an agent that builds its own commands loses turns.
 EXACT = 'Run each command exactly as it is printed here, one per Bash call, with no variables, `cd` or `&&` around it.'
 # The kinds of finding, in the order the findings schema lists them.
-KINDS = claude.findings_schema()['properties']['findings']['items']['properties']['kind']['enum']
+KINDS = schema.findings_schema()['properties']['findings']['items']['properties']['kind']['enum']
 # What a finder needs beyond the skill's prompt: how to read the change, and where its answer goes. A unit's finder
 # also hears how the review knows it read its docs.
 SERVED = 'Read each doc only through its command, so the review knows it was read. '
@@ -151,7 +150,7 @@ def brief(args):
         diff=f'what `{cmd} diff <path>` prints, one path at a time, for the paths `{cmd} files` lists',
         log=f'what `{cmd} log` prints', docs=docs.rstrip('\n'))
     print('\n\n'.join([text.rstrip('\n'), FINDER.format(exact=EXACT, served=served, kind=kind),
-                       handing('answer', run.command('submit', str(finder)), claude.findings_schema())]))
+                       handing('answer', run.command('submit', str(finder)), schema.findings_schema())]))
 
 
 def sources(folder):
@@ -187,7 +186,7 @@ def merge_brief(run):
     print('\n\n'.join([text.rstrip('\n'),
                        MERGE.format(exact=EXACT, files=run.command('files'), diff=run.command('diff', '<path>'),
                                     log=run.command('log')),
-                       handing('groups', run.command('submit-groups'), claude.groups_schema())]))
+                       handing('groups', run.command('submit-groups'), schema.groups_schema())]))
 
 
 def sources_step(args):
@@ -265,7 +264,7 @@ def submit(args):
             them = 'it' if len(unread) == 1 else 'them'
             raise Refused(f"Not taken: you didn't read {listed}. Read {them}, check the diff against {them}, update "
                           f'your answer, then submit it again with `{submit}`.')
-    text = answer('answer', submit, claude.findings_schema())
+    text = answer('answer', submit, schema.findings_schema())
     findings = json.loads(text)['findings']
     run.accepted(finder).parent.mkdir(exist_ok=True)
     run.accepted(finder).write_text(text, encoding='utf-8')
@@ -312,7 +311,7 @@ def submit_groups(args):
                       'in.')
     submit = run.command('submit-groups')
     groups = run.folder / 'groups.json'
-    groups.write_text(answer('groups', submit, claude.groups_schema()), encoding='utf-8')
+    groups.write_text(answer('groups', submit, schema.groups_schema()), encoding='utf-8')
     try:
         findings = report.findings_in(groups, run.sources)
     except report.Rejected as rejected:

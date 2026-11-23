@@ -1,7 +1,12 @@
-"""Where a JSON value breaks a JSON Schema, in the words an agent fixes it from. It knows only what the review's own
-schemas use, since the standard library has no validator: type, required, properties, additionalProperties, items,
-enum and minItems. A schema that uses anything else stops, rather than passing values it can't check."""
+"""The review's schemas, for a finder's answer and the merging agent's groups, and where a JSON value breaks one, in
+the words an agent fixes it from. It knows only what those schemas use, since the standard library has no validator:
+type, required, properties, additionalProperties, items, enum and minItems. A schema that uses anything else stops,
+rather than passing values it can't check."""
 import json
+from pathlib import Path
+
+# The schema lives with the pack-findings skill, so a local review and CI read one copy.
+SCHEMA = Path(__file__).resolve().parents[1] / 'skills' / 'pack-findings' / 'findings.schema.json'
 
 TYPES = {'object': dict, 'array': list, 'string': str, 'integer': int, 'boolean': bool}
 KNOWN = {'type', 'required', 'properties', 'additionalProperties', 'items', 'enum', 'minItems', 'description'}
@@ -50,3 +55,19 @@ def broken(value, schema, where):
         for n, item in enumerate(value):
             found += broken(item, schema.get('items', {}), f'{named}[{n}]')
     return found
+
+
+def findings_schema():
+    return json.loads(SCHEMA.read_text(encoding='utf-8'))
+
+
+def groups_schema():
+    """The merging agent's answer: which of the finders' findings make each finding, with its kind, headline and take,
+    from the findings schema. A script builds the rest of each finding from its group's findings."""
+    finding = findings_schema()['properties']['findings']['items']['properties']
+    group = {'type': 'object', 'additionalProperties': False, 'required': ['ids', 'kind', 'headline', 'take'],
+             'properties': {'ids': {'type': 'array', 'minItems': 1, 'items': {'type': 'string'},
+                                    'description': "The ids of the finders' findings this one merges."},
+                            'kind': finding['kind'], 'headline': finding['headline'], 'take': finding['take']}}
+    return {'type': 'object', 'additionalProperties': False, 'required': ['groups'],
+            'properties': {'groups': {'type': 'array', 'items': group}}}

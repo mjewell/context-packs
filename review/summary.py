@@ -3,7 +3,7 @@ JSON for the author's local run. post.py posts it. Only the report's text reache
 the agent is what the report holds."""
 import json
 
-from args import SCHEMA
+from schema import SCHEMA
 import finding_comment
 import github
 
