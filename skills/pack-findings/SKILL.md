@@ -33,7 +33,7 @@ A PR named as `owner/repo#number` is in that repo: from a folder above the repos
 
 ## The CLI
 
-Every command below runs the CLI as `npx context-packs@0.11.0`, the version this skill was written for. When you were asked for the `checkout` CLI, run it from the checkout this skill was loaded from instead: `python3 <repo>/src/cli.py`, where `<repo>` is this skill's base directory without its last two parts, `/skills/pack-findings`. Write that path out in full, with no `..` and no shell variable. CI asks for the `checkout` CLI, so a CI review runs the code of the commit its workflow pinned.
+Every command below runs the CLI as `npx context-packs@0.11.0`, the version this skill was written for. When you were asked for the `checkout` CLI, run it from the checkout this skill was loaded from instead: `node <repo>/src/cli.ts`, where `<repo>` is this skill's base directory without its last two parts, `/skills/pack-findings`. Write that path out in full, with no `..` and no shell variable. CI asks for the `checkout` CLI, so a CI review runs the code of the commit its workflow pinned.
 
 ## 1. Pin the diff
 

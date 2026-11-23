@@ -39,7 +39,7 @@ def reviewer(answers, model):
     review, with this checkout's CLI. It may run only the commands the skill runs, and has no MCP server. It writes
     only in answers, the folder where the wizard's briefs say to write each answer."""
     # The path the skill builds from its own folder, so the agent's commands match it.
-    cli = f'python3 {REVIEW.parent}/src/cli.py'
+    cli = f'node {REVIEW.parent}/src/cli.ts'
     # git rev-parse and git status have no option that writes a file, unlike git log's --output.
     allowed = ['Skill(context-packs:pack-findings)', f'Bash({cli} review:*)', f'Bash({cli} docs)',
                'Bash(git rev-parse:*)', 'Bash(git status:*)',

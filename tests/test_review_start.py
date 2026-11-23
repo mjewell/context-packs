@@ -5,7 +5,7 @@ from test_review_pairing import PairingCase
 
 BASE, HEAD = 'b' * 40, 'h' * 40
 ANSWERS = '/runner/temp/runs/pack-review-answers'
-CLI = f'python3 {REVIEW.parent}/src/cli.py'
+CLI = f'node {REVIEW.parent}/src/cli.ts'
 
 
 class StartTests(PairingCase):
