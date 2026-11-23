@@ -85,11 +85,11 @@ def merger(inputs, base, head, model):
 
 def reviewer(model):
     """The review agent's line: it runs the pack-findings skill, as a local review does, from this checkout of the
-    review, at the CLI version the skill pins. It may run only the commands the skill runs, and has no MCP server. It
-    reads and writes files only in the checkout and in its scratchpad, where it writes its answers before passing them
-    to the wizard."""
-    version = json.loads((REVIEW.parent / 'package.json').read_text(encoding='utf-8'))['version']
-    cli = f'npx context-packs@{version}'
+    review, with this checkout's CLI. It may run only the commands the skill runs, and has no MCP server. It reads and
+    writes files only in the checkout and in its scratchpad, where it writes its answers before passing them to the
+    wizard."""
+    # The path the skill builds from its own folder, so the agent's commands match it.
+    cli = f'python3 {REVIEW.parent}/src/cli.py'
     # git rev-parse and git status have no option that writes a file, unlike git log's --output.
     allowed = ['Skill(context-packs:pack-findings)', f'Bash({cli} review:*)', f'Bash({cli} docs)',
                'Bash(git rev-parse:*)', 'Bash(git status:*)']

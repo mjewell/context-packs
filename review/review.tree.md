@@ -132,7 +132,8 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
       - A run cancelled during post leaves only comments it fully posted
   - The review job runs the pack-findings skill on the PR's range, as a [[local-review|local review]] does, and builds the report from the [[findings]] its [[wizard]] built {#review-job}
     - It can only read the repo, so GitHub, not the agent's tool list, keeps it from writing
-    - It loads the skill from the review's checkout, which runs the CLI version released with the pinned commit
+    - It loads the skill from the review's checkout and asks for its checkout CLI, so every step runs the pinned code
+      - Why: with the npm release the skill pins, a run between releases would pair one version's wizard with another's report
     - The report reads the one run that reached its findings, from a new temporary folder the job gave the agent. Any other count fails the job
       - Why: a review that didn't finish, or ran twice, would otherwise post findings nobody checked
     - The report refuses findings for a head other than the PR's

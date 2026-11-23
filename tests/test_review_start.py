@@ -1,11 +1,10 @@
-import json
 import shlex
 
 from review_case import REVIEW
 from test_review_pairing import PairingCase
 
 BASE, HEAD = 'b' * 40, 'h' * 40
-VERSION = json.loads((REVIEW.parent / 'package.json').read_text())['version']
+CLI = f'python3 {REVIEW.parent}/src/cli.py'
 
 
 class StartTests(PairingCase):
@@ -24,7 +23,8 @@ class StartTests(PairingCase):
         return args[args.index(name) + 1]
 
     def test_asks_for_the_pack_findings_skill_on_the_reviewed_range(self):
-        self.assertEqual(self.start()['prompt'], f'Use the pack-findings skill on the commit range {BASE}..{HEAD}.')
+        self.assertEqual(self.start()['prompt'],
+                         f'Use the pack-findings skill on the commit range {BASE}..{HEAD}, with the checkout CLI.')
 
     def test_loads_the_skill_from_the_reviews_checkout(self):
         self.assertEqual(self.flag(self.args(), '--plugin-dir'), str(REVIEW.parent))
@@ -34,8 +34,8 @@ class StartTests(PairingCase):
 
         self.assertEqual(self.flag(args, '--tools'), 'Read,Glob,Grep,Write,Bash,Agent,Skill')
         self.assertEqual(self.flag(args, '--allowedTools').split(','), [
-            'Skill(context-packs:pack-findings)', f'Bash(npx context-packs@{VERSION} review:*)',
-            f'Bash(npx context-packs@{VERSION} docs)', 'Bash(git rev-parse:*)', 'Bash(git status:*)'])
+            'Skill(context-packs:pack-findings)', f'Bash({CLI} review:*)', f'Bash({CLI} docs)',
+            'Bash(git rev-parse:*)', 'Bash(git status:*)'])
         self.assertEqual(self.flag(args, '--disallowedTools'), 'Read(./.git/**)')
         self.assertIn('--restricted', args)
 
