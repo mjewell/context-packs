@@ -1,10 +1,11 @@
 ---
 name: pack-findings
 description: Find where a PR, branch or commit range deviates from a repo's context packs, whether each rule's `when` reached the work, and the choices it makes that no rule covers. Run by the `pack-review` skill, which goes through the findings with the user.
-argument-hint: "[PR number or owner/repo#number, branch, or commit range]"
+argument-hint: "[PR number or owner/repo#number, branch, or commit range] [checkout]"
 # Each finder runs the wizard many times, and they start in the turn that invoked this skill, so this grant keeps
 # their calls from asking. It ends with that turn, so the orchestrator's later calls ask, unless the session allows the
-# command at startup, as a headless run does.
+# command at startup, as a headless run does. The checkout CLI isn't granted, since its path is known only once the
+# skill loads: CI allows it at startup.
 allowed-tools: Bash(npx context-packs@0.10.0 review:*)
 ---
 
@@ -30,15 +31,19 @@ Each finding is one of three kinds:
 
 A PR named as `owner/repo#number` is in that repo: from a folder above the repos, work in its checkout.
 
+## The CLI
+
+Every command below runs the CLI as `npx context-packs@0.10.0`, the version this skill was written for. When you were asked for the `checkout` CLI, run it from the checkout this skill was loaded from instead: `python3 <repo>/src/cli.py`, where `<repo>` is this skill's base directory without its last two parts, `/skills/pack-findings`. Write that path out in full, with no `..` and no shell variable. CI asks for the `checkout` CLI, so a CI review runs the code of the commit its workflow pinned.
+
 ## 1. Pin the diff
 
 Resolve what you were given to a base and a head: a PR's base and head, a branch against the default branch, or a range as given. For a GitHub PR, `git fetch origin pull/<number>/head` gets the head. Stop if a ref doesn't resolve.
 
-The review reads the packs and the existing code from the checkout, so a change that updates a rule along with the code is judged by the new rule. Note any changes the diff makes to the packs, for whoever reads the findings. The checkout has to be the head. Compare `git rev-parse HEAD` with the head. When they differ, stop. Say which commit is checked out. Offer to check out the head. Once the checkout is the head, list any uncommitted changes to the instruction file or to a doc `npx context-packs@0.10.0 docs` lists. The review reads those changes as the head's rules. Done when the checkout is the head and the user has seen any uncommitted changes to the rules.
+The review reads the packs and the existing code from the checkout, so a change that updates a rule along with the code is judged by the new rule. Note any changes the diff makes to the packs, for whoever reads the findings. The checkout has to be the head. Compare `git rev-parse HEAD` with the head. When they differ, stop. Say which commit is checked out. Offer to check out the head. Once the checkout is the head, list any uncommitted changes to the instruction file or to a doc the CLI's `docs` command lists. The review reads those changes as the head's rules. Done when the checkout is the head and the user has seen any uncommitted changes to the rules.
 
 ## 2. Run the wizard
 
-The wizard runs the review: it lists the finders, gives each one its brief, checks every answer, and builds the findings from the merge. A CI review runs the same steps, so a local review and a CI review check the same way. Start it with this command, with the base and head from step 1, as one Bash call written out in full, with no shell variables:
+The wizard runs the review: it lists the finders, gives each one its brief, checks every answer, and builds the findings from the merge. A CI review runs the same steps, so a local review and a CI review check the same way. Start it with this command, with the base and head from step 1 and the CLI from [The CLI](#the-cli) in both places, as one Bash call written out in full, with no shell variables:
 
 ```bash
 npx context-packs@0.10.0 review init --base <base> --head <head> --command "npx context-packs@0.10.0 review"
