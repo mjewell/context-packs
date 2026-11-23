@@ -1,10 +1,11 @@
 import shutil
 import subprocess
-import sys
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+
+from scripts import command
 
 REPO = Path(__file__).resolve().parent.parent
 TOOLS = REPO / 'skills' / 'spec-tree' / 'scripts'
@@ -48,7 +49,7 @@ class TreeCase(unittest.TestCase):
         file.write_text(textwrap.dedent(text).lstrip(), encoding='utf-8')
 
     def trees(self, *args):
-        return subprocess.run([sys.executable, str(TOOLS / 'trees.py'), *args], cwd=self.root, capture_output=True,
+        return subprocess.run([*command('skills/spec-tree/scripts/trees'), *args], cwd=self.root, capture_output=True,
                               text=True)
 
 
@@ -382,7 +383,7 @@ class RepoTreesTests(unittest.TestCase):
     """This repo's own trees follow the spec's rules, so the test suite checks them until a CI workflow does."""
 
     def test_this_repos_trees_have_no_failures(self):
-        run = subprocess.run([sys.executable, str(TOOLS / 'trees.py'), 'check'], cwd=REPO, capture_output=True,
+        run = subprocess.run([*command('skills/spec-tree/scripts/trees'), 'check'], cwd=REPO, capture_output=True,
                              text=True)
 
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)

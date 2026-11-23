@@ -3,10 +3,11 @@ import json
 import os
 import re
 import subprocess
-import sys
 import tempfile
 
-from git_case import REVIEW, GitCase
+from git_case import GitCase
+from scripts import command
+
 
 # An instruction file with an empty context-packs block, as a sync writes it, so the wizard has its one unit.
 AGENTS = ('<!-- context-packs:start -->\n'
@@ -41,7 +42,7 @@ class ChangeCase(GitCase):
         return self.wizard('--run', self.run_dir, *args)
 
     def wizard(self, *args):
-        return subprocess.run([sys.executable, str(REVIEW / 'wizard.py'), *args], cwd=self.repo, env=self.env,
+        return subprocess.run([*command('review/wizard'), *args], cwd=self.repo, env=self.env,
                               input='', capture_output=True, text=True)
 
     def text(self, *args):
@@ -78,7 +79,7 @@ class ShownTests(ChangeCase):
         self.commit('Change line 10 and delete a file', {'a.txt': TWELVE.replace('l10\n', 'ten\n')},
                     removed=['gone.txt'])
 
-        run = subprocess.run([sys.executable, str(REVIEW / 'change.py'), '--base', self.base, '--head', 'HEAD',
+        run = subprocess.run([*command('review/change'), '--base', self.base, '--head', 'HEAD',
                               'shown'], cwd=self.repo, capture_output=True, text=True, check=True)
 
         self.assertEqual(json.loads(run.stdout), {'a.txt': [7, 8, 9, 10, 11, 12], 'gone.txt': []})

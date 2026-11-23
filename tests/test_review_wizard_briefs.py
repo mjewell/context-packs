@@ -1,11 +1,10 @@
 import json
 from pathlib import Path
 import re
-import shlex
 import subprocess
-import sys
 
-from review_wizard_case import REVIEW, StartedCase, WizardCase, deviation
+from review_wizard_case import StartedCase, WizardCase, deviation
+from scripts import shell
 
 
 class BriefTests(WizardCase):
@@ -89,7 +88,7 @@ class ShellTests(WizardCase):
     says to write it."""
 
     def test_the_briefs_submit_command_takes_the_answer_the_brief_named_through_bash(self):
-        launcher = f'{shlex.quote(sys.executable)} {shlex.quote(str(REVIEW / "wizard.py"))}'
+        launcher = shell('review/wizard')
         run = self.wizard('init', '--base', self.base, '--head', 'HEAD', '--command', launcher)
         self.assertEqual(run.returncode, 0, run.stderr)
         brief = re.search(r'Run `(.+ brief 3)`', run.stdout).group(1)
