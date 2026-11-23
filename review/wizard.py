@@ -77,6 +77,14 @@ class Run:
         merge has started."""
         return self.folder / 'sources.json'
 
+    def phase(self):
+        """Which step the run is at: 'finders' until next starts the merge, 'merge' until submit-groups builds the
+        findings, then 'done'. Each phase starts when the file that marks it is written, so this is the one place
+        that knows which file that is."""
+        if self.findings.exists():
+            return 'done'
+        return 'merge' if self.sources.exists() else 'finders'
+
     def accepted(self, finder):
         """Where submit keeps a finder's answer once it took it, so a later edit to the answer changes nothing."""
         return self.folder / 'accepted' / f'unit-{finder}.json'
@@ -145,7 +153,7 @@ def sources(folder):
 
 def merging(run):
     """The run, once every finder is in and the merge has started."""
-    if not run.sources.exists():
+    if run.phase() == 'finders':
         raise Refused(f"The merge can't start yet: run `{run.command('next')}` to see whose answers aren't in.")
     return run
 
@@ -225,7 +233,7 @@ def submit(args):
     run = Run(args.run)
     finder = run.finder(args.finder)
     submit = run.command('submit', str(finder))
-    if run.sources.exists():
+    if run.phase() != 'finders':
         raise Refused("Not taken: the merge has started, so the finders' answers can't change.")
     if finder != run.uncovered:
         served = run.served(finder)
@@ -246,7 +254,8 @@ def submit(args):
 
 def next_step(args):
     run = Run(args.run)
-    if run.findings.exists():
+    phase = run.phase()
+    if phase == 'done':
         findings = json.loads(run.findings.read_text(encoding='utf-8'))['findings']
         kinds = [counted(sum(found['kind'] == kind for found in findings), kind) for kind in KINDS
                  if any(found['kind'] == kind for found in findings)]
@@ -254,7 +263,7 @@ def next_step(args):
         print(f'Done: {counted(len(findings), "finding")}' + f', {listed}' * bool(listed)
               + f', in {run.findings}. Here they are:\n{json.dumps(findings, ensure_ascii=False, indent=1)}')
         return
-    if run.sources.exists():
+    if phase == 'merge':
         print("Waiting on the merge, whose groups aren't in yet. If it stopped without its groups going in, start it "
               f'again with the same prompt: Run `{run.command("brief", "merge")}` and follow what it says. When it has '
               f'answered, run `{run.command("next")}` again.')
@@ -277,7 +286,7 @@ def next_step(args):
 
 def submit_groups(args):
     run = Run(args.run)
-    if not run.sources.exists():
+    if run.phase() == 'finders':
         raise Refused(f"Not taken: the merge hasn't started. Run `{run.command('next')}` to see whose answers aren't "
                       'in.')
     submit = run.command('submit-groups')
