@@ -81,6 +81,22 @@ The finder with no unit, which reads the whole diff for uncovered choices and se
 **Group**:
 The merging agent's answer for one finding: the ids of the finders' findings it merges, with its kind, headline and take.
 
+**Wizard**:
+The command an agent runs a review through, one step at a time: `context-packs review` locally, `review/wizard.py` in CI. Each step prints what to do next, with every command in full.
+_Avoid_: script, orchestrator (the agent that runs it)
+
+**Orchestrator**:
+The agent that runs the wizard's `init` and `next`, and starts the subagents they name.
+
+**Run folder**:
+The folder `init` makes for one review, which holds its state, the agents' answers and the findings. Every command the wizard prints names it.
+
+**Brief**:
+The prompt the wizard gives one finder, or the merging agent: the skill's prompt for it, with the commands it reads through and where its answer goes.
+
+**Served doc**:
+A doc the wizard printed through `doc`. A unit's answer is taken only once every doc in the unit was served.
+
 **Finding**:
 One choice in a diff that the review reports. It is a deviation, a conflict or an uncovered choice.
 

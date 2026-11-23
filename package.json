@@ -8,7 +8,9 @@
   },
   "files": [
     "bin",
-    "src/*.py"
+    "src/*.py",
+    "review/*.py",
+    "skills/pack-findings/*"
   ],
   "engines": {
     "node": ">=18"

@@ -7,6 +7,7 @@ import contextlib
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 import tempfile
 
@@ -56,6 +57,11 @@ def check(file, found, written, out, repo):
 
 
 def main():
+    # The review's wizard has its own steps and arguments, so `review` hands everything after it on. It runs in its own
+    # interpreter, since review/ and src/ each have a report module.
+    if sys.argv[1:2] == ['review']:
+        wizard = Path(__file__).resolve().parents[1] / 'review' / 'wizard.py'
+        sys.exit(subprocess.run([sys.executable, str(wizard), *sys.argv[2:]]).returncode)
     parser = argparse.ArgumentParser(prog='context-packs', description=__doc__)
     parser.add_argument('--dir', type=Path, default=Path.cwd(),
                         help='the folder to sync, if not the current one')
