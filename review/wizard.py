@@ -8,7 +8,6 @@ import json
 import os
 from pathlib import Path
 import shlex
-import shutil
 import sys
 import tempfile
 
@@ -24,26 +23,21 @@ import tables  # noqa: E402
 from units import PROMPTS, RULE_KIND, UNCOVERED_KIND, sources  # noqa: E402
 
 STATE = 'state.json'
-SCHEMA = 'findings.schema.json'
-GROUPS = 'groups.schema.json'
+# The heredoc delimiter an answer comes between. A line of valid JSON can't be a bare word, since a JSON string can't
+# hold a raw line break, so no answer that parses can end its heredoc early.
+END = 'PACK_REVIEW_ANSWER'
 # The kinds of finding, in the order the findings schema lists them.
 KINDS = claude.findings_schema()['properties']['findings']['items']['properties']['kind']['enum']
 # What a finder needs beyond the skill's prompt: how to read the change, and where its answer goes. A unit's finder
 # also hears how the review knows it read its docs.
 SERVED = 'Read each doc only through its command, so the review knows it was read. '
-FINDER = '''
-
-{served}Read the code at the head with Read, Glob and Grep. `diff` starts each line the head has with its line number \
-there: give that number as a spot's line, not a count of lines in the diff. Read every page of a path's diff before \
-you judge it. {kind} Write your answer to `{answer}`, in the shape `{schema}` sets. Then run `{submit}`, and do what \
-it says.'''
+FINDER = '''{served}Read the code at the head with Read, Glob and Grep. `diff` starts each line the head has with its \
+line number there: give that number as a spot's line, not a count of lines in the diff. Read every page of a path's \
+diff before you judge it. {kind}'''
 # What the merging agent needs beyond the skill's merge prompt.
-MERGE = '''
-
-Read the change with `{files}`, `{diff}` and `{log}`, if a spot needs checking. Answer with groups. Each group is one \
-finding: the ids of the finders' findings it merges, and its kind, headline and take. Put every id in exactly one \
-group. A script builds each finding's rules, spots, signs and exemplars from its group's findings. Write your groups \
-to `{answer}`, in the shape `{schema}` sets. Then run `{submit}`, and do what it says.'''
+MERGE = '''Read the change with `{files}`, `{diff}` and `{log}`, if a spot needs checking. Answer with groups. Each \
+group is one finding: the ids of the finders' findings it merges, and its kind, headline and take. Put every id in \
+exactly one group. A script builds each finding's rules, spots, signs and exemplars from its group's findings.'''
 
 
 def counted(count, noun):
@@ -86,15 +80,6 @@ class Run:
         once never write the same file."""
         return self.folder / 'served' / f'unit-{unit}'
 
-    def answer(self, finder):
-        """Where a finder writes its answer."""
-        return self.folder / 'answers' / f'unit-{finder}.json'
-
-    @property
-    def groups(self):
-        """Where the merging agent writes its groups."""
-        return self.folder / 'answers' / 'groups.json'
-
     @property
     def findings(self):
         """The review's findings, which submit-groups writes from the groups, so it marks that the run is done."""
@@ -130,9 +115,6 @@ def init(args):
     folder = Path(tempfile.mkdtemp(prefix='pack-review-'))
     state = {'base': change.base, 'head': change.head, 'root': str(root), 'command': args.command, 'units': units}
     (folder / STATE).write_text(json.dumps(state), encoding='utf-8')
-    (folder / 'answers').mkdir()
-    shutil.copy(PROMPTS / SCHEMA, folder / SCHEMA)
-    (folder / GROUPS).write_text(json.dumps(claude.groups_schema(), indent=1), encoding='utf-8')
     run = Run(folder)
     lines = [f'Reviewing {counted(commits, "commit")} that change {counted(len(change.paths()), "file")}, against '
              f'{counted(len(units), "unit")}.', '',
@@ -162,18 +144,37 @@ def brief(args):
     text = (PROMPTS / name).read_text(encoding='utf-8').format(
         diff=f'what `{cmd} diff <path>` prints, one path at a time, for the paths `{cmd} files` lists',
         log=f'what `{cmd} log` prints', docs=docs.rstrip('\n'))
-    print(text.rstrip('\n') + FINDER.format(served=served, kind=kind, answer=run.answer(finder),
-                                            schema=run.folder / SCHEMA, submit=run.command('submit', str(finder))))
+    print('\n\n'.join([text.rstrip('\n'), FINDER.format(served=served, kind=kind),
+                       handing('answer', run.command('submit', str(finder)), '{"findings": [...]}',
+                               claude.findings_schema())]))
+
+
+def handing(noun, submit, example, shape):
+    """How an agent hands its answer to the wizard: the command with a heredoc, and the schema the answer fits."""
+    return (f'Submit your {noun} with exactly this command, with your JSON in place of the middle line, then do what '
+            f"it prints:\n\n{submit} <<'{END}'\n{example}\n{END}\n\n"
+            f'Your {noun} must fit this JSON Schema:\n\n{json.dumps(shape, indent=1)}')
+
+
+def merging(run):
+    """The run, once every finder is in and the merge has started."""
+    if not run.sources.exists():
+        raise Refused(f"The merge can't start yet: run `{run.command('next')}` to see whose answers aren't in.")
+    return run
 
 
 def merge_brief(run):
-    if not run.sources.exists():
-        raise Refused(f"The merge can't start yet: run `{run.command('next')}` to see whose answers aren't in.")
-    answers = f"Every finder's findings are in `{run.sources}`, each with an id."
+    merging(run)
+    answers = f"Every finder's findings, each with an id, are what `{run.command('sources')}` prints."
     text = (PROMPTS / 'merge-prompt.md').read_text(encoding='utf-8').format(answers=answers)
-    print(text.rstrip('\n') + MERGE.format(files=run.command('files'), diff=run.command('diff', '<path>'),
-                                           log=run.command('log'), answer=run.groups, schema=run.folder / GROUPS,
-                                           submit=run.command('submit-groups')))
+    print('\n\n'.join([text.rstrip('\n'),
+                       MERGE.format(files=run.command('files'), diff=run.command('diff', '<path>'),
+                                    log=run.command('log')),
+                       handing('groups', run.command('submit-groups'), '{"groups": [...]}', claude.groups_schema())]))
+
+
+def sources_step(args):
+    print(merging(Run(args.run)).sources.read_text(encoding='utf-8'))
 
 
 def doc(args):
@@ -213,26 +214,30 @@ def log(args):
     print(Run(args.run).change().log(page=page(args.page)), end='')
 
 
-def answer(path, shape, again):
-    """The text of an agent's answer, once it's JSON in the schema's shape."""
-    if not path.is_file():
-        raise Refused(f"Not taken: there's no answer at {path}. Write it, {again}.")
-    text = path.read_text(encoding='utf-8')
+def answer(noun, submit, shape):
+    """The text of the answer an agent sent on stdin, once it's JSON in the schema's shape."""
+    # A terminal on stdin means no heredoc came, and reading it would wait for typing.
+    text = '' if sys.stdin.isatty() else sys.stdin.read()
+    it = 'them' if noun == 'groups' else 'it'
+    again = f'then submit {it} again with `{submit}`'
+    if not text.strip():
+        raise Refused(f'Not taken: no {noun} came on stdin. Submit {it} as your brief shows: '
+                      f"`{submit} <<'{END}'`, then your JSON, then a line holding only {END}.")
     try:
         value = json.loads(text)
     except ValueError as error:
-        raise Refused(f"Not taken: your answer at {path} isn't JSON: {error}. Fix it, {again}.")
+        raise Refused(f"Not taken: your {noun} isn't JSON: {error}. Fix {it}, {again}.")
     broken = schema.errors(value, shape)
     if broken:
         lines = ''.join(f'  {line}\n' for line in broken)
-        raise Refused(f'Not taken: your answer at {path} breaks the schema:\n{lines}Fix it, {again}.')
+        raise Refused(f'Not taken: your {noun} breaks the schema:\n{lines}Fix {it}, {again}.')
     return text
 
 
 def submit(args):
     run = Run(args.run)
     finder = run.finder(args.finder)
-    again = f'then run `{run.command("submit", str(finder))}` again'
+    submit = run.command('submit', str(finder))
     if run.sources.exists():
         raise Refused("Not taken: the merge has started, so the finders' answers can't change.")
     if finder != run.uncovered:
@@ -242,8 +247,8 @@ def submit(args):
             listed = ', '.join(f'{path} through `{run.command("doc", str(finder), str(n))}`' for n, path in unread)
             them = 'it' if len(unread) == 1 else 'them'
             raise Refused(f"Not taken: you didn't read {listed}. Read {them}, check the diff against {them}, update "
-                          f'your answer, {again}.')
-    text = answer(run.answer(finder), json.loads((run.folder / SCHEMA).read_text(encoding='utf-8')), again)
+                          f'your answer, then submit it again with `{submit}`.')
+    text = answer('answer', submit, claude.findings_schema())
     findings = json.loads(text)['findings']
     run.accepted(finder).parent.mkdir(exist_ok=True)
     run.accepted(finder).write_text(text, encoding='utf-8')
@@ -287,12 +292,13 @@ def submit_groups(args):
     if not run.sources.exists():
         raise Refused(f"Not taken: the merge hasn't started. Run `{run.command('next')}` to see whose answers aren't "
                       'in.')
-    again = f'then run `{run.command("submit-groups")}` again'
-    answer(run.groups, json.loads((run.folder / GROUPS).read_text(encoding='utf-8')), again)
+    submit = run.command('submit-groups')
+    groups = run.folder / 'groups.json'
+    groups.write_text(answer('groups', submit, claude.groups_schema()), encoding='utf-8')
     try:
-        findings = report.findings_in(run.groups, run.sources)
+        findings = report.findings_in(groups, run.sources)
     except report.Rejected as rejected:
-        raise Refused(f'Not taken: {rejected}. Fix your groups, {again}.')
+        raise Refused(f'Not taken: {rejected}. Fix your groups, then submit them again with `{submit}`.')
     built = {'base': run.state['base'], 'head': run.state['head'], 'findings': findings}
     run.findings.write_text(json.dumps(built, ensure_ascii=False), encoding='utf-8')
     print(f'{counted(len(findings), "finding")} are in {run.findings}. Tell whoever started you, and stop.')
@@ -318,17 +324,18 @@ def main(argv=None):
     fourth.add_argument('page', nargs='?', default='1', help='which page, from 1')
     fifth = steps.add_parser('log', allow_abbrev=False, help="print the change's commits")
     fifth.add_argument('page', nargs='?', default='1', help='which page, from 1')
-    sixth = steps.add_parser('submit', allow_abbrev=False, help="check a finder's answer and take it")
+    sixth = steps.add_parser('submit', allow_abbrev=False, help="check a finder's answer on stdin and take it")
     sixth.add_argument('finder', help="the finder's number")
     steps.add_parser('next', allow_abbrev=False, help='print what to do now')
+    steps.add_parser('sources', allow_abbrev=False, help="print the finders' findings, numbered for the merge")
     steps.add_parser('submit-groups', allow_abbrev=False,
-                     help="check the merging agent's groups and build the findings")
+                     help="check the merging agent's groups on stdin and build the findings")
     args = parser.parse_args(argv)
     if args.step != 'init' and not args.run:
         parser.error(f'{args.step} needs --run, the run folder init made')
     try:
         {'init': init, 'brief': brief, 'doc': doc, 'files': files, 'diff': diff, 'log': log, 'submit': submit,
-         'next': next_step, 'submit-groups': submit_groups}[args.step](args)
+         'next': next_step, 'sources': sources_step, 'submit-groups': submit_groups}[args.step](args)
     except Refused as refused:
         sys.exit(str(refused))
 

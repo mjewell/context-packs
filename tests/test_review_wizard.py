@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -50,9 +51,9 @@ class WizardCase(GitCase):
                     'TMPDIR': temp.name}
         self.run_dir = None
 
-    def wizard(self, *args):
+    def wizard(self, *args, input=''):
         return subprocess.run([sys.executable, str(REVIEW / 'wizard.py'), *args], cwd=self.repo, env=self.env,
-                              capture_output=True, text=True)
+                              input=input, capture_output=True, text=True)
 
     def init(self):
         """What init printed, once it succeeded. The run folder it made is in every command it prints."""
@@ -113,9 +114,15 @@ class BriefTests(WizardCase):
         self.assertIn('Read each doc only through its command, so the review knows it was read.', brief)
         self.assertIn(f'`{self.command("files")}`', brief)
         self.assertIn(f'`{self.command("diff", "<path>")}`', brief)
-        self.assertIn(f'Write your answer to `{self.run_dir}/answers/unit-1.json`, in the shape '
-                      f'`{self.run_dir}/findings.schema.json` sets. Then run `{self.command("submit", "1")}`', brief)
-        self.assertNotIn('{', brief)
+        self.assertIn("Submit your answer with exactly this command, with your JSON in place of the middle line, then "
+                      'do what it prints:\n\n'
+                      f"{self.command('submit', '1')} <<'PACK_REVIEW_ANSWER'\n"
+                      '{"findings": [...]}\n'
+                      'PACK_REVIEW_ANSWER\n\n'
+                      'Your answer must fit this JSON Schema:\n\n{\n "type": "object",', brief)
+        self.assertIn('"take"', brief)
+        for placeholder in ('{diff}', '{log}', '{docs}'):
+            self.assertNotIn(placeholder, brief)
 
     def test_gives_the_uncovered_finder_every_units_docs_to_search(self):
         brief = self.brief('3')
@@ -123,9 +130,9 @@ class BriefTests(WizardCase):
         self.assertTrue(brief.startswith("You're looking for the choices a change makes that no rule covers"),
                         brief[:80])
         self.assertIn('- `AGENTS.md`\n- `docs/testing.md`\n- `docs/git.md`\n- `docs/prose.md`\n', brief)
-        self.assertNotIn(' doc ', brief)
+        self.assertNotIn(self.command('doc'), brief)
         self.assertIn('Each choice is one finding of kind `uncovered choice`', brief)
-        self.assertIn(f'Then run `{self.command("submit", "3")}`', brief)
+        self.assertIn(f"{self.command('submit', '3')} <<'PACK_REVIEW_ANSWER'\n", brief)
 
     def test_refuses_a_finder_init_didnt_name(self):
         run = self.wizard('--run', self.run_dir, 'brief', '4')
@@ -141,9 +148,9 @@ class StartedCase(WizardCase):
         super().setUp()
         self.init()
 
-    def step(self, *args):
+    def step(self, *args, input=''):
         """A step of this run: what it printed, and what it printed as an error, with its exit code."""
-        return self.wizard('--run', self.run_dir, *args)
+        return self.wizard('--run', self.run_dir, *args, input=input)
 
 
 class DocTests(StartedCase):
@@ -206,11 +213,12 @@ def deviation(headline='Tests reach into a private helper', path='tests/test_app
 
 
 class SubmitCase(StartedCase):
-    """A finder at the end of its brief: it read its docs and wrote its answer."""
+    """A finder at the end of its brief: it read its docs and submits its answer on stdin, as the brief's heredoc
+    gives it."""
 
-    def answer(self, finder, findings):
-        path = Path(self.run_dir) / 'answers' / f'unit-{finder}.json'
-        path.write_text(findings if isinstance(findings, str) else json.dumps({'findings': findings}))
+    def submit(self, finder, findings):
+        text = findings if isinstance(findings, str) else json.dumps({'findings': findings})
+        return self.step('submit', str(finder), input=text)
 
     def read_docs(self, unit, count):
         for n in range(1, count + 1):
@@ -219,8 +227,7 @@ class SubmitCase(StartedCase):
 
     def submit_unit(self, unit, docs, findings):
         self.read_docs(unit, docs)
-        self.answer(unit, findings)
-        run = self.step('submit', str(unit))
+        run = self.submit(unit, findings)
         self.assertEqual(run.returncode, 0, run.stderr)
 
 
@@ -230,9 +237,8 @@ class SubmitTests(SubmitCase):
 
     def test_takes_an_answer_once_every_doc_was_read(self):
         self.read_docs(1, 2)
-        self.answer(1, [deviation()])
 
-        run = self.step('submit', '1')
+        run = self.submit(1, [deviation()])
 
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertEqual(run.stdout, 'Unit 1 is in, with 1 finding. Tell whoever started you that unit 1 is in, and '
@@ -240,21 +246,18 @@ class SubmitTests(SubmitCase):
 
     def test_refuses_an_answer_before_every_doc_was_read_and_names_the_commands_left(self):
         self.read_docs(1, 1)
-        self.answer(1, [deviation()])
 
-        run = self.step('submit', '1')
+        run = self.submit(1, [deviation()])
 
         self.assertEqual(run.returncode, 1)
         self.assertEqual(run.stdout, '')
         self.assertIn(f"Not taken: you didn't read docs/git.md through `{self.command('doc', '1', '2')}`. Read it, "
-                      f"check the diff against it, update your answer, then run `{self.command('submit', '1')}` again.",
-                      run.stderr)
+                      'check the diff against it, update your answer, then submit it again with '
+                      f"`{self.command('submit', '1')}`.", run.stderr)
         self.assertFalse((Path(self.run_dir) / 'accepted' / 'unit-1.json').exists())
 
     def test_takes_the_uncovered_finders_answer_without_any_doc_read(self):
-        self.answer(3, [])
-
-        run = self.step('submit', '3')
+        run = self.submit(3, [])
 
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertEqual(run.stdout, "The uncovered finder's answer is in, with 0 findings. Tell whoever started you "
@@ -266,44 +269,42 @@ class SubmitTests(SubmitCase):
         del broken['take']
         broken['kind'] = 'nit'
         self.read_docs(1, 2)
-        self.answer(1, [broken])
 
-        run = self.step('submit', '1')
+        run = self.submit(1, [broken])
 
         self.assertEqual(run.returncode, 1)
-        self.assertIn(f'Not taken: your answer at {self.run_dir}/answers/unit-1.json breaks the schema:\n'
+        self.assertIn('Not taken: your answer breaks the schema:\n'
                       '  findings[0] needs take\n'
                       '  findings[0].kind must be one of "deviation", "conflict", "uncovered choice"\n'
                       '  findings[0].spots[0].line must be an integer\n'
-                      f"Fix it, then run `{self.command('submit', '1')}` again.", run.stderr)
+                      f"Fix it, then submit it again with `{self.command('submit', '1')}`.", run.stderr)
 
     def test_refuses_an_answer_with_a_key_the_schema_doesnt_have(self):
         extra = {**deviation(), 'severity': 'high'}
         self.read_docs(1, 2)
-        self.answer(1, [extra])
 
-        run = self.step('submit', '1')
+        run = self.submit(1, [extra])
 
         self.assertEqual(run.returncode, 1)
         self.assertIn('  findings[0] has severity, which the schema has no place for\n', run.stderr)
 
     def test_refuses_an_answer_that_isnt_json(self):
         self.read_docs(1, 2)
-        self.answer(1, '{"findings": [')
 
-        run = self.step('submit', '1')
+        run = self.submit(1, '{"findings": [')
 
         self.assertEqual(run.returncode, 1)
-        self.assertIn(f"Not taken: your answer at {self.run_dir}/answers/unit-1.json isn't JSON", run.stderr)
+        self.assertIn("Not taken: your answer isn't JSON", run.stderr)
 
-    def test_refuses_when_there_is_no_answer_yet(self):
+    def test_refuses_a_submit_with_nothing_on_stdin_and_shows_how_to_send_it(self):
         self.read_docs(1, 2)
 
         run = self.step('submit', '1')
 
         self.assertEqual(run.returncode, 1)
-        self.assertIn(f"Not taken: there's no answer at {self.run_dir}/answers/unit-1.json. Write it, then run "
-                      f"`{self.command('submit', '1')}` again.", run.stderr)
+        self.assertIn("Not taken: no answer came on stdin. Submit it as your brief shows: "
+                      f"`{self.command('submit', '1')} <<'PACK_REVIEW_ANSWER'`, then your JSON, then a line holding "
+                      'only PACK_REVIEW_ANSWER.', run.stderr)
 
 
 class NextTests(SubmitCase):
@@ -327,8 +328,7 @@ class NextTests(SubmitCase):
         self.submit_unit(0, 1, [deviation('A')])
         self.submit_unit(1, 2, [deviation('B'), deviation('C')])
         self.submit_unit(2, 1, [])
-        self.answer(3, [{**deviation('D'), 'kind': 'uncovered choice', 'rules': []}])
-        self.assertEqual(self.step('submit', '3').returncode, 0)
+        self.assertEqual(self.submit(3, [{**deviation('D'), 'kind': 'uncovered choice', 'rules': []}]).returncode, 0)
 
         run = self.step('next')
 
@@ -344,11 +344,10 @@ class NextTests(SubmitCase):
     def test_keeps_the_finders_answers_once_the_merge_has_started(self):
         for unit, docs in ((0, 1), (1, 2), (2, 1)):
             self.submit_unit(unit, docs, [])
-        self.answer(3, [])
-        self.step('submit', '3')
+        self.submit(3, [])
         self.step('next')
 
-        run = self.step('submit', '1')
+        run = self.submit(1, [])
 
         self.assertEqual(run.returncode, 1)
         self.assertIn("Not taken: the merge has started, so the finders' answers can't change.", run.stderr)
@@ -362,12 +361,11 @@ class MergeTests(SubmitCase):
         self.submit_unit(0, 1, [deviation('A')])
         self.submit_unit(1, 2, [deviation('B')])
         self.submit_unit(2, 1, [])
-        self.answer(3, [{**deviation('D'), 'kind': 'uncovered choice', 'rules': []}])
-        self.assertEqual(self.step('submit', '3').returncode, 0)
+        self.assertEqual(self.submit(3, [{**deviation('D'), 'kind': 'uncovered choice', 'rules': []}]).returncode, 0)
         self.assertEqual(self.step('next').returncode, 0)
 
     def groups(self, groups):
-        (Path(self.run_dir) / 'answers' / 'groups.json').write_text(json.dumps({'groups': groups}))
+        return self.step('submit-groups', input=json.dumps({'groups': groups}))
 
     def test_brief_gives_the_merging_agent_the_numbered_findings_and_where_its_groups_go(self):
         self.all_in()
@@ -376,10 +374,31 @@ class MergeTests(SubmitCase):
 
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertTrue(run.stdout.startswith("You're merging the finders' answers in a pack review"), run.stdout[:80])
-        self.assertIn(f"Every finder's findings are in `{self.run_dir}/sources.json`, each with an id.", run.stdout)
-        self.assertIn(f'Write your groups to `{self.run_dir}/answers/groups.json`, in the shape '
-                      f'`{self.run_dir}/groups.schema.json` sets. Then run `{self.command("submit-groups")}`',
+        self.assertIn(f"Every finder's findings, each with an id, are what `{self.command('sources')}` prints.",
                       run.stdout)
+        self.assertIn('Submit your groups with exactly this command, with your JSON in place of the middle line, then '
+                      'do what it prints:\n\n'
+                      f"{self.command('submit-groups')} <<'PACK_REVIEW_ANSWER'\n"
+                      '{"groups": [...]}\n'
+                      'PACK_REVIEW_ANSWER\n\n'
+                      'Your groups must fit this JSON Schema:\n\n{\n "type": "object",', run.stdout)
+        self.assertIn('"ids"', run.stdout)
+
+    def test_sources_prints_the_finders_findings_numbered(self):
+        self.all_in()
+
+        run = self.step('sources')
+
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual([(source['id'], source['finding']['headline']) for source in json.loads(run.stdout)],
+                         [('0:0', 'A'), ('1:0', 'B'), ('3:0', 'D')])
+
+    def test_sources_refuses_before_every_finder_is_in(self):
+        run = self.step('sources')
+
+        self.assertEqual(run.returncode, 1)
+        self.assertIn(f"The merge can't start yet: run `{self.command('next')}` to see whose answers aren't in.",
+                      run.stderr)
 
     def test_brief_refuses_the_merge_before_every_finder_is_in(self):
         run = self.step('brief', 'merge')
@@ -400,20 +419,17 @@ class MergeTests(SubmitCase):
 
     def test_refuses_groups_that_leave_out_a_finders_finding(self):
         self.all_in()
-        self.groups([{'ids': ['0:0', '1:0'], 'kind': 'deviation', 'headline': 'H', 'take': 'T'}])
-
-        run = self.step('submit-groups')
+        run = self.groups([{'ids': ['0:0', '1:0'], 'kind': 'deviation', 'headline': 'H', 'take': 'T'}])
 
         self.assertEqual(run.returncode, 1)
-        self.assertIn("Not taken: the merge's groups leave out 3:0. Fix your groups, then run "
-                      f"`{self.command('submit-groups')}` again.", run.stderr)
+        self.assertIn("Not taken: the merge's groups leave out 3:0. Fix your groups, then submit them again with "
+                      f"`{self.command('submit-groups')}`.", run.stderr)
 
     def test_builds_the_findings_from_the_groups_and_next_says_its_done(self):
         self.all_in()
-        self.groups([{'ids': ['0:0', '1:0'], 'kind': 'deviation', 'headline': 'One import, two rules', 'take': 'T'},
-                     {'ids': ['3:0'], 'kind': 'uncovered choice', 'headline': 'Where config lives', 'take': 'U'}])
-
-        run = self.step('submit-groups')
+        run = self.groups([{'ids': ['0:0', '1:0'], 'kind': 'deviation', 'headline': 'One import, two rules',
+                            'take': 'T'},
+                           {'ids': ['3:0'], 'kind': 'uncovered choice', 'headline': 'Where config lives', 'take': 'U'}])
 
         self.assertEqual(run.returncode, 0, run.stderr)
         path = f'{self.run_dir}/findings.json'
@@ -480,3 +496,23 @@ class PackageTests(WizardCase):
 
         self.assertEqual(run.returncode, 1)
         self.assertIn("The checkout isn't the head", run.stderr)
+
+
+class HeredocTests(WizardCase):
+    """The submit command a brief prints works as written, run through a shell with the JSON in its middle line."""
+
+    def test_the_briefs_submit_command_takes_an_answer_through_bash(self):
+        launcher = f'{shlex.quote(sys.executable)} {shlex.quote(str(REVIEW / "wizard.py"))}'
+        run = self.wizard('init', '--base', self.base, '--head', 'HEAD', '--command', launcher)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        brief = re.search(r'Run `(.+ brief 3)`', run.stdout).group(1)
+        text = subprocess.run(['bash', '-c', brief], cwd=self.repo, env=self.env, capture_output=True,
+                              text=True).stdout
+        block = re.search(r"\n\n(.+ submit 3 <<'PACK_REVIEW_ANSWER'\n)(.+)\n(PACK_REVIEW_ANSWER)\n", text)
+        answer = json.dumps({'findings': [{**deviation("Don't say 'EOF'"), 'kind': 'uncovered choice', 'rules': []}]})
+
+        submitted = subprocess.run(['bash', '-c', f'{block.group(1)}{answer}\n{block.group(3)}\n'], cwd=self.repo,
+                                   env=self.env, capture_output=True, text=True)
+
+        self.assertEqual(submitted.returncode, 0, submitted.stderr)
+        self.assertIn("The uncovered finder's answer is in, with 1 finding.", submitted.stdout)
