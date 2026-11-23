@@ -12,7 +12,7 @@ import tempfile
 
 import evals
 import imports
-import report
+import sync_report
 import tables
 from blocks import block, header, instructions, region, snapshot
 from packs import GEN, REPO, base
@@ -56,6 +56,12 @@ def check(file, found, written, out, repo):
 
 
 def main():
+    # The review's wizard has its own steps and arguments, so `review` hands everything after it on.
+    if sys.argv[1:2] == ['review']:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'review'))
+        import wizard
+        wizard.main(sys.argv[2:])
+        return
     parser = argparse.ArgumentParser(prog='context-packs', description=__doc__)
     parser.add_argument('--dir', type=Path, default=Path.cwd(),
                         help='the folder to sync, if not the current one')
@@ -128,7 +134,7 @@ def main():
     if linked:
         (repo / 'CLAUDE.md').symlink_to('AGENTS.md')
     updating = [i.id for i in before if not args.ids or i.id in args.ids] if args.command == 'update' else []
-    for line in report.changes(found, written, created, linked, before, imports.scan(repo), updating):
+    for line in sync_report.changes(found, written, created, linked, before, imports.scan(repo), updating):
         print(line)
 
 

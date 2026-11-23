@@ -14,7 +14,8 @@ Each command syncs the current folder, or `--dir <folder>`, and prints what chan
 | `update <id> --ref R` | Pins one pack to a tag or commit |
 | `list` | Lists each import pack, where its pack comes from, and its pin |
 | `check` | Exits 1, naming what's stale, if a sync would change anything, and writes nothing |
-| `docs` | Prints the path of every doc and nested pack's index the tables point at, one per line, with a blank line between packs. It reads the synced tables, so it fetches no pack, and writes nothing. The `pack-findings` skill gives each pack's docs to its own subagent, and the `review` action hands it this list |
+| `docs` | Prints the path of every doc and nested pack's index the tables point at, one per line, with a blank line between packs. It reads the synced tables, so it fetches no pack, and writes nothing. The `review` action hands this list to its finders, one pack's docs each |
+| `review init --base B --head H --command C`, then the steps it prints | Runs a review one step at a time, for an agent: the `pack-findings` skill runs it. Each step prints what to do next, with every command in full |
 | `eval [doc…] [--pack F] [--runs N] [--model M]` | Runs each pack's eval prompts, checking that an agent reads each doc when it should, and only then |
 
 A pack's id is its import pack's folder under `context-packs/`, such as `core` or `server/database`. Moving the folder changes the id.
@@ -146,7 +147,7 @@ Prompts close to a row's `when` that shouldn't match it, or that match only thro
 
 **Experimental.** The review action is still changing: its jobs, their inputs, and what it posts on a PR can change in any release. Pin it to a commit, not `@main`, and expect to update your workflow when you move the pin.
 
-The review is a reusable workflow, `.github/workflows/review.yml`. One finder per unit of your packs checks the PR, an agent merges what they found, the merged findings are paired with pack-review's threads from earlier runs, and a script posts the review. The author then goes through the findings in a local session. Add a workflow such as `.github/workflows/pack-review.yml`, with the commit you pin in place of `<commit>`:
+The review is a reusable workflow, `.github/workflows/review.yml`. An agent runs the `pack-findings` skill on the PR, as a local review does: one finder per unit of your packs checks it, and an agent merges what they found. The findings are paired with pack-review's threads from earlier runs, and a script posts the review. The author then goes through the findings in a local session. Add a workflow such as `.github/workflows/pack-review.yml`, with the commit you pin in place of `<commit>`:
 
 ```yaml
 name: pack-review
@@ -163,7 +164,7 @@ jobs:
       anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
-It runs five jobs: units, find, merge, pairing and post. The units are your instruction file, then each pack's docs, and the workflow starts a finder for each, so every unit is checked: no agent can decide one isn't worth it. The `permissions` you grant are the most any job gets, and each job narrows them. The finders and the merging agent can only read the repo, the pairing job's agents can only read the PR, and the post job, which runs no agent, is the only one that can write to it. It skips drafts and PRs from forks. Each job checks out the review at the commit you pinned, so its parts always match. It needs GitHub.com: GitHub Enterprise Server doesn't give a reusable workflow its own commit.
+It runs four jobs: pr, review, pairing and post. The units are your instruction file, then each pack's docs. The skill's wizard names a finder for each and won't merge until every one has answered, so every unit is checked: no agent can decide one isn't worth it. The `permissions` you grant are the most any job gets, and each job narrows them. The review job's agents can only read the repo, the pairing job's agents can only read the PR, and the post job, which runs no agent, is the only one that can write to it. It skips drafts and PRs from forks. Each job checks out the review at the commit you pinned, so its parts always match. The review's agent runs the CLI from that commit too, so it needs nothing from npm. It needs GitHub.com: GitHub Enterprise Server doesn't give a reusable workflow its own commit.
 
 With a Pro or Max subscription instead of an API key, run `claude setup-token` locally, add what it prints as the secret `CLAUDE_CODE_OAUTH_TOKEN`, and pass `claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}` in place of `anthropic_api_key`. Reviews then count against the subscription's usage limits.
 
@@ -175,7 +176,7 @@ Each new finding also gets **a thread on the diff**, on a line where it applies.
 
 To go through the findings, the author runs `/pack-review <owner>/<repo>#<number>` in Claude Code with the PR's branch checked out, as the summary says. Naming the repo lets it work from a session in a folder above the repos; inside the repo, the number alone does. `pack-review` reads the summary's JSON rather than finding them again, goes through each finding with the author, and runs `pack-rule` for each one they want recorded. Neither run commits or pushes.
 
-The diff and the repo's files can hold text written to steer the agent, so the agent can't reach the PR, and its tools only read the checkout and the change, through a git server that runs fixed git commands. It has no shell. Its findings appear in review threads and in the summary's list, escaped so they can't notify anyone or hide text. They appear in full in the summary's JSON block, where everything shows as written. Invisible characters are removed, and anything that looks like an Anthropic key or GitHub token is redacted. claude-code-action runs it only when whoever triggered the run has write access. A PR with more than 100 comments can't get a summary, since one that missed its earlier summary would post a second.
+The diff and the repo's files can hold text written to steer the agent, so the agent can't reach the PR. Its tools only read the checkout, and it reads the change through the wizard, which runs fixed git commands. Its shell runs only the commands the skill runs, and it writes only its answers, in a folder the job makes for them. Its findings appear in review threads and in the summary's list, escaped so they can't notify anyone or hide text. They appear in full in the summary's JSON block, where everything shows as written. Invisible characters are removed, and anything that looks like an Anthropic key or GitHub token is redacted. claude-code-action runs it only when whoever triggered the run has write access. A PR with more than 100 comments can't get a summary, since one that missed its earlier summary would post a second.
 
 Each run costs about what a review in chat does.
 

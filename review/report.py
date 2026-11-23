@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Write the merge job's report for the pairing and post jobs: the findings, built from the finders' findings each of
-the merging agent's groups names, cleaned, and the line each one's thread can open on. It reaches nothing outside the
-runner."""
+"""Write the review job's report for the pairing and post jobs: the findings the wizard built, cleaned again, and the
+line each one's thread can open on. findings_in() builds findings from the finders' findings each of the merging
+agent's groups names, for the wizard's submit-groups. It reaches nothing outside the runner."""
 import argparse
 import json
 from pathlib import Path
@@ -21,13 +21,17 @@ def cleaned(value):
     return value
 
 
+class Rejected(Exception):
+    """Groups the report can't be built from, with the reason."""
+
+
 def groups_in(path):
     try:
         output = json.loads(path.read_text(encoding='utf-8'))
     except ValueError:
         output = None
     if not isinstance(output, dict) or not isinstance(output.get('groups'), list):
-        sys.exit(f'pack-review: the merge returned no groups: {path.read_text(encoding="utf-8")[:500]!r}')
+        raise Rejected(f'the merge returned no groups: {path.read_text(encoding="utf-8")[:500]!r}')
     return output['groups']
 
 
@@ -56,19 +60,27 @@ def checked(groups, sources):
     named = [id for group in groups for id in group['ids']]
     invented = unique([id for id in named if id not in sources])
     if invented:
-        sys.exit(f"pack-review: the merge's groups name {', '.join(invented)}, which no finder reported.")
+        raise Rejected(f"the merge's groups name {', '.join(invented)}, which no finder reported")
     repeated = unique([id for n, id in enumerate(named) if id in named[:n]])
     if repeated:
-        sys.exit(f"pack-review: the merge's groups put {', '.join(repeated)} in more than one group.")
+        raise Rejected(f"the merge's groups put {', '.join(repeated)} in more than one group")
     left = [id for id in sources if id not in named]
     if left:
-        sys.exit(f"pack-review: the merge's groups leave out {', '.join(left)}.")
+        raise Rejected(f"the merge's groups leave out {', '.join(left)}")
     return groups
 
 
 def findings_in(groups_path, sources_path):
     sources = {source['id']: source['finding'] for source in json.loads(sources_path.read_text(encoding='utf-8'))}
     return cleaned([built(group, sources) for group in checked(groups_in(groups_path), sources)])
+
+
+def built_by_wizard(path, head):
+    """The findings a review's wizard built, cleaned like the merge's, once they're for the head that was reviewed."""
+    built = json.loads(path.read_text(encoding='utf-8'))
+    if built['head'] != head:
+        raise Rejected(f"the review's findings are for {built['head']}, not the head, {head}")
+    return cleaned(built['findings'])
 
 
 def anchors(findings, shown):
@@ -87,14 +99,15 @@ def main():
     parser.add_argument('--base', required=True, help='the commit the reviewed change starts from')
     parser.add_argument('--base-ref', required=True, help='the branch the PR was to merge into when it was reviewed')
     parser.add_argument('--head', required=True, help='the commit that was reviewed')
-    parser.add_argument('--sources', type=Path, required=True,
-                        help="the finders' findings, as `units.py merge` numbers them")
-    parser.add_argument('--groups', type=Path, required=True, help="the merging agent's structured output")
+    parser.add_argument('--findings', type=Path, required=True, help="the findings the review's wizard built")
     parser.add_argument('--shown', type=Path, required=True,
-                        help='the head lines each diff shows, as `git_server.py shown` prints them')
+                        help='the head lines each diff shows, as `change.py shown` prints them')
     parser.add_argument('--out', type=Path, required=True, help='where to write the report')
     args = parser.parse_args()
-    findings = findings_in(args.groups, args.sources)
+    try:
+        findings = built_by_wizard(args.findings, args.head)
+    except Rejected as rejected:
+        sys.exit(f'pack-review: {rejected}.')
     report = {'base': args.base, 'base_ref': args.base_ref, 'head': args.head, 'findings': findings,
               'anchors': anchors(findings, json.loads(args.shown.read_text(encoding='utf-8')))}
     args.out.write_text(json.dumps(report, ensure_ascii=False), encoding='utf-8')

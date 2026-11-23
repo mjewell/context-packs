@@ -17,9 +17,9 @@ on:
         description: An Anthropic API key. Pass this or claude_code_oauth_token.
         required: false
 # One reviewing run per PR. A run that will review cancels the one before it, and reviews the PR as it is when its
-# units job starts, so whichever run is left reviews the newest head. A run that won't review, such as one for a title
+# pr job starts, so whichever run is left reviews the newest head. A run that won't review, such as one for a title
 # edit, gets a group of its own: GitHub cancels a run waiting in a group when another joins, and a review waits there
-# while the run before it is cancelled. Its condition is the units job's, written twice since concurrency can't read a
+# while the run before it is cancelled. Its condition is the pr job's, written twice since concurrency can't read a
 # job's if.
 concurrency:
   group: >-
@@ -31,7 +31,7 @@ concurrency:
 # actions from there, so the actions and this workflow always match. The PR's own checkout comes first where a job
 # needs one, since checking it out cleans the workspace.
 jobs:
-  units:
+  pr:
     # Drafts wait until they're ready. PRs from forks get no secrets, so they're skipped. An edit reviews again only
     # when it changed the base branch, so the findings match the new diff. The concurrency group at the top repeats this
     # condition: change both together.
@@ -39,12 +39,12 @@ jobs:
       ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository
       && (github.event.action != 'edited' || github.event.changes.base.ref.from != null) }}
     runs-on: ubuntu-latest
-    # pull-requests read is for the PR's head and base now. This job runs no agent.
+    # pull-requests read is for the PR's head and base now. This job runs no agent, so the review's agent never gets
+    # a token that reads the PR.
     permissions:
       contents: read
       pull-requests: read
     outputs:
-      units: ${{ steps.units.outputs.units }}
       head: ${{ steps.pr.outputs.head }}
       base: ${{ steps.pr.outputs.base }}
       base-ref: ${{ steps.pr.outputs.base-ref }}
@@ -58,31 +58,17 @@ jobs:
         run: >-
           gh api "repos/$GITHUB_REPOSITORY/pulls/$PR"
           --jq '"head=\(.head.sha)\nbase=\(.base.sha)\nbase-ref=\(.base.ref)"' >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ steps.pr.outputs.head }}
-      - uses: actions/checkout@v6
-        with:
-          repository: ${{ job.workflow_repository }}
-          ref: ${{ job.workflow_sha }}
-          path: .pack-review
-          persist-credentials: false
-      - id: units
-        uses: ./.pack-review/review/units
-  find:
-    needs: units
+  review:
+    needs: pr
     runs-on: ubuntu-latest
-    # One finder per unit, started by the workflow, so no agent decides whether a unit is worth checking.
-    strategy:
-      matrix:
-        unit: ${{ fromJSON(needs.units.outputs.units) }}
-    # The finders read the repo and nothing else, so GitHub, not their tool lists, keeps them from writing.
+    # The review's agent runs the pack-findings skill, as a local review does. It reads the repo and nothing else, so
+    # GitHub, not its tool list, keeps it from writing.
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ needs.units.outputs.head }}
+          ref: ${{ needs.pr.outputs.head }}
           fetch-depth: 0
       - uses: actions/checkout@v6
         with:
@@ -90,40 +76,16 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .pack-review
           persist-credentials: false
-      - uses: ./.pack-review/review/find
+      - uses: ./.pack-review/review/review
         with:
-          unit: ${{ matrix.unit }}
-          head: ${{ needs.units.outputs.head }}
-          base: ${{ needs.units.outputs.base }}
-          model: ${{ inputs.model }}
-          claude-code-oauth-token: ${{ secrets.claude_code_oauth_token }}
-          anthropic-api-key: ${{ secrets.anthropic_api_key }}
-  merge:
-    needs: [units, find]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.units.outputs.head }}
-          fetch-depth: 0
-      - uses: actions/checkout@v6
-        with:
-          repository: ${{ job.workflow_repository }}
-          ref: ${{ job.workflow_sha }}
-          path: .pack-review
-          persist-credentials: false
-      - uses: ./.pack-review/review/merge
-        with:
-          head: ${{ needs.units.outputs.head }}
-          base: ${{ needs.units.outputs.base }}
-          base-ref: ${{ needs.units.outputs.base-ref }}
+          head: ${{ needs.pr.outputs.head }}
+          base: ${{ needs.pr.outputs.base }}
+          base-ref: ${{ needs.pr.outputs.base-ref }}
           model: ${{ inputs.model }}
           claude-code-oauth-token: ${{ secrets.claude_code_oauth_token }}
           anthropic-api-key: ${{ secrets.anthropic_api_key }}
   pairing:
-    needs: [units, merge]
+    needs: [pr, review]
     runs-on: ubuntu-latest
     # The pairing job's agents read pack-review's threads and can't write.
     permissions:
@@ -134,7 +96,7 @@ jobs:
       # branch with git, which fails outside a checkout.
       - uses: actions/checkout@v6
         with:
-          ref: ${{ needs.units.outputs.head }}
+          ref: ${{ needs.pr.outputs.head }}
       - uses: actions/checkout@v6
         with:
           repository: ${{ job.workflow_repository }}
@@ -147,7 +109,7 @@ jobs:
           claude-code-oauth-token: ${{ secrets.claude_code_oauth_token }}
           anthropic-api-key: ${{ secrets.anthropic_api_key }}
   post:
-    needs: [merge, pairing]
+    needs: [review, pairing]
     runs-on: ubuntu-latest
     # Two posts at once could each find no summary and add one, so they wait their turn.
     concurrency:

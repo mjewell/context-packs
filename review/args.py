@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""The claude_args the review hands claude-code-action, each as one line. A finder checks one unit of the packs, and
-the merging agent groups the finders' findings. Both get the schema their answer is checked against, tools that only
-read, and the git server, which reads the change. claude-code-action splits the line the way a shell would. output()
-writes a prompt, a claude_args line or the units' matrix as a GitHub step output."""
+"""The claude_args the review hands claude-code-action, as one line. The reviewer runs the pack-findings skill, whose
+wizard starts the finders and the merge. claude-code-action splits the line the way a shell would. output() writes a
+prompt or a claude_args line as a GitHub step output."""
 import json
 import os
 from pathlib import Path
@@ -11,17 +10,6 @@ import sys
 import uuid
 
 REVIEW = Path(__file__).resolve().parent
-# The schema lives with the pack-findings skill, so a local review and CI read one copy.
-SCHEMA = REVIEW.parent / 'skills' / 'pack-findings' / 'findings.schema.json'
-# The diff and the repo's files can hold text written to steer the agent, so its tools only read: confined by
-# --restricted to the checkout, without .git/config, where claude-code-action keeps its token, and to any folder it's
-# given. It gets no shell, since an allowed git command such as git log --output=<file> writes any file. It reads the
-# change through the git server instead, which runs fixed git commands, and that's its only MCP server, so nothing it
-# does reaches the PR. It starts no subagents: the workflow starts one finder per unit, so no agent can skip one.
-TOOLS = ['Read', 'Glob', 'Grep']
-# Allows every tool on the git server. A name starting with mcp__github would make claude-code-action add its own
-# GitHub servers.
-SERVER = 'mcp__git'
 
 
 def compact(value):
@@ -46,37 +34,19 @@ def output(name, value):
         out.write(f'{name}<<{delimiter}\n{value}\n{delimiter}\n')
 
 
-def findings_schema():
-    return json.loads(SCHEMA.read_text(encoding='utf-8'))
-
-
-def groups_schema():
-    """The merging agent's answer: which of the finders' findings make each finding, with its kind, headline and take,
-    from the findings schema. A script builds the rest of each finding from its group's findings."""
-    finding = findings_schema()['properties']['findings']['items']['properties']
-    group = {'type': 'object', 'additionalProperties': False, 'required': ['ids', 'kind', 'headline', 'take'],
-             'properties': {'ids': {'type': 'array', 'minItems': 1, 'items': {'type': 'string'},
-                                    'description': "The ids of the finders' findings this one merges."},
-                            'kind': finding['kind'], 'headline': finding['headline'], 'take': finding['take']}}
-    return {'type': 'object', 'additionalProperties': False, 'required': ['groups'],
-            'properties': {'groups': {'type': 'array', 'items': group}}}
-
-
-def reading(base, head, model, schema):
-    """The arguments every agent that reads the change gets."""
-    servers = {'mcpServers': {'git': {'type': 'stdio', 'command': sys.executable,
-                                      'args': [str(REVIEW / 'git_server.py'), '--base', base, '--head', head]}}}
-    return ['--json-schema', compact(schema), '--tools', ','.join(TOOLS), '--allowedTools', ','.join([*TOOLS, SERVER]),
-            '--disallowedTools', 'Read(./.git/**)', *(['--model', model] if model else []), '--mcp-config',
-            compact(servers), '--restricted', '--strict-mcp-config']
-
-
-def finder(base, head, model):
-    """A finder's line: its prompt holds everything it needs, so it gets no skill and no folder."""
-    return line(reading(base, head, model, findings_schema()))
-
-
-def merger(inputs, base, head, model):
-    """The merging agent's line: its prompt holds its instructions, and it gets the folder holding the finders'
-    answers."""
-    return line(['--add-dir', inputs, *reading(base, head, model, groups_schema())])
+def reviewer(answers, model):
+    """The review agent's line: it runs the pack-findings skill, as a local review does, from this checkout of the
+    review, with this checkout's CLI. It may run only the commands the skill runs, and has no MCP server. It writes
+    only in answers, the folder where the wizard's briefs say to write each answer."""
+    # The path the skill builds from its own folder, so the agent's commands match it.
+    cli = f'python3 {REVIEW.parent}/src/cli.py'
+    # git rev-parse and git status have no option that writes a file, unlike git log's --output.
+    allowed = ['Skill(context-packs:pack-findings)', f'Bash({cli} review:*)', f'Bash({cli} docs)',
+               'Bash(git rev-parse:*)', 'Bash(git status:*)',
+               # A headless run writes outside its working directory only with both this rule and --add-dir. The
+               # rule's // makes the path absolute, where one / would start from the settings file.
+               f'Edit(/{answers}/**)']
+    return line(['--plugin-dir', str(REVIEW.parent), '--add-dir', answers,
+                 '--tools', 'Read,Glob,Grep,Write,Bash,Agent,Skill',
+                 '--allowedTools', ','.join(allowed), '--disallowedTools', 'Read(./.git/**)',
+                 *(['--model', model] if model else []), '--restricted', '--strict-mcp-config'])

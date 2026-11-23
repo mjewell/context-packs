@@ -81,6 +81,25 @@ The finder with no unit, which reads the whole diff for uncovered choices and se
 **Group**:
 The merging agent's answer for one finding: the ids of the finders' findings it merges, with its kind, headline and take.
 
+**Wizard**:
+The command an agent runs a review through, one step at a time: `context-packs review`, which the pack-findings skill runs in a local review and in CI alike. Each step prints what to do next, with every command in full. It's a state machine: its state is which files the run folder holds, and it refuses a step whose checks fail.
+_Avoid_: script, orchestrator (the agent that runs it)
+
+**Orchestrator**:
+The agent that runs the wizard's `init` and `next`, and starts the subagents they name.
+
+**Run folder**:
+The folder `init` makes for one review, in `pack-review-runs` under the temporary folder, which holds its state, the answers the wizard took and the findings. Every command the wizard prints names it. No agent writes in it.
+
+**Answers folder**:
+The folder beside a run folder, in `pack-review-answers`, where agents write their answers for the wizard to read. Each brief names the file its agent writes.
+
+**Brief**:
+The prompt the wizard gives one finder, or the merging agent: the skill's prompt for it, with the commands it reads through and where its answer goes.
+
+**Served doc**:
+A doc the wizard printed through `doc`. A unit's answer is taken only once every doc in the unit was served.
+
 **Finding**:
 One choice in a diff that the review reports. It is a deviation, a conflict or an uncovered choice.
 
