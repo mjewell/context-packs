@@ -18,6 +18,17 @@ export function repr(text: string): string {
   return `'${escaped.replace(/'/g, "\\'")}'`;
 }
 
+/** template filled in as str.format fills it: each {name} replaced, and {{ and }} written as one brace. */
+export function format(template: string, values: Readonly<Record<string, string>>): string {
+  return template.replace(/\{\{|\}\}|\{(\w+)\}/g, (match, key?: string) => {
+    if (match === '{{') return '{';
+    if (match === '}}') return '}';
+    const value = values[key!];
+    if (value === undefined) throw new Error(`a template has a placeholder {${key}} that nothing fills`);
+    return value;
+  });
+}
+
 /** text quoted for a POSIX shell, as shlex.quote quotes it: as it is when it holds only safe characters. */
 export function quote(text: string): string {
   if (!text) return "''";

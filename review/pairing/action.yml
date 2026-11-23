@@ -29,7 +29,7 @@ runs:
         PR: ${{ github.event.pull_request.number }}
       run: |
         mkdir "$RUNNER_TEMP/pack-review-pairing"
-        python3 "$GITHUB_ACTION_PATH/../threads.py" --pr "$PR" > "$RUNNER_TEMP/pack-review-pairing/threads.json"
+        node "$GITHUB_ACTION_PATH/../threads.ts" --pr "$PR" > "$RUNNER_TEMP/pack-review-pairing/threads.json"
     - name: Prepare the pairing
       id: prepare
       shell: bash
@@ -37,7 +37,7 @@ runs:
         MODEL: ${{ inputs.model }}
       # The prompt holds the findings and the findings the threads were opened for, and no one's comments.
       run: |
-        python3 "$GITHUB_ACTION_PATH/../pairing.py" pair-prompt --report "$RUNNER_TEMP/pack-review-report/report.json" \
+        node "$GITHUB_ACTION_PATH/../pairing.ts" pair-prompt --report "$RUNNER_TEMP/pack-review-report/report.json" \
           --threads "$RUNNER_TEMP/pack-review-pairing/threads.json" --model "$MODEL"
     - name: Pair
       id: pair
@@ -62,18 +62,18 @@ runs:
           printf '%s' "$PAIRS" > "$dir/pairs.json"
           pairs=(--pairs "$dir/pairs.json")
         fi
-        python3 "$GITHUB_ACTION_PATH/../pairing.py" pair-check --report "$RUNNER_TEMP/pack-review-report/report.json" \
+        node "$GITHUB_ACTION_PATH/../pairing.ts" pair-check --report "$RUNNER_TEMP/pack-review-report/report.json" \
           --threads "$dir/threads.json" "${pairs[@]}" --out "$dir/paired.json"
     - name: Prepare the commentary
       id: prepare-comment
       shell: bash
       env:
         MODEL: ${{ inputs.model }}
-      # This prompt holds each paired finding and its thread's replies, filtered by trust.py. The pairs are already
+      # This prompt holds each paired finding and its thread's replies, filtered by trust.ts. The pairs are already
       # fixed, so nothing in a reply can change them.
       run: |
         dir="$RUNNER_TEMP/pack-review-pairing"
-        python3 "$GITHUB_ACTION_PATH/../pairing.py" comment-prompt \
+        node "$GITHUB_ACTION_PATH/../pairing.ts" comment-prompt \
           --report "$RUNNER_TEMP/pack-review-report/report.json" --threads "$dir/threads.json" \
           --paired "$dir/paired.json" --model "$MODEL"
     - name: Comment
@@ -99,7 +99,7 @@ runs:
           printf '%s' "$COMMENTARY" > "$dir/commentary.json"
           commentary=(--commentary "$dir/commentary.json")
         fi
-        python3 "$GITHUB_ACTION_PATH/../pairing.py" comment-check --paired "$dir/paired.json" "${commentary[@]}"
+        node "$GITHUB_ACTION_PATH/../pairing.ts" comment-check --paired "$dir/paired.json" "${commentary[@]}"
     - name: Save the pairs
       # v7.0.2, pinned by commit since a tag can move.
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9

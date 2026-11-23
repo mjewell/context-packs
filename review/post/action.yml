@@ -23,4 +23,4 @@ runs:
         REPORT: ${{ runner.temp }}/pack-review-report/report.json
         PAIRED: ${{ runner.temp }}/pack-review-pairing/paired.json
       # One script plans the threads and the summary and checks both before it writes either.
-      run: python3 "$GITHUB_ACTION_PATH/../post.py" --pr "$PR" --report "$REPORT" --paired "$PAIRED"
+      run: node "$GITHUB_ACTION_PATH/../post.ts" --pr "$PR" --report "$REPORT" --paired "$PAIRED"

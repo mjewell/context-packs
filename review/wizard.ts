@@ -14,7 +14,7 @@ import { instructions, region } from '../src/blocks.ts';
 import { runAsScript } from '../src/main.ts';
 import { exists } from '../src/paths.ts';
 import { dumps } from '../src/pyjson.ts';
-import { quote, repr } from '../src/pystr.ts';
+import { format, quote, repr } from '../src/pystr.ts';
 import { ROOT } from '../src/root.ts';
 import { Stop } from '../src/stop.ts';
 import { units as tableUnits } from '../src/tables.ts';
@@ -134,15 +134,9 @@ class Run {
   }
 }
 
-/** A prompt file filled in as str.format fills it: each {name} replaced, and {{ and }} written as one brace. */
+/** A prompt file filled in as str.format fills it. */
 function prompt(name: string, values: Readonly<Record<string, string>>): string {
-  return fs.readFileSync(path.join(PROMPTS, name), 'utf8').replace(/\{\{|\}\}|\{(\w+)\}/g, (match, key?: string) => {
-    if (match === '{{') return '{';
-    if (match === '}}') return '}';
-    const value = values[key!];
-    if (value === undefined) throw new Error(`${name} has a placeholder {${key}} that nothing fills`);
-    return value;
-  });
+  return format(fs.readFileSync(path.join(PROMPTS, name), 'utf8'), values);
 }
 
 function init(args: Values): void {

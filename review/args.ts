@@ -6,9 +6,15 @@
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 
+import { ascii } from '../src/pyjson.ts';
 import { quote } from '../src/pystr.ts';
 import { ROOT } from '../src/root.ts';
 import { fail } from '../src/stop.ts';
+
+/** JSON on one line, with each ' written as \u0027 so the whole value fits in one pair of single quotes. */
+export function compact(value: unknown): string {
+  return ascii(JSON.stringify(value)).replace(/'/g, '\\u0027');
+}
 
 /**
  * The values as one claude_args line, each quoted whole. A value holding a single quote stops the run, since
