@@ -249,8 +249,9 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
   - Text from the PR reaches a step output only under a delimiter it can't contain, so a line in it can't set another output
 - The author goes through the [[findings]] locally, decides each one, and records the [[rules]] they want {#local-review}
   - The author runs /pack-review on a PR, which reads CI's [[findings]] or runs the pack-findings skill {#pack-review}
-    - [[findings|Findings]] come from the first source that has them: this conversation, CI's [[ci-review|summary]], then a fresh run of pack-findings
-      - A fresh run hands its [[findings]] back unshown, and [[pack-review]] shows each one, so the author doesn't see it twice
+    - [[findings|Findings]] come from the first source that has them: a [[wizard]] run in this conversation, CI's [[ci-review|summary]], then a fresh run of pack-findings
+      - pack-findings shows nothing and hands back its [[wizard|wizard's]] `next` command. [[pack-review]] runs it and shows each [[findings|finding]], so the author sees each one once
+        - Why: after a compaction, the conversation holds only a summary of the [[findings]], while `next` prints the ones the wizard checked
     - It loads pack-findings with the Skill tool, which can't load a skill that sets `disable-model-invocation`, so pack-findings is the one skill that doesn't
   - CI's [[ci-review|summary]] carries every [[findings|finding]] as JSON, so the author works through exactly what CI found {#summary-json}
     - Rejected: a CI artifact. It would expire, and reviewing again locally costs a second review that could find different things

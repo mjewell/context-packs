@@ -26,7 +26,7 @@ Each finding is one of three kinds:
 
 ## Where it runs
 
-- **Run by another skill**, such as `pack-review`: every step below, then hand the findings back to that skill, which shows them to the user one at a time. Don't also show them here, since the user would see each one twice. Once you've handed them back, carry on with that skill's next step.
+- **Run by another skill**, such as `pack-review`: every step below, then hand back to that skill the `next` command that printed the findings, so it reads them from the wizard. Don't show the findings here, since that skill shows them to the user one at a time, and the user would see each one twice. Once you've handed the command back, carry on with that skill's next step.
 - **Run by the user**, with a PR, branch or range: every step below, then show the findings. Give the number of each kind, then each finding in full, grouped by kind. Say that running `pack-review` in this session goes through them, without finding them again.
 
 A PR named as `owner/repo#number` is in that repo: from a folder above the repos, work in its checkout.

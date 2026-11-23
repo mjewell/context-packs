@@ -20,9 +20,9 @@ A PR named as `owner/repo#number` is in that repo: from a folder above the repos
 
 Take them from the first source that has them:
 
-- **This conversation**, when `pack-findings` already ran in it on the same base and head.
+- **This conversation**, when `pack-findings` already ran in it on the same base and head. Run the `next` command its wizard printed the findings with, exactly as printed, and take the findings from what it prints. The conversation may hold only a summary of them, while the wizard prints the findings it checked. If the command fails, its run is gone: go to the next source.
 - **A summary CI posted**, when the user names a PR, by number or as `owner/repo#number`. Fetch it as described in [From a CI review](#from-a-ci-review). A PR with no summary from pack-review goes to the next source.
-- **`pack-findings`**, run with the Skill tool on what the user named. It hands the findings back to this skill, which shows them in step 2. Then carry on at step 2 here.
+- **`pack-findings`**, run with the Skill tool on what the user named. It hands back the wizard's `next` command. Run it, exactly as printed, and take the findings from what it prints. Then carry on at step 2 here.
 
 ## 2. Report
 
