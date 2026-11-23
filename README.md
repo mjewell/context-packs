@@ -42,7 +42,7 @@ It works with any agent that reads `AGENTS.md` or `CLAUDE.md`. [The full example
 
 ## Quick start
 
-You need `git` and Node 22.18+. A local review also needs Python 3.9+, until its code moves to TypeScript. On macOS, the command line tools provide `git` and Python.
+You need `git` and Node 22.18+. On macOS, the command line tools provide `git`.
 
 ### 1. Write your repo's docs
 
