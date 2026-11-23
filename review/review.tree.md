@@ -52,7 +52,7 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     - The [[wizard]] fills each one with the commands that read the [[doc|docs]] and the change, and how to hand in an answer, in a [[local-review|local review]] and in CI alike
     - The prompts, one each for a [[unit|unit's]] [[finders|finder]], the [[uncovered-finder|uncovered finder]] and the [[merge]], live with the schema in the pack-findings skill's folder, since an installed skill holds only its own folder
       - Why: with the schema in `review/`, a local agent fetched it from a GitHub URL the user never pinned
-  - The wizard runs every review, local or CI: a command agents run one step at a time {#wizard}
+  - The wizard runs every review, local or CI: a state machine that agents step through {#wizard}
     ```d2
     shape: sequence_diagram
     o: orchestrator
@@ -94,6 +94,7 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
       - `init` checks that the checkout is the head and that the change touches a file, then names one [[finders|finder]] for each [[unit]] and the [[uncovered-finder|uncovered finder]], each with a one-line prompt
       - While answers are missing, `next` names each finder that hasn't answered, with its prompt, so one that stopped can be started again
       - Once every answer is in, `next` numbers the finders' findings and names the merging agent. Once its groups are in, `next` prints the [[findings]]
+      - The run's state is which files its folder holds. The wizard works it out on each step instead of storing it, and refuses a step whose checks fail
     - A finder's brief is the skill's prompt for its kind, with the commands that read its docs and the change, and its answer's schema {#brief}
       - `doc` prints one of the unit's docs and marks it served. `submit` takes a unit's answer only once every doc in it was served, and only in the schema's shape
         - Why: the wizard keeps its own record of what it printed, so the check needs no transcript, see [[doc-names]]
@@ -136,6 +137,7 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
       - Why: with the npm release the skill pins, a run between releases would pair one version's wizard with another's report
     - The report reads the one run that reached its findings, from a new temporary folder the job gave the agent. Any other count fails the job
       - Why: a review that didn't finish, or ran twice, would otherwise post findings nobody checked
+      - Why: it never reads the agent's reply, since the wizard checked every answer behind the findings, and nothing checks the reply
     - The report refuses findings for a head other than the PR's
     - The run's log lists each tool call's input, and only whether its result was an error
       - Why: a call's full output can hold file contents and secrets
