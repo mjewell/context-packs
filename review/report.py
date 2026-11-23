@@ -75,6 +75,14 @@ def findings_in(groups_path, sources_path):
     return cleaned([built(group, sources) for group in checked(groups_in(groups_path), sources)])
 
 
+def built_by_wizard(path, head):
+    """The findings a review's wizard built, cleaned like the merge's, once they're for the head that was reviewed."""
+    built = json.loads(path.read_text(encoding='utf-8'))
+    if built['head'] != head:
+        raise Rejected(f"the review's findings are for {built['head']}, not the head, {head}")
+    return cleaned(built['findings'])
+
+
 def anchors(findings, shown):
     """The spot each finding's thread can open on: its first spot that deviates and the diff shows, or else its first
     spot the diff shows, or None when the diff shows none, since a review comment needs a line in the diff."""
@@ -91,15 +99,19 @@ def main():
     parser.add_argument('--base', required=True, help='the commit the reviewed change starts from')
     parser.add_argument('--base-ref', required=True, help='the branch the PR was to merge into when it was reviewed')
     parser.add_argument('--head', required=True, help='the commit that was reviewed')
-    parser.add_argument('--sources', type=Path, required=True,
-                        help="the finders' findings, as `units.py merge` numbers them")
-    parser.add_argument('--groups', type=Path, required=True, help="the merging agent's structured output")
+    parser.add_argument('--sources', type=Path, help="the finders' findings, as `units.py merge` numbers them")
+    parser.add_argument('--groups', type=Path, help="the merging agent's structured output")
+    parser.add_argument('--findings', type=Path,
+                        help="the findings the review's wizard built, in place of --sources and --groups")
     parser.add_argument('--shown', type=Path, required=True,
                         help='the head lines each diff shows, as `git_server.py shown` prints them')
     parser.add_argument('--out', type=Path, required=True, help='where to write the report')
     args = parser.parse_args()
+    if bool(args.findings) == bool(args.sources or args.groups) or bool(args.sources) != bool(args.groups):
+        parser.error('give --findings, or --sources and --groups')
     try:
-        findings = findings_in(args.groups, args.sources)
+        findings = (built_by_wizard(args.findings, args.head) if args.findings
+                    else findings_in(args.groups, args.sources))
     except Rejected as rejected:
         sys.exit(f'pack-review: {rejected}.')
     report = {'base': args.base, 'base_ref': args.base_ref, 'head': args.head, 'findings': findings,

@@ -1,0 +1,57 @@
+import json
+import shlex
+
+from review_case import REVIEW
+from test_review_pairing import PairingCase
+
+BASE, HEAD = 'b' * 40, 'h' * 40
+VERSION = json.loads((REVIEW.parent / 'package.json').read_text())['version']
+
+
+class StartTests(PairingCase):
+    """The review job's agent runs the pack-findings skill, as a local review does, from the review's own checkout,
+    allowed only the commands the skill runs."""
+
+    def start(self, *extra):
+        run = self.script('start', '--base', BASE, '--head', HEAD, *extra)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        return self.outputs()
+
+    def args(self, *extra):
+        return shlex.split(self.start(*extra)['claude-args'])
+
+    def flag(self, args, name):
+        return args[args.index(name) + 1]
+
+    def test_asks_for_the_pack_findings_skill_on_the_reviewed_range(self):
+        self.assertEqual(self.start()['prompt'], f'Use the pack-findings skill on the commit range {BASE}..{HEAD}.')
+
+    def test_loads_the_skill_from_the_reviews_checkout(self):
+        self.assertEqual(self.flag(self.args(), '--plugin-dir'), str(REVIEW.parent))
+
+    def test_allows_only_the_skill_and_the_commands_it_runs(self):
+        args = self.args()
+
+        self.assertEqual(self.flag(args, '--tools'), 'Read,Glob,Grep,Write,Bash,Agent,Skill')
+        self.assertEqual(self.flag(args, '--allowedTools').split(','), [
+            'Skill(context-packs:pack-findings)', f'Bash(npx context-packs@{VERSION} review:*)',
+            f'Bash(npx context-packs@{VERSION} docs)', 'Bash(git rev-parse:*)', 'Bash(git status:*)'])
+        self.assertEqual(self.flag(args, '--disallowedTools'), 'Read(./.git/**)')
+        self.assertIn('--restricted', args)
+
+    def test_gives_the_agent_no_mcp_server_and_no_answer_schema(self):
+        args = self.args()
+
+        self.assertIn('--strict-mcp-config', args)
+        self.assertNotIn('--mcp-config', args)
+        self.assertNotIn('--json-schema', args)
+
+    def test_passes_a_model_when_given_one(self):
+        self.assertEqual(self.flag(self.args('--model', 'opus'), '--model'), 'opus')
+        self.output.write_text('')
+        self.assertNotIn('--model', self.args('--model', ''))
+
+    def test_quotes_each_value_whole_so_any_shell_style_parser_reads_it_the_same(self):
+        for value in self.args():
+            quoted = shlex.quote(value)
+            self.assertTrue(quoted == value or (quoted.startswith("'") and quoted.count("'") == 2), value[:60])
