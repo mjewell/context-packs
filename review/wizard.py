@@ -12,8 +12,7 @@ import sys
 import tempfile
 
 REVIEW = Path(__file__).resolve().parent
-# After review/, since src/ has a report.py of its own, and the wizard needs review/'s.
-sys.path.append(str(REVIEW.parent / 'src'))
+sys.path.insert(0, str(REVIEW.parent / 'src'))
 from blocks import instructions, region  # noqa: E402
 import args as claude  # noqa: E402
 from change import Change, Refused, commit, git  # noqa: E402
