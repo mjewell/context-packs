@@ -49,7 +49,7 @@ runs:
         temp=$(mktemp -d "$RUNNER_TEMP/pack-review-temp.XXXXXX")
         mkdir "$temp/pack-review-runs" "$temp/pack-review-answers"
         echo "temp=$temp" >> "$GITHUB_OUTPUT"
-        python3 "$GITHUB_ACTION_PATH/../start.py" --base "$BASE" --head "$HEAD" --answers "$temp/pack-review-answers" \
+        node "$GITHUB_ACTION_PATH/../start.ts" --base "$BASE" --head "$HEAD" --answers "$temp/pack-review-answers" \
           --model "$MODEL"
     - name: Review
       id: review
@@ -72,7 +72,7 @@ runs:
       shell: bash
       env:
         TRANSCRIPT: ${{ steps.review.outputs.execution_file }}
-      run: python3 "$GITHUB_ACTION_PATH/../transcript.py" --file "$TRANSCRIPT"
+      run: node "$GITHUB_ACTION_PATH/../transcript.ts" --file "$TRANSCRIPT"
     - name: Write the report
       shell: bash
       env:
@@ -88,9 +88,9 @@ runs:
           echo "::error::The review left findings from $count runs of the wizard in $RUNS, not 1, so it didn't finish or ran twice. Its log above shows how far it got."
           exit 1
         fi
-        python3 "$GITHUB_ACTION_PATH/../change.py" --base "$BASE" --head "$HEAD" shown > "$RUNNER_TEMP/pack-review-shown.json"
+        node "$GITHUB_ACTION_PATH/../change.ts" --base "$BASE" --head "$HEAD" shown > "$RUNNER_TEMP/pack-review-shown.json"
         mkdir "$RUNNER_TEMP/pack-review-report"
-        python3 "$GITHUB_ACTION_PATH/../report.py" --base "$BASE" --base-ref "$BASE_REF" --head "$HEAD" \
+        node "$GITHUB_ACTION_PATH/../report.ts" --base "$BASE" --base-ref "$BASE_REF" --head "$HEAD" \
           --findings "$found" --shown "$RUNNER_TEMP/pack-review-shown.json" \
           --out "$RUNNER_TEMP/pack-review-report/report.json"
     - name: Save the report

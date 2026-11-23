@@ -93,7 +93,7 @@ def planned(repo, number, report, paired, pr, threads):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pr', type=int, required=True, help='the PR number')
-    parser.add_argument('--report', type=Path, required=True, help="the find job's report, from report.py")
+    parser.add_argument('--report', type=Path, required=True, help="the find job's report, from report.ts")
     parser.add_argument('--paired', type=Path, required=True, help="the pairing job's pairs and commentary")
     args = parser.parse_args()
     report = json.loads(args.report.read_text(encoding='utf-8'))

@@ -10,11 +10,6 @@
   "files": [
     "bin",
     "dist",
-    "src/blocks.py",
-    "src/origins.py",
-    "src/packs.py",
-    "src/tables.py",
-    "review/*.py",
     "skills/pack-findings/*"
   ],
   "scripts": {

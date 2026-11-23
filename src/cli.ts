@@ -4,7 +4,6 @@
  * context-packs/, the repo's own and those its import packs name, as one block in AGENTS.md, with the docs of packs from
  * git and the indexes of nested packs in context-packs/gen/.
  */
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,6 +18,7 @@ import { Stack, Stop, fail } from './stop.ts';
 import * as syncReport from './sync_report.ts';
 import * as tables from './tables.ts';
 import * as tree from './tree.ts';
+import { main as wizard } from '../review/wizard.ts';
 
 /** Each import pack: its id, where its pack comes from, and its pin. */
 function show(found: readonly imports.Import[]): void {
@@ -114,17 +114,13 @@ async function sync(args: Args): Promise<void> {
   }
 }
 
-/** The review's wizard, which is still Python, with everything after `review` handed on. */
-function review(argv: readonly string[]): never {
-  const wizard = path.join(import.meta.dirname, '..', 'review', 'wizard.py');
-  const result = spawnSync('python3', [wizard, ...argv], { stdio: 'inherit' });
-  if (result.error) fail(`context-packs: couldn't run python3 (${result.error.message}). Install Python 3.9 or later.`);
-  process.exit(result.status ?? 1);
-}
-
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
-  if (argv[0] === 'review') review(argv.slice(1));
+  // The review's wizard has its own steps and arguments, so `review` hands everything after it on.
+  if (argv[0] === 'review') {
+    wizard(argv.slice(1));
+    return;
+  }
   try {
     await sync(parse(argv, process.cwd()));
   } catch (error) {
