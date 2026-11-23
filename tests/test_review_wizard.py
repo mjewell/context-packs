@@ -114,11 +114,13 @@ class BriefTests(WizardCase):
         self.assertIn('Read each doc only through its command, so the review knows it was read.', brief)
         self.assertIn(f'`{self.command("files")}`', brief)
         self.assertIn(f'`{self.command("diff", "<path>")}`', brief)
-        self.assertIn("Submit your answer with exactly this command, with your JSON in place of the middle line, then "
-                      'do what it prints:\n\n'
-                      f"{self.command('submit', '1')} <<'PACK_REVIEW_ANSWER'\n"
-                      '{"findings": [...]}\n'
-                      'PACK_REVIEW_ANSWER\n\n'
+        self.assertIn('Run each command exactly as it is printed here, one per Bash call, with no variables, `cd` or '
+                      '`&&` around it.', brief)
+        self.assertIn('Read the code at the head in the current folder.', brief)
+        self.assertNotIn('Grep', brief)
+        self.assertIn('Write your answer as JSON to a new file in your scratchpad, then run exactly this command, with '
+                      "that file's path in place of `<file>`, and do what it prints:\n\n"
+                      f"{self.command('submit', '1')} < <file>\n\n"
                       'Your answer must fit this JSON Schema:\n\n{\n "type": "object",', brief)
         self.assertIn('"take"', brief)
         for placeholder in ('{diff}', '{log}', '{docs}'):
@@ -132,7 +134,7 @@ class BriefTests(WizardCase):
         self.assertIn('- `AGENTS.md`\n- `docs/testing.md`\n- `docs/git.md`\n- `docs/prose.md`\n', brief)
         self.assertNotIn(self.command('doc'), brief)
         self.assertIn('Each choice is one finding of kind `uncovered choice`', brief)
-        self.assertIn(f"{self.command('submit', '3')} <<'PACK_REVIEW_ANSWER'\n", brief)
+        self.assertIn(f"{self.command('submit', '3')} < <file>\n", brief)
 
     def test_refuses_a_finder_init_didnt_name(self):
         run = self.wizard('--run', self.run_dir, 'brief', '4')
@@ -172,7 +174,7 @@ class DocTests(StartedCase):
         run = self.step('doc', '3', '1')
 
         self.assertEqual(run.returncode, 1)
-        self.assertIn('The uncovered finder has no docs to read through doc: search them with Read, Glob and Grep.',
+        self.assertIn('The uncovered finder has no docs to read through doc: search them in the current folder.',
                       run.stderr)
 
 
@@ -302,9 +304,8 @@ class SubmitTests(SubmitCase):
         run = self.step('submit', '1')
 
         self.assertEqual(run.returncode, 1)
-        self.assertIn("Not taken: no answer came on stdin. Submit it as your brief shows: "
-                      f"`{self.command('submit', '1')} <<'PACK_REVIEW_ANSWER'`, then your JSON, then a line holding "
-                      'only PACK_REVIEW_ANSWER.', run.stderr)
+        self.assertIn('Not taken: no answer came on stdin. Write it as JSON to a file in your scratchpad, then run '
+                      f"`{self.command('submit', '1')} < <file>` with that file's path.", run.stderr)
 
 
 class NextTests(SubmitCase):
@@ -376,12 +377,11 @@ class MergeTests(SubmitCase):
         self.assertTrue(run.stdout.startswith("You're merging the finders' answers in a pack review"), run.stdout[:80])
         self.assertIn(f"Every finder's findings, each with an id, are what `{self.command('sources')}` prints.",
                       run.stdout)
-        self.assertIn('Submit your groups with exactly this command, with your JSON in place of the middle line, then '
-                      'do what it prints:\n\n'
-                      f"{self.command('submit-groups')} <<'PACK_REVIEW_ANSWER'\n"
-                      '{"groups": [...]}\n'
-                      'PACK_REVIEW_ANSWER\n\n'
+        self.assertIn('Write your groups as JSON to a new file in your scratchpad, then run exactly this command, with '
+                      "that file's path in place of `<file>`, and do what it prints:\n\n"
+                      f"{self.command('submit-groups')} < <file>\n\n"
                       'Your groups must fit this JSON Schema:\n\n{\n "type": "object",', run.stdout)
+        self.assertIn('Run each command exactly as it is printed here', run.stdout)
         self.assertIn('"ids"', run.stdout)
 
     def test_sources_prints_the_finders_findings_numbered(self):
@@ -498,20 +498,22 @@ class PackageTests(WizardCase):
         self.assertIn("The checkout isn't the head", run.stderr)
 
 
-class HeredocTests(WizardCase):
-    """The submit command a brief prints works as written, run through a shell with the JSON in its middle line."""
+class ShellTests(WizardCase):
+    """The submit command a brief prints works as written, run through a shell with a file's path in it."""
 
-    def test_the_briefs_submit_command_takes_an_answer_through_bash(self):
+    def test_the_briefs_submit_command_takes_an_answer_from_a_file_through_bash(self):
         launcher = f'{shlex.quote(sys.executable)} {shlex.quote(str(REVIEW / "wizard.py"))}'
         run = self.wizard('init', '--base', self.base, '--head', 'HEAD', '--command', launcher)
         self.assertEqual(run.returncode, 0, run.stderr)
         brief = re.search(r'Run `(.+ brief 3)`', run.stdout).group(1)
         text = subprocess.run(['bash', '-c', brief], cwd=self.repo, env=self.env, capture_output=True,
                               text=True).stdout
-        block = re.search(r"\n\n(.+ submit 3 <<'PACK_REVIEW_ANSWER'\n)(.+)\n(PACK_REVIEW_ANSWER)\n", text)
-        answer = json.dumps({'findings': [{**deviation("Don't say 'EOF'"), 'kind': 'uncovered choice', 'rules': []}]})
+        command = re.search(r'\n\n(.+ submit 3 < <file>)\n', text).group(1)
+        answer = Path(self.env['TMPDIR']) / 'my answer.json'
+        answer.write_text(json.dumps({'findings': [{**deviation('Quote "{this}"'), 'kind': 'uncovered choice',
+                                                     'rules': []}]}))
 
-        submitted = subprocess.run(['bash', '-c', f'{block.group(1)}{answer}\n{block.group(3)}\n'], cwd=self.repo,
+        submitted = subprocess.run(['bash', '-c', command.replace('<file>', shlex.quote(str(answer)))], cwd=self.repo,
                                    env=self.env, capture_output=True, text=True)
 
         self.assertEqual(submitted.returncode, 0, submitted.stderr)

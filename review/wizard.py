@@ -23,21 +23,22 @@ import tables  # noqa: E402
 from units import PROMPTS, RULE_KIND, UNCOVERED_KIND, sources  # noqa: E402
 
 STATE = 'state.json'
-# The heredoc delimiter an answer comes between. A line of valid JSON can't be a bare word, since a JSON string can't
-# hold a raw line break, so no answer that parses can end its heredoc early.
-END = 'PACK_REVIEW_ANSWER'
+# How a brief's agent runs the wizard. Claude Code refuses a command it can't check before it runs, such as one with a
+# shell variable, so an agent that builds its own commands loses turns.
+EXACT = 'Run each command exactly as it is printed here, one per Bash call, with no variables, `cd` or `&&` around it.'
 # The kinds of finding, in the order the findings schema lists them.
 KINDS = claude.findings_schema()['properties']['findings']['items']['properties']['kind']['enum']
 # What a finder needs beyond the skill's prompt: how to read the change, and where its answer goes. A unit's finder
 # also hears how the review knows it read its docs.
 SERVED = 'Read each doc only through its command, so the review knows it was read. '
-FINDER = '''{served}Read the code at the head with Read, Glob and Grep. `diff` starts each line the head has with its \
-line number there: give that number as a spot's line, not a count of lines in the diff. Read every page of a path's \
-diff before you judge it. {kind}'''
+FINDER = '''{exact} {served}Read the code at the head in the current folder. `diff` starts each line the head has \
+with its line number there: give that number as a spot's line, not a count of lines in the diff. Read every page of a \
+path's diff before you judge it. {kind}'''
 # What the merging agent needs beyond the skill's merge prompt.
-MERGE = '''Read the change with `{files}`, `{diff}` and `{log}`, if a spot needs checking. Answer with groups. Each \
-group is one finding: the ids of the finders' findings it merges, and its kind, headline and take. Put every id in \
-exactly one group. A script builds each finding's rules, spots, signs and exemplars from its group's findings.'''
+MERGE = '''{exact} Read the change with `{files}`, `{diff}` and `{log}`, if a spot needs checking. Answer with \
+groups. Each group is one finding: the ids of the finders' findings it merges, and its kind, headline and take. Put \
+every id in exactly one group. A script builds each finding's rules, spots, signs and exemplars from its group's \
+findings.'''
 
 
 def counted(count, noun):
@@ -144,15 +145,16 @@ def brief(args):
     text = (PROMPTS / name).read_text(encoding='utf-8').format(
         diff=f'what `{cmd} diff <path>` prints, one path at a time, for the paths `{cmd} files` lists',
         log=f'what `{cmd} log` prints', docs=docs.rstrip('\n'))
-    print('\n\n'.join([text.rstrip('\n'), FINDER.format(served=served, kind=kind),
-                       handing('answer', run.command('submit', str(finder)), '{"findings": [...]}',
-                               claude.findings_schema())]))
+    print('\n\n'.join([text.rstrip('\n'), FINDER.format(exact=EXACT, served=served, kind=kind),
+                       handing('answer', run.command('submit', str(finder)), claude.findings_schema())]))
 
 
-def handing(noun, submit, example, shape):
-    """How an agent hands its answer to the wizard: the command with a heredoc, and the schema the answer fits."""
-    return (f'Submit your {noun} with exactly this command, with your JSON in place of the middle line, then do what '
-            f"it prints:\n\n{submit} <<'{END}'\n{example}\n{END}\n\n"
+def handing(noun, submit, shape):
+    """How an agent hands its answer to the wizard, and the schema the answer fits. The answer goes in a file of the
+    agent's own, and reaches the wizard on stdin, so no agent touches the run folder. It can't go in the command
+    itself: Claude Code refuses a command with a brace before a quote, which every JSON object starts with."""
+    return (f'Write your {noun} as JSON to a new file in your scratchpad, then run exactly this command, with that '
+            f"file's path in place of `<file>`, and do what it prints:\n\n{submit} < <file>\n\n"
             f'Your {noun} must fit this JSON Schema:\n\n{json.dumps(shape, indent=1)}')
 
 
@@ -168,9 +170,9 @@ def merge_brief(run):
     answers = f"Every finder's findings, each with an id, are what `{run.command('sources')}` prints."
     text = (PROMPTS / 'merge-prompt.md').read_text(encoding='utf-8').format(answers=answers)
     print('\n\n'.join([text.rstrip('\n'),
-                       MERGE.format(files=run.command('files'), diff=run.command('diff', '<path>'),
+                       MERGE.format(exact=EXACT, files=run.command('files'), diff=run.command('diff', '<path>'),
                                     log=run.command('log')),
-                       handing('groups', run.command('submit-groups'), '{"groups": [...]}', claude.groups_schema())]))
+                       handing('groups', run.command('submit-groups'), claude.groups_schema())]))
 
 
 def sources_step(args):
@@ -181,7 +183,7 @@ def doc(args):
     run = Run(args.run)
     unit = run.finder(args.unit)
     if unit == run.uncovered:
-        raise Refused('The uncovered finder has no docs to read through doc: search them with Read, Glob and Grep.')
+        raise Refused('The uncovered finder has no docs to read through doc: search them in the current folder.')
     docs = run.units[unit]
     if not args.n.isdigit() or not 1 <= int(args.n) <= len(docs):
         raise Refused(f'Unit {unit} has {counted(len(docs), "doc")}.')
@@ -216,13 +218,13 @@ def log(args):
 
 def answer(noun, submit, shape):
     """The text of the answer an agent sent on stdin, once it's JSON in the schema's shape."""
-    # A terminal on stdin means no heredoc came, and reading it would wait for typing.
+    # A terminal on stdin means no file came, and reading it would wait for typing.
     text = '' if sys.stdin.isatty() else sys.stdin.read()
     it = 'them' if noun == 'groups' else 'it'
     again = f'then submit {it} again with `{submit}`'
     if not text.strip():
-        raise Refused(f'Not taken: no {noun} came on stdin. Submit {it} as your brief shows: '
-                      f"`{submit} <<'{END}'`, then your JSON, then a line holding only {END}.")
+        raise Refused(f'Not taken: no {noun} came on stdin. Write {it} as JSON to a file in your scratchpad, then run '
+                      f"`{submit} < <file>` with that file's path.")
     try:
         value = json.loads(text)
     except ValueError as error:
