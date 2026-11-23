@@ -14,7 +14,8 @@ Each command syncs the current folder, or `--dir <folder>`, and prints what chan
 | `update <id> --ref R` | Pins one pack to a tag or commit |
 | `list` | Lists each import pack, where its pack comes from, and its pin |
 | `check` | Exits 1, naming what's stale, if a sync would change anything, and writes nothing |
-| `docs` | Prints the path of every doc and nested pack's index the tables point at, one per line, with a blank line between packs. It reads the synced tables, so it fetches no pack, and writes nothing. The `pack-findings` skill gives each pack's docs to its own subagent, and the `review` action hands it this list |
+| `docs` | Prints the path of every doc and nested pack's index the tables point at, one per line, with a blank line between packs. It reads the synced tables, so it fetches no pack, and writes nothing. The `review` action hands this list to its finders, one pack's docs each |
+| `review init --base B --head H --command C`, then the steps it prints | Runs a review one step at a time, for an agent: the `pack-findings` skill runs it. Each step prints what to do next, with every command in full |
 | `eval [doc…] [--pack F] [--runs N] [--model M]` | Runs each pack's eval prompts, checking that an agent reads each doc when it should, and only then |
 
 A pack's id is its import pack's folder under `context-packs/`, such as `core` or `server/database`. Moving the folder changes the id.
