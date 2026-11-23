@@ -49,17 +49,17 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     - Groups that leave out a [[finders|finder's]] finding, name one twice, or name one no finder reported stop the run
     - An [[uncovered-choice|uncovered choice]] joins a [[deviation]] about the same choice at the same [[findings|spots]], since a [[rules|rule]] covers it after all
   - A [[local-review|local review]] and a [[ci-review|CI review]] give their agents the same three prompt files, so both check the same way. Finders answer in the findings schema in both {#shared-prompts}
-    - Locally, the wizard runs the review: a command an agent runs one step at a time, which prints what to do next with every command in full {#wizard}
-      - It names a subagent for each [[unit]] and the [[uncovered-finder|uncovered finder]]. The agent starts them all at once and reads no [[doc]] itself
-      - It prints each unit's docs itself, and takes a unit's answer only once it printed every one
-      - An agent writes its answer to a file in its own scratchpad and passes it on stdin, so it needs only the wizard's one command, and never reads or writes the run folder
-        - The skill allows that command for the turn the finders start in. A headless run allows it at startup, and an interactive session asks about the agent's later calls
-        - Why: the subagents run in the author's session, which would otherwise ask about each call, and about each file outside the repo
-        - Rejected: the answer in a heredoc. Claude Code refuses a command with a brace before a quote, which every JSON object starts with
-      - The [[merge|merging]] agent answers with groups too, and the wizard builds the [[findings]] with the merge job's checks
     - In CI, the workflow starts the [[finders]]. Each prompt gains only what a CI agent needs: that it has no shell, to copy line numbers from the diff, and for the [[merge]], to answer with groups
     - The prompts, one each for a [[unit|unit's]] [[finders|finder]], the [[uncovered-finder|uncovered finder]] and the [[merge]], live with the schema in the pack-findings skill's folder, since an installed skill holds only its own folder
       - Why: with the schema in `review/`, a local agent fetched it from a GitHub URL the user never pinned
+  - Locally, the wizard runs the review: a command an agent runs one step at a time, which prints what to do next with every command in full {#wizard}
+    - It names a subagent for each [[unit]] and the [[uncovered-finder|uncovered finder]]. The agent starts them all at once and reads no [[doc]] itself
+    - It prints each unit's docs itself, and takes a unit's answer only once it printed every one
+    - An agent writes its answer to a file in its own scratchpad and passes it on stdin, so it needs only the wizard's one command, and never reads or writes the run folder
+      - The skill allows that command for the turn the finders start in. A headless run allows it at startup, and an interactive session asks about the agent's later calls
+      - Why: the subagents run in the author's session, which would otherwise ask about each call, and about each file outside the repo
+      - Rejected: the answer in a heredoc. Claude Code refuses a command with a brace before a quote, which every JSON object starts with
+    - The [[merge|merging]] agent answers with groups too, and the wizard builds the [[findings]] with the merge job's checks
 - In CI, five jobs find, merge and post the [[findings]], as [[review-threads|threads]] and one summary comment. Only the last can write to the PR {#ci-review}
   ```d2
   direction: right
