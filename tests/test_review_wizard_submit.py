@@ -68,11 +68,12 @@ class SubmitTests(SubmitCase):
         self.assertEqual(run.returncode, 1)
         self.assertIn("Not taken: your answer isn't JSON", run.stderr)
 
-    def test_refuses_a_submit_with_nothing_on_stdin_and_shows_how_to_send_it(self):
+    def test_refuses_a_submit_before_the_answer_is_written_and_says_where_it_goes(self):
         self.read_docs(1, 2)
 
         run = self.step('submit', '1')
 
         self.assertEqual(run.returncode, 1)
-        self.assertIn('Not taken: no answer came on stdin. Write it as JSON to a file in your scratchpad, then run '
-                      f"`{self.command('submit', '1')} < <file>` with that file's path.", run.stderr)
+        self.assertIn(f"Not taken: there is no answer at {self.answer_path('unit-1.json')}. Write it there as JSON, "
+                      f"with your tool for writing files, then submit it again with `{self.command('submit', '1')}`.",
+                      run.stderr)

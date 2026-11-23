@@ -34,16 +34,19 @@ def output(name, value):
         out.write(f'{name}<<{delimiter}\n{value}\n{delimiter}\n')
 
 
-def reviewer(model):
+def reviewer(answers, model):
     """The review agent's line: it runs the pack-findings skill, as a local review does, from this checkout of the
-    review, with this checkout's CLI. It may run only the commands the skill runs, and has no MCP server. It reads and
-    writes files only in the checkout and in its scratchpad, where it writes its answers before passing them to the
-    wizard."""
+    review, with this checkout's CLI. It may run only the commands the skill runs, and has no MCP server. It writes
+    only in answers, the folder where the wizard's briefs say to write each answer."""
     # The path the skill builds from its own folder, so the agent's commands match it.
     cli = f'python3 {REVIEW.parent}/src/cli.py'
     # git rev-parse and git status have no option that writes a file, unlike git log's --output.
     allowed = ['Skill(context-packs:pack-findings)', f'Bash({cli} review:*)', f'Bash({cli} docs)',
-               'Bash(git rev-parse:*)', 'Bash(git status:*)']
-    return line(['--plugin-dir', str(REVIEW.parent), '--tools', 'Read,Glob,Grep,Write,Bash,Agent,Skill',
+               'Bash(git rev-parse:*)', 'Bash(git status:*)',
+               # A headless run writes outside its working directory only with both this rule and --add-dir. The
+               # rule's // makes the path absolute, where one / would start from the settings file.
+               f'Edit(/{answers}/**)']
+    return line(['--plugin-dir', str(REVIEW.parent), '--add-dir', answers,
+                 '--tools', 'Read,Glob,Grep,Write,Bash,Agent,Skill',
                  '--allowedTools', ','.join(allowed), '--disallowedTools', 'Read(./.git/**)',
                  *(['--model', model] if model else []), '--restricted', '--strict-mcp-config'])

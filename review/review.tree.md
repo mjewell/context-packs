@@ -101,10 +101,11 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
       - `files`, `diff` and `log` read the change from the merge base, through fixed git commands, see [[change-commands]]. `diff` takes only a path the change touches
       - A refusal says what's missing and the command to run next. Once the [[merge]] starts, no finder's answer can change
     - The merging agent reads the numbered findings through `sources`, and `submit-groups` builds the [[findings]] from its groups, see [[merge]]
-    - An agent writes each answer to a file in its scratchpad and passes it on stdin, so it needs only the wizard's command
-      - The skill allows that command for the turn the finders start in. A headless run allows it at startup, and an interactive session asks about the [[orchestrator|orchestrator's]] later calls
-      - Why: the subagents run in the author's session, which would otherwise ask about each call, and about each file outside the repo
+    - An agent writes each answer to the file its brief names, with its tool for writing files, then runs `submit`, which reads that file {#answers-folder}
+      - The files are in an answers folder beside the [[run-folder|run folder]], not in it, so no agent can write what the wizard checked
+      - Why: a scratchpad exists only for some accounts. A CI review's finders had none, so none of their answers could be written
       - Rejected: the answer in the command, such as in a heredoc. Claude Code refuses a command with a brace before a quote, which every JSON object starts with, even when it writes a file
+      - The skill allows the wizard's command for the turn the finders start in. A headless run allows it at startup, and an interactive session asks about the [[orchestrator|orchestrator's]] later calls, and about each answer it writes outside the repo
     - Agents run each command exactly as printed, and the wizard takes only the arguments it names, spelled out
       - Why: Claude Code refused commands that wrapped one in a shell variable or a `cd`, and each refusal cost the agent a turn
       - Why: an allowed command prefix passes any arguments after it, and a shortened option would otherwise count as the full one
@@ -222,7 +223,8 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     - An allowed prefix refused redirects, command substitution, env prefixes and chained commands after it, but let options through, so the wizard takes only the options it names
     - `git rev-parse` and `git status` have no option that writes a file
       - Rejected: other git commands. Claude Code doesn't check what a shell command writes, and an allowed `git log` wrote any text to any file through `--output`
-    - It reads files with Read, Glob and Grep, confined to the checkout, and writes only its answers, in its scratchpad. Read is denied on `.git/`, where claude-code-action keeps its token
+    - It reads files with Read, Glob and Grep, confined to the checkout, and writes only in the [[answers-folder|answers folder]], which the job makes before the agent starts. Read is denied on `.git/`, where claude-code-action keeps its token
+      - Why: a headless run writes outside its working directory only with both `--add-dir` and an `Edit` rule for the folder. Either alone was refused
   - Agents read the change through the wizard, which runs one fixed git command for each of `files`, `diff` and `log` {#change-commands}
     - The agent sends a path and a page number, never a revision. A path must be one the change touches, and is taken literally, so `*` names only a file called `*`
     - Diffs run without external diff drivers or text conversion, since a PR picks a path's diff driver

@@ -23,6 +23,13 @@ class InitTests(WizardCase):
         self.assertIn(f'When all of them have answered, run `{self.command("next")}`.', out)
         self.assertTrue(Path(self.run_dir).is_dir())
 
+    def test_keeps_the_run_apart_from_the_folder_agents_write_answers_in(self):
+        self.init()
+        temp = Path(self.env['TMPDIR'])
+
+        self.assertEqual(Path(self.run_dir).parent, temp / 'pack-review-runs')
+        self.assertTrue((temp / 'pack-review-answers' / Path(self.run_dir).name).is_dir())
+
     def test_refuses_a_change_that_touches_no_files(self):
         run = self.wizard('init', '--base', 'HEAD', '--head', 'HEAD', '--command', 'review')
 

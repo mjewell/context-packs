@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import sys
+from pathlib import Path
 import tempfile
 
 from git_case import REVIEW, GitCase
@@ -63,6 +64,10 @@ class WizardCase(GitCase):
         """A command as the wizard prints it for this run."""
         return ' '.join(['review', '--run', self.run_dir, *args])
 
+    def answer_path(self, name):
+        """Where an agent writes one of this run's answers, such as unit-1.json."""
+        return Path(self.env['TMPDIR']) / 'pack-review-answers' / Path(self.run_dir).name / name
+
 
 class StartedCase(WizardCase):
     """A run init started."""
@@ -71,9 +76,14 @@ class StartedCase(WizardCase):
         super().setUp()
         self.init()
 
-    def step(self, *args, input=''):
+    def step(self, *args):
         """A step of this run: what it printed, and what it printed as an error, with its exit code."""
-        return self.wizard('--run', self.run_dir, *args, input=input)
+        return self.wizard('--run', self.run_dir, *args)
+
+    def submit_groups(self, groups):
+        """The merging agent's groups, written where its brief says, then submitted."""
+        self.answer_path('groups.json').write_text(json.dumps({'groups': groups}))
+        return self.step('submit-groups')
 
 
 def deviation(headline='Tests reach into a private helper', path='tests/test_app.py', line=1):
@@ -84,12 +94,12 @@ def deviation(headline='Tests reach into a private helper', path='tests/test_app
 
 
 class SubmitCase(StartedCase):
-    """A finder at the end of its brief: it read its docs and submits its answer on stdin, as the brief's heredoc
-    gives it."""
+    """A finder at the end of its brief: it read its docs, writes its answer where the brief says, and submits it."""
 
     def submit(self, finder, findings):
         text = findings if isinstance(findings, str) else json.dumps({'findings': findings})
-        return self.step('submit', str(finder), input=text)
+        self.answer_path(f'unit-{finder}.json').write_text(text)
+        return self.step('submit', str(finder))
 
     def read_docs(self, unit, count):
         for n in range(1, count + 1):

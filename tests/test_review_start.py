@@ -4,6 +4,7 @@ from review_case import REVIEW
 from test_review_pairing import PairingCase
 
 BASE, HEAD = 'b' * 40, 'h' * 40
+ANSWERS = '/runner/temp/runs/pack-review-answers'
 CLI = f'python3 {REVIEW.parent}/src/cli.py'
 
 
@@ -12,7 +13,7 @@ class StartTests(PairingCase):
     allowed only the commands the skill runs."""
 
     def start(self, *extra):
-        run = self.script('start', '--base', BASE, '--head', HEAD, *extra)
+        run = self.script('start', '--base', BASE, '--head', HEAD, '--answers', ANSWERS, *extra)
         self.assertEqual(run.returncode, 0, run.stderr)
         return self.outputs()
 
@@ -35,9 +36,17 @@ class StartTests(PairingCase):
         self.assertEqual(self.flag(args, '--tools'), 'Read,Glob,Grep,Write,Bash,Agent,Skill')
         self.assertEqual(self.flag(args, '--allowedTools').split(','), [
             'Skill(context-packs:pack-findings)', f'Bash({CLI} review:*)', f'Bash({CLI} docs)',
-            'Bash(git rev-parse:*)', 'Bash(git status:*)'])
+            'Bash(git rev-parse:*)', 'Bash(git status:*)', f'Edit(/{ANSWERS}/**)'])
         self.assertEqual(self.flag(args, '--disallowedTools'), 'Read(./.git/**)')
         self.assertIn('--restricted', args)
+
+    def test_lets_the_agent_write_only_in_the_answers_folder(self):
+        # A headless run writes outside its working directory only with both: the folder added, and an Edit rule for it.
+        args = self.args()
+
+        self.assertEqual(self.flag(args, '--add-dir'), ANSWERS)
+        self.assertEqual([rule for rule in self.flag(args, '--allowedTools').split(',') if rule.startswith('Edit')],
+                         [f'Edit(//{ANSWERS[1:]}/**)'])
 
     def test_gives_the_agent_no_mcp_server_and_no_answer_schema(self):
         args = self.args()

@@ -62,7 +62,7 @@ class MergeTests(SubmitCase):
         self.assertEqual(self.step('next').returncode, 0)
 
     def groups(self, groups):
-        return self.step('submit-groups', input=json.dumps({'groups': groups}))
+        return self.submit_groups(groups)
 
     def test_brief_gives_the_merging_agent_the_numbered_findings_and_where_its_groups_go(self):
         self.all_in()
@@ -73,10 +73,9 @@ class MergeTests(SubmitCase):
         self.assertTrue(run.stdout.startswith("You're merging the finders' answers in a pack review"), run.stdout[:80])
         self.assertIn(f"Every finder's findings, each with an id, are what `{self.command('sources')}` prints.",
                       run.stdout)
-        self.assertIn('Write your groups as JSON to a new file in your scratchpad, with your tool for writing '
-                      "files, not the shell. Then run exactly this command, with that file's path in place of "
-                      '`<file>`, and do what it prints:\n\n'
-                      f"{self.command('submit-groups')} < <file>\n\n"
+        self.assertIn(f"Write your groups as JSON to `{self.answer_path('groups.json')}`, with your tool for writing "
+                      'files, not the shell. Then run exactly this command, and do what it prints:\n\n'
+                      f"{self.command('submit-groups')}\n\n"
                       'Your groups must fit this JSON Schema:\n\n{\n "type": "object",', run.stdout)
         self.assertIn('Run each command exactly as it is printed here', run.stdout)
         self.assertIn('"ids"', run.stdout)
@@ -166,7 +165,7 @@ class GroupTests(SubmitCase):
         return {'ids': list(ids), 'kind': kind, 'headline': headline, 'take': take}
 
     def built(self, groups):
-        run = self.step('submit-groups', input=json.dumps({'groups': groups}))
+        run = self.submit_groups(groups)
         self.assertEqual(run.returncode, 0, run.stderr)
         return json.loads((Path(self.run_dir) / 'findings.json').read_text())['findings']
 
@@ -217,7 +216,7 @@ class GroupTests(SubmitCase):
                              ([self.group('0:0', '1:0'), self.group('1:0')], 'put 1:0 in more than one group'),
                              ([self.group('0:0', '1:0', '9:9')], 'name 9:9, which no finder reported')):
             with self.subTest(says=says):
-                run = self.step('submit-groups', input=json.dumps({'groups': groups}))
+                run = self.submit_groups(groups)
 
                 self.assertEqual(run.returncode, 1)
                 self.assertIn(says, run.stderr)

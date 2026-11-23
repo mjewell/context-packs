@@ -35,10 +35,9 @@ class BriefTests(WizardCase):
                       '`&&` around it.', brief)
         self.assertIn('Read the code at the head in the current folder.', brief)
         self.assertNotIn('Grep', brief)
-        self.assertIn('Write your answer as JSON to a new file in your scratchpad, with your tool for writing '
-                      "files, not the shell. Then run exactly this command, with that file's path in place of "
-                      '`<file>`, and do what it prints:\n\n'
-                      f"{self.command('submit', '1')} < <file>\n\n"
+        self.assertIn(f"Write your answer as JSON to `{self.answer_path('unit-1.json')}`, with your tool for writing "
+                      'files, not the shell. Then run exactly this command, and do what it prints:\n\n'
+                      f"{self.command('submit', '1')}\n\n"
                       'Your answer must fit this JSON Schema:\n\n{\n "type": "object",', brief)
         self.assertIn('"take"', brief)
         for placeholder in ('{diff}', '{log}', '{docs}'):
@@ -52,7 +51,8 @@ class BriefTests(WizardCase):
         self.assertIn('- `AGENTS.md`\n- `docs/testing.md`\n- `docs/git.md`\n- `docs/prose.md`\n', brief)
         self.assertNotIn(self.command('doc'), brief)
         self.assertIn('Each choice is one finding of kind `uncovered choice`', brief)
-        self.assertIn(f"{self.command('submit', '3')} < <file>\n", brief)
+        self.assertIn(f"`{self.answer_path('unit-3.json')}`", brief)
+        self.assertIn(f"\n\n{self.command('submit', '3')}\n\n", brief)
 
     def test_refuses_a_finder_init_didnt_name(self):
         run = self.wizard('--run', self.run_dir, 'brief', '4')
@@ -85,22 +85,23 @@ class DocTests(StartedCase):
 
 
 class ShellTests(WizardCase):
-    """The submit command a brief prints works as written, run through a shell with a file's path in it."""
+    """The submit command a brief prints works as written, run through a shell, once the answer is where the brief
+    says to write it."""
 
-    def test_the_briefs_submit_command_takes_an_answer_from_a_file_through_bash(self):
+    def test_the_briefs_submit_command_takes_the_answer_the_brief_named_through_bash(self):
         launcher = f'{shlex.quote(sys.executable)} {shlex.quote(str(REVIEW / "wizard.py"))}'
         run = self.wizard('init', '--base', self.base, '--head', 'HEAD', '--command', launcher)
         self.assertEqual(run.returncode, 0, run.stderr)
         brief = re.search(r'Run `(.+ brief 3)`', run.stdout).group(1)
         text = subprocess.run(['bash', '-c', brief], cwd=self.repo, env=self.env, capture_output=True,
                               text=True).stdout
-        command = re.search(r'\n\n(.+ submit 3 < <file>)\n', text).group(1)
-        answer = Path(self.env['TMPDIR']) / 'my answer.json'
+        command = re.search(r'\n\n(.+ submit 3)\n', text).group(1)
+        answer = Path(re.search(r'Write your answer as JSON to `(.+?)`', text).group(1))
         answer.write_text(json.dumps({'findings': [{**deviation('Quote "{this}"'), 'kind': 'uncovered choice',
                                                      'rules': []}]}))
 
-        submitted = subprocess.run(['bash', '-c', command.replace('<file>', shlex.quote(str(answer)))], cwd=self.repo,
-                                   env=self.env, capture_output=True, text=True)
+        submitted = subprocess.run(['bash', '-c', command], cwd=self.repo, env=self.env, stdin=subprocess.DEVNULL,
+                                   capture_output=True, text=True)
 
         self.assertEqual(submitted.returncode, 0, submitted.stderr)
         self.assertIn("The uncovered finder's answer is in, with 1 finding.", submitted.stdout)

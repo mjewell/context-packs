@@ -49,6 +49,10 @@ class Run:
         """A command as an agent runs it: the launcher this run was started with, its folder, and the step."""
         return ' '.join([self.state['command'], '--run', shlex.quote(str(self.folder)), *args])
 
+    def answer(self, name):
+        """Where an agent writes one of this run's answers, such as unit-1.json, in the run's answers folder."""
+        return Path(self.state['answers']) / name
+
     @property
     def units(self):
         return self.state['units']
@@ -111,8 +115,15 @@ def init(args):
     if not change.paths():
         raise Refused(f'The change from {args.base} to {args.head} touches no files, so there is nothing to review.')
     commits = len(git('rev-list', f'{change.start}..{change.head}').split())
-    folder = Path(tempfile.mkdtemp(prefix='pack-review-'))
-    state = {'base': change.base, 'head': change.head, 'root': str(root), 'command': args.command, 'units': units}
+    # Agents write their answers in a folder of their own, so a run folder, which holds what the wizard checked, is
+    # never one they can write in. A CI review allows writes in pack-review-answers alone, before the agent starts.
+    temp = Path(tempfile.gettempdir())
+    (temp / 'pack-review-runs').mkdir(exist_ok=True)
+    folder = Path(tempfile.mkdtemp(prefix='pack-review-', dir=temp / 'pack-review-runs'))
+    answers = temp / 'pack-review-answers' / folder.name
+    answers.mkdir(parents=True)
+    state = {'base': change.base, 'head': change.head, 'root': str(root), 'command': args.command, 'units': units,
+             'answers': str(answers)}
     (folder / STATE).write_text(json.dumps(state), encoding='utf-8')
     run = Run(folder)
     lines = [f'Reviewing {counted(commits, "commit")} that change {counted(len(change.paths()), "file")}, against '
@@ -142,7 +153,8 @@ def brief(args):
                        for n, path in enumerate(run.units[finder], 1))
     print((PROMPTS / name).read_text(encoding='utf-8').format(
         diff=f'what `{cmd} diff <path>` prints, one path at a time, for the paths `{cmd} files` lists',
-        log=f'what `{cmd} log` prints', docs=docs.rstrip('\n'), submit=run.command('submit', str(finder)),
+        log=f'what `{cmd} log` prints', docs=docs.rstrip('\n'), answer=run.answer(f'unit-{finder}.json'),
+        submit=run.command('submit', str(finder)),
         schema=json.dumps(schema.findings_schema(), indent=1)), end='')
 
 
@@ -165,7 +177,7 @@ def merge_brief(run):
     merging(run)
     print((PROMPTS / 'merge-prompt.md').read_text(encoding='utf-8').format(
         sources=run.command('sources'), files=run.command('files'), diff=run.command('diff', '<path>'),
-        log=run.command('log'), submit=run.command('submit-groups'),
+        log=run.command('log'), answer=run.answer('groups.json'), submit=run.command('submit-groups'),
         schema=json.dumps(schema.groups_schema(), indent=1)), end='')
 
 
@@ -210,17 +222,16 @@ def log(args):
     print(Run(args.run).change().log(page=page(args.page)), end='')
 
 
-def answer(noun, submit, shape):
-    """The text of the answer an agent sent on stdin, once it's JSON in the schema's shape. The answer comes from a file
-    in the agent's own scratchpad, so no agent touches the run folder. It can't be in the command itself: Claude Code
-    refuses a command with a brace before a quote, which every JSON object starts with."""
-    # A terminal on stdin means no file came, and reading it would wait for typing.
-    text = '' if sys.stdin.isatty() else sys.stdin.read()
+def answer(noun, path, submit, shape):
+    """The text of the answer an agent wrote to path, the file its brief named, once it's JSON in the schema's shape.
+    The answer can't be in the command itself: Claude Code refuses a command with a brace before a quote, which every
+    JSON object starts with."""
     it = 'them' if noun == 'groups' else 'it'
     again = f'then submit {it} again with `{submit}`'
-    if not text.strip():
-        raise Refused(f'Not taken: no {noun} came on stdin. Write {it} as JSON to a file in your scratchpad, then run '
-                      f"`{submit} < <file>` with that file's path.")
+    if not path.exists():
+        raise Refused(f'Not taken: there is no {noun} at {path}. Write {it} there as JSON, with your tool for writing '
+                      f'files, {again}.')
+    text = path.read_text(encoding='utf-8')
     try:
         value = json.loads(text)
     except ValueError as error:
@@ -246,7 +257,7 @@ def submit(args):
             them = 'it' if len(unread) == 1 else 'them'
             raise Refused(f"Not taken: you didn't read {listed}. Read {them}, check the diff against {them}, update "
                           f'your answer, then submit it again with `{submit}`.')
-    text = answer('answer', submit, schema.findings_schema())
+    text = answer('answer', run.answer(f'unit-{finder}.json'), submit, schema.findings_schema())
     findings = json.loads(text)['findings']
     run.accepted(finder).parent.mkdir(exist_ok=True)
     run.accepted(finder).write_text(text, encoding='utf-8')
@@ -294,7 +305,7 @@ def submit_groups(args):
                       'in.')
     submit = run.command('submit-groups')
     groups = run.folder / 'groups.json'
-    groups.write_text(answer('groups', submit, schema.groups_schema()), encoding='utf-8')
+    groups.write_text(answer('groups', run.answer('groups.json'), submit, schema.groups_schema()), encoding='utf-8')
     try:
         findings = report.findings_in(groups, run.sources)
     except report.Rejected as rejected:
@@ -324,12 +335,12 @@ def main(argv=None):
     fourth.add_argument('page', nargs='?', default='1', help='which page, from 1')
     fifth = steps.add_parser('log', allow_abbrev=False, help="print the change's commits")
     fifth.add_argument('page', nargs='?', default='1', help='which page, from 1')
-    sixth = steps.add_parser('submit', allow_abbrev=False, help="check a finder's answer on stdin and take it")
+    sixth = steps.add_parser('submit', allow_abbrev=False, help="check the answer its brief named and take it")
     sixth.add_argument('finder', help="the finder's number")
     steps.add_parser('next', allow_abbrev=False, help='print what to do now')
     steps.add_parser('sources', allow_abbrev=False, help="print the finders' findings, numbered for the merge")
     steps.add_parser('submit-groups', allow_abbrev=False,
-                     help="check the merging agent's groups on stdin and build the findings")
+                     help="check the merging agent's groups and build the findings")
     args = parser.parse_args(argv)
     if args.step != 'init' and not args.run:
         parser.error(f'{args.step} needs --run, the run folder init made')

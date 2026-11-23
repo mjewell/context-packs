@@ -89,7 +89,10 @@ _Avoid_: script, orchestrator (the agent that runs it)
 The agent that runs the wizard's `init` and `next`, and starts the subagents they name.
 
 **Run folder**:
-The folder `init` makes for one review, which holds its state, the agents' answers and the findings. Every command the wizard prints names it.
+The folder `init` makes for one review, in `pack-review-runs` under the temporary folder, which holds its state, the answers the wizard took and the findings. Every command the wizard prints names it. No agent writes in it.
+
+**Answers folder**:
+The folder beside a run folder, in `pack-review-answers`, where agents write their answers for the wizard to read. Each brief names the file its agent writes.
 
 **Brief**:
 The prompt the wizard gives one finder, or the merging agent: the skill's prompt for it, with the commands it reads through and where its answer goes.
