@@ -59,6 +59,21 @@ class ArgumentTests(WizardCase):
         self.assertIn('unrecognized arguments: --output=x', run.stderr)
 
 
+
+class MissingRunTests(WizardCase):
+    """A run folder can be gone by the time a step names it, such as after the system clears TMPDIR, so a step on one
+    says so and how to start again."""
+
+    def test_refuses_a_step_on_a_run_folder_that_doesnt_exist(self):
+        self.init()
+        shutil.rmtree(self.run_dir)
+
+        run = self.wizard('--run', self.run_dir, 'next')
+
+        self.assertEqual(run.returncode, 1)
+        self.assertEqual(run.stderr, f"There's no review run in {self.run_dir}: its folder is gone, or init never "
+                                     "made it. Start a new review with init.\n")
+
 @unittest.skipUnless(shutil.which('npm') and shutil.which('node'), 'the npm package runs under node')
 
 

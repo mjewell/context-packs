@@ -35,6 +35,9 @@ class Run:
 
     def __init__(self, folder):
         self.folder = Path(folder)
+        if not (self.folder / STATE).exists():
+            raise Refused(f"There's no review run in {folder}: its folder is gone, or init never made it. Start a new "
+                          'review with init.')
         self.state = json.loads((self.folder / STATE).read_text(encoding='utf-8'))
         # git reads the repo the review started in, wherever the agent runs the step from.
         os.chdir(self.state['root'])
