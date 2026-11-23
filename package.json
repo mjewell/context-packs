@@ -3,20 +3,34 @@
   "version": "0.11.0",
   "description": "Sync your agent docs into AGENTS.md as an index that points the agent at the right doc for each task",
   "license": "MIT",
+  "type": "module",
   "bin": {
     "context-packs": "bin/context-packs.js"
   },
   "files": [
     "bin",
-    "src/*.py",
+    "dist",
+    "src/blocks.py",
+    "src/origins.py",
+    "src/packs.py",
+    "src/tables.py",
     "review/*.py",
     "skills/pack-findings/*"
   ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "prepack": "tsc"
+  },
   "engines": {
-    "node": ">=18"
+    "node": ">=22.18"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mjewell/context-packs.git"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "7.0.2"
   }
 }

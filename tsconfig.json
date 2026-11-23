@@ -1,0 +1,20 @@
+{
+  // Node runs the .ts sources directly, outside node_modules, by stripping their types. So the code uses only
+  // TypeScript that can be stripped, and names the .ts file in each import. tsc checks the types, and writes dist/
+  // for the npm package, since Node won't strip types under node_modules.
+  "compilerOptions": {
+    "target": "es2023",
+    "module": "nodenext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "rewriteRelativeImportExtensions": true,
+    "types": ["node"],
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts"]
+}

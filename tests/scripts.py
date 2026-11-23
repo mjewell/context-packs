@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 # The scripts written in TypeScript so far, each by its path from the repo root without its extension, such as
 # 'src/cli'. Node runs a .ts file directly, outside node_modules.
-TYPESCRIPT = frozenset()
+TYPESCRIPT = frozenset({'src/cli'})
 
 
 def command(script):
