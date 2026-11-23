@@ -120,9 +120,8 @@ Edit only files I own. Plugins, synced skills, and installed dependencies belong
 
 ## Project
 
-- The CLI in `src/`, and the review's wizard and review job in `review/`, are TypeScript, run by Node 22.18 or later, with no dependencies at runtime but `git`. Node runs the `.ts` files directly, so write only TypeScript it can strip, and name the `.ts` file in each import. `tsc` compiles `dist/` for the npm package, since Node won't run TypeScript from `node_modules`.
-- The review's pairing and post jobs are still Python, moving to TypeScript next: standard library and `git` only, on macOS's system `python3` (3.9). They import `args.py`, `schema.py` and `sanitize.py` from `review/`, so until they move, make a change to one of those in its `.ts` twin too.
+- The CLI in `src/` and the review in `review/` are TypeScript, run by Node 22.18 or later, with no dependencies at runtime but `git`. Node runs the `.ts` files directly, so write only TypeScript it can strip, and name the `.ts` file in each import. `tsc` compiles `dist/` for the npm package, since Node won't run TypeScript from `node_modules`.
 - The skills in `skills/` are for anyone using the tool, so they rely on nothing from any one person's packs.
-- Run `npm install` once, then `npm run typecheck` and the tests, with `python3 -m unittest discover tests`. The tests stay Python while the code moves, and `tests/scripts.py` says which language runs each script.
+- Run `npm install` once, then `npm run typecheck` and the tests, with `python3 -m unittest discover tests`. The tests are still Python, moving to `node:test` next, and `tests/scripts.py` runs each script with `node`.
 - `GLOSSARY.md` holds the terms for the packs and the review. Use them in code, docs and skills. When a name settles, add or update its entry there.
 - This repo's own pack docs are in `context-packs/project/`, and its shared rules come from agent-config through the import pack `context-packs/core/`. After adding a doc or changing its `when:` line, run `node src/cli.ts` and commit the result.
