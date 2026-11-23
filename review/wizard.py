@@ -21,26 +21,9 @@ import tables  # noqa: E402
 
 # The prompts and the schema live with the pack-findings skill, since an installed skill holds only its own folder.
 PROMPTS = REVIEW.parent / 'skills' / 'pack-findings'
-# The sentence after a finder's prompt that names the kind of finding it reports.
-RULE_KIND = 'Each rule with a deviating spot is one finding of kind `deviation`.'
-UNCOVERED_KIND = 'Each choice is one finding of kind `uncovered choice`, with no rules.'
 STATE = 'state.json'
-# How a brief's agent runs the wizard. Claude Code refuses a command it can't check before it runs, such as one with a
-# shell variable, so an agent that builds its own commands loses turns.
-EXACT = 'Run each command exactly as it is printed here, one per Bash call, with no variables, `cd` or `&&` around it.'
 # The kinds of finding, in the order the findings schema lists them.
 KINDS = schema.findings_schema()['properties']['findings']['items']['properties']['kind']['enum']
-# What a finder needs beyond the skill's prompt: how to read the change, and where its answer goes. A unit's finder
-# also hears how the review knows it read its docs.
-SERVED = 'Read each doc only through its command, so the review knows it was read. '
-FINDER = '''{exact} {served}Read the code at the head in the current folder. `diff` starts each line the head has \
-with its line number there: give that number as a spot's line, not a count of lines in the diff. Read every page of a \
-path's diff before you judge it. {kind}'''
-# What the merging agent needs beyond the skill's merge prompt.
-MERGE = '''{exact} Read the change with `{files}`, `{diff}` and `{log}`, if a spot needs checking. Answer with \
-groups. Each group is one finding: the ids of the finders' findings it merges, and its kind, headline and take. Put \
-every id in exactly one group. A script builds each finding's rules, spots, signs and exemplars from its group's \
-findings.'''
 
 
 def counted(count, noun):
@@ -140,17 +123,16 @@ def brief(args):
     if finder == run.uncovered:
         # The uncovered finder searches every unit's docs for a rule that settles a choice, rather than reading each
         # in full, so it reads them with its own tools.
-        name, kind, served = 'uncovered-prompt.md', UNCOVERED_KIND, ''
+        name = 'uncovered-prompt.md'
         docs = ''.join(f'- `{path}`\n' for unit in run.units for path in unit)
     else:
-        name, kind, served = 'unit-prompt.md', RULE_KIND, SERVED
+        name = 'unit-prompt.md'
         docs = ''.join(f'- `{path}`: run `{run.command("doc", str(finder), str(n))}`\n'
                        for n, path in enumerate(run.units[finder], 1))
-    text = (PROMPTS / name).read_text(encoding='utf-8').format(
+    print((PROMPTS / name).read_text(encoding='utf-8').format(
         diff=f'what `{cmd} diff <path>` prints, one path at a time, for the paths `{cmd} files` lists',
-        log=f'what `{cmd} log` prints', docs=docs.rstrip('\n'))
-    print('\n\n'.join([text.rstrip('\n'), FINDER.format(exact=EXACT, served=served, kind=kind),
-                       handing('answer', run.command('submit', str(finder)), schema.findings_schema())]))
+        log=f'what `{cmd} log` prints', docs=docs.rstrip('\n'), submit=run.command('submit', str(finder)),
+        schema=json.dumps(schema.findings_schema(), indent=1)), end='')
 
 
 def sources(folder):
@@ -159,17 +141,6 @@ def sources(folder):
     answers = sorted(Path(folder).glob('unit-*.json'), key=lambda path: int(path.stem.split('-')[1]))
     return [{'id': f"{path.stem.split('-')[1]}:{n}", 'finding': finding} for path in answers
             for n, finding in enumerate(json.loads(path.read_text(encoding='utf-8'))['findings'])]
-
-
-def handing(noun, submit, shape):
-    """How an agent hands its answer to the wizard, and the schema the answer fits. The answer goes in a file of the
-    agent's own, and reaches the wizard on stdin, so no agent touches the run folder. It can't go in the command
-    itself, nor be written to the file through the shell: Claude Code refuses a command with a brace before a quote,
-    which every JSON object starts with."""
-    return (f'Write your {noun} as JSON to a new file in your scratchpad, with your tool for writing files, not the '
-            "shell. Then run exactly this command, with that file's path in place of `<file>`, and do what it prints:"
-            f'\n\n{submit} < <file>\n\n'
-            f'Your {noun} must fit this JSON Schema:\n\n{json.dumps(shape, indent=1)}')
 
 
 def merging(run):
@@ -181,12 +152,10 @@ def merging(run):
 
 def merge_brief(run):
     merging(run)
-    answers = f"Every finder's findings, each with an id, are what `{run.command('sources')}` prints."
-    text = (PROMPTS / 'merge-prompt.md').read_text(encoding='utf-8').format(answers=answers)
-    print('\n\n'.join([text.rstrip('\n'),
-                       MERGE.format(exact=EXACT, files=run.command('files'), diff=run.command('diff', '<path>'),
-                                    log=run.command('log')),
-                       handing('groups', run.command('submit-groups'), schema.groups_schema())]))
+    print((PROMPTS / 'merge-prompt.md').read_text(encoding='utf-8').format(
+        sources=run.command('sources'), files=run.command('files'), diff=run.command('diff', '<path>'),
+        log=run.command('log'), submit=run.command('submit-groups'),
+        schema=json.dumps(schema.groups_schema(), indent=1)), end='')
 
 
 def sources_step(args):
@@ -231,7 +200,9 @@ def log(args):
 
 
 def answer(noun, submit, shape):
-    """The text of the answer an agent sent on stdin, once it's JSON in the schema's shape."""
+    """The text of the answer an agent sent on stdin, once it's JSON in the schema's shape. The answer comes from a file
+    in the agent's own scratchpad, so no agent touches the run folder. It can't be in the command itself: Claude Code
+    refuses a command with a brace before a quote, which every JSON object starts with."""
     # A terminal on stdin means no file came, and reading it would wait for typing.
     text = '' if sys.stdin.isatty() else sys.stdin.read()
     it = 'them' if noun == 'groups' else 'it'
