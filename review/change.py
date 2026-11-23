@@ -1,5 +1,9 @@
+#!/usr/bin/env python3
 """The change a review reads, from the merge base of a base commit to a head commit, as fixed git commands. Nothing
-a caller passes reaches git as an option, so an agent's tools can hand it a path or a page as they got them."""
+a caller passes reaches git as an option, so the wizard can hand it a path or a page as an agent typed them. Run as a
+script, `shown` prints the head lines each diff shows, for the report to pick where each new thread opens."""
+import argparse
+import json
 import re
 import subprocess
 
@@ -34,14 +38,13 @@ class Change:
     def changed(self):
         return ''.join(f'{len(self.lines(path))}\t{path}\n' for path in self.paths())
 
-    def log(self, path=None, page=1):
-        paths = ['--', checked(path)] if path is not None else []
-        return paged('the log', git('log', '--no-decorate', '--format=medium', f'{self.start}..{self.head}',
-                                    *paths).splitlines(), page)
+    def log(self, page=1):
+        return paged('the log', git('log', '--no-decorate', '--format=medium', f'{self.start}..{self.head}')
+                     .splitlines(), page)
 
     def diff(self, path, page=1):
         if checked(path) not in self.paths():
-            raise Refused(f"{path} isn't one of the paths changed() lists.")
+            raise Refused(f"{path} isn't one of the paths the change touches.")
         return paged(path, self.lines(path), page)
 
 
@@ -58,7 +61,7 @@ def paged(name, lines, page):
     text = ''.join(f'{line}\n' for line in lines[(page - 1) * LINES:page * LINES])
     if count == 1:
         return text
-    more = f': call again with page {page + 1} for more' if page < count else ''
+    more = f': run it again with page {page + 1} for more' if page < count else ''
     return f'{text}(page {page} of {count}{more})\n'
 
 
@@ -118,3 +121,16 @@ def commit(rev):
     """The hash of the commit rev names. --end-of-options, and the ^{commit} after rev, keep rev from being read as
     an option."""
     return git('rev-parse', '--verify', '--end-of-options', f'{rev}^{{commit}}').strip()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
+    parser.add_argument('--base', required=True, help='the commit the reviewed change starts from')
+    parser.add_argument('--head', required=True, help='the commit that is reviewed')
+    parser.add_argument('command', choices=['shown'], help='print as JSON the head lines each diff shows')
+    args = parser.parse_args()
+    print(json.dumps(Change(args.base, args.head).shown()))
+
+
+if __name__ == '__main__':
+    main()

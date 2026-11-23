@@ -80,7 +80,7 @@ runs:
           echo "::error::The review left findings from $count runs of the wizard in $RUNS, not 1, so it didn't finish or ran twice. Its log above shows how far it got."
           exit 1
         fi
-        python3 "$GITHUB_ACTION_PATH/../git_server.py" --base "$BASE" --head "$HEAD" shown > "$RUNNER_TEMP/pack-review-shown.json"
+        python3 "$GITHUB_ACTION_PATH/../change.py" --base "$BASE" --head "$HEAD" shown > "$RUNNER_TEMP/pack-review-shown.json"
         mkdir "$RUNNER_TEMP/pack-review-report"
         python3 "$GITHUB_ACTION_PATH/../report.py" --base "$BASE" --base-ref "$BASE_REF" --head "$HEAD" \
           --findings "$found" --shown "$RUNNER_TEMP/pack-review-shown.json" \

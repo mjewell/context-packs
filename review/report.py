@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Write the merge job's report for the pairing and post jobs: the findings, built from the finders' findings each of
-the merging agent's groups names, cleaned, and the line each one's thread can open on. It reaches nothing outside the
-runner."""
+"""Write the review job's report for the pairing and post jobs: the findings the wizard built, cleaned again, and the
+line each one's thread can open on. findings_in() builds findings from the finders' findings each of the merging
+agent's groups names, for the wizard's submit-groups. It reaches nothing outside the runner."""
 import argparse
 import json
 from pathlib import Path
@@ -99,19 +99,13 @@ def main():
     parser.add_argument('--base', required=True, help='the commit the reviewed change starts from')
     parser.add_argument('--base-ref', required=True, help='the branch the PR was to merge into when it was reviewed')
     parser.add_argument('--head', required=True, help='the commit that was reviewed')
-    parser.add_argument('--sources', type=Path, help="the finders' findings, as `units.py merge` numbers them")
-    parser.add_argument('--groups', type=Path, help="the merging agent's structured output")
-    parser.add_argument('--findings', type=Path,
-                        help="the findings the review's wizard built, in place of --sources and --groups")
+    parser.add_argument('--findings', type=Path, required=True, help="the findings the review's wizard built")
     parser.add_argument('--shown', type=Path, required=True,
-                        help='the head lines each diff shows, as `git_server.py shown` prints them')
+                        help='the head lines each diff shows, as `change.py shown` prints them')
     parser.add_argument('--out', type=Path, required=True, help='where to write the report')
     args = parser.parse_args()
-    if bool(args.findings) == bool(args.sources or args.groups) or bool(args.sources) != bool(args.groups):
-        parser.error('give --findings, or --sources and --groups')
     try:
-        findings = (built_by_wizard(args.findings, args.head) if args.findings
-                    else findings_in(args.groups, args.sources))
+        findings = built_by_wizard(args.findings, args.head)
     except Rejected as rejected:
         sys.exit(f'pack-review: {rejected}.')
     report = {'base': args.base, 'base_ref': args.base_ref, 'head': args.head, 'findings': findings,

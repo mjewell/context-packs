@@ -24,7 +24,7 @@ def block(body):
 
 
 class SummaryCase(ReviewCase):
-    """A run about to post its summary: the merging agent's answer, and the head lines each diff shows."""
+    """A run about to post its summary: the findings the review's wizard built, and the head lines each diff shows."""
 
     def setUp(self):
         super().setUp()
@@ -34,14 +34,9 @@ class SummaryCase(ReviewCase):
             'AddReview': ok({'addPullRequestReview': {'pullRequestReview': {'id': 'PRR_1'}}}),
             'AddReply': ok({'addPullRequestReviewThreadReply': {'comment': {'id': 'RC_9'}}})})
 
-    def summarize(self, findings=(), output=None, head=HEAD, base_ref='main', pairs=(), commentary=(), shown=None):
-        """Post the summary of the merging agent's output, with pairs as the pairing job checked them."""
-        # Each finding is one finder's, in a group of its own, so the report builds it back as it was.
-        (self.root / 'sources.json').write_text(json.dumps([{'id': f'0:{n}', 'finding': f}
-                                                            for n, f in enumerate(findings)]))
-        (self.root / 'output.json').write_text(output if output is not None else json.dumps({'groups': [
-            {'ids': [f'0:{n}'], 'kind': f['kind'], 'headline': f['headline'], 'take': f['take']}
-            for n, f in enumerate(findings)]}))
+    def summarize(self, findings=(), head=HEAD, base_ref='main', pairs=(), commentary=(), shown=None):
+        """Post the summary of the findings the review's wizard built, with pairs as the pairing job checked them."""
+        (self.root / 'findings.json').write_text(json.dumps({'base': BASE, 'head': head, 'findings': list(findings)}))
         (self.root / 'shown.json').write_text(json.dumps(shown or {}))
         report = self.report(base_ref, head)
         if report.returncode:
@@ -55,9 +50,9 @@ class SummaryCase(ReviewCase):
         return post
 
     def report(self, base_ref='main', head=HEAD):
-        """The merge job's report on the merging agent's output, written to report.json for the post job."""
-        return self.script('report', '--base', BASE, '--base-ref', base_ref, '--head', head, '--sources',
-                           'sources.json', '--groups', 'output.json', '--shown', 'shown.json', '--out', 'report.json')
+        """The review job's report on the wizard's findings, written to report.json for the post job."""
+        return self.script('report', '--base', BASE, '--base-ref', base_ref, '--head', head, '--findings',
+                           'findings.json', '--shown', 'shown.json', '--out', 'report.json')
 
     def body(self):
         [sent] = self.sent('AddComment') or self.sent('UpdateComment')
@@ -201,15 +196,6 @@ class SummaryTests(SummaryCase):
 
         report = json.loads((self.root / 'report.json').read_text())
         self.assertEqual(report['anchors'], [{'path': 'b.ts', 'line': 4}, {'path': 'a.ts', 'line': 3}, None])
-
-    def test_stops_when_the_merge_returned_no_groups(self):
-        for output in ('', 'null', '{"result": "done"}'):
-            with self.subTest(output=output):
-                result = self.summarize(output=output)
-
-                self.assertEqual(result.returncode, 1)
-                self.assertIn('returned no groups', result.stderr)
-                self.assertEqual(self.github.requests, [])
 
     def test_stops_on_an_error_from_github(self):
         self.github.responses['AddComment'] = (200, {'data': None, 'errors': [{'message': 'Forbidden'}]})

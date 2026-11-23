@@ -529,3 +529,86 @@ class ShellTests(WizardCase):
 
         self.assertEqual(submitted.returncode, 0, submitted.stderr)
         self.assertIn("The uncovered finder's answer is in, with 1 finding.", submitted.stdout)
+
+
+class GroupTests(SubmitCase):
+    """Each finding is built from the finders' findings its group names, so the merge can't drop what they found, and
+    groups that would drop, repeat or invent one are refused."""
+
+    NUMBERS = {'file': 'AGENTS.md', 'quote': 'Game numbers live in content.', 'routed': True}
+    SIM = {'file': 'docs/testing.md', 'quote': 'Sim code reads its numbers from content.', 'routed': False}
+
+    def found(self, rules=(), spots=(), deliberate=(), exemplars=(), kind='deviation', headline='A finder headline'):
+        return {'kind': kind, 'headline': headline, 'rules': list(rules), 'spots': list(spots),
+                'deliberate': list(deliberate), 'exemplars': list(exemplars), 'take': 'A finder take.'}
+
+    def spot(self, path, line, follows=False):
+        return {'path': path, 'line': line, 'follows': follows}
+
+    def answered(self, unit0=(), unit1=(), unit2=(), uncovered=()):
+        """Every finder in, with these findings: unit 0's are 0:0, 0:1 and so on."""
+        for unit, docs, findings in ((0, 1, unit0), (1, 2, unit1), (2, 1, unit2)):
+            self.submit_unit(unit, docs, list(findings))
+        self.assertEqual(self.submit(3, list(uncovered)).returncode, 0)
+        self.assertEqual(self.step('next').returncode, 0)
+
+    def group(self, *ids, kind='deviation', headline='A game number in sim code', take='Move it to content.'):
+        return {'ids': list(ids), 'kind': kind, 'headline': headline, 'take': take}
+
+    def built(self, groups):
+        run = self.step('submit-groups', input=json.dumps({'groups': groups}))
+        self.assertEqual(run.returncode, 0, run.stderr)
+        return json.loads((Path(self.run_dir) / 'findings.json').read_text())['findings']
+
+    def test_builds_a_finding_from_every_finding_its_group_names(self):
+        self.answered(unit0=[self.found(rules=[self.NUMBERS], spots=[self.spot('src/sim.ts', 42)],
+                                        deliberate=['Commit abc says so.'])],
+                      unit2=[self.found(rules=[self.SIM, self.NUMBERS],
+                                        spots=[self.spot('src/sim.ts', 42), self.spot('src/rng.ts', 9)],
+                                        deliberate=['Commit abc says so.', 'A comment at the spot.'])])
+
+        [finding] = self.built([self.group('0:0', '2:0')])
+
+        self.assertEqual(finding, {
+            'kind': 'deviation', 'headline': 'A game number in sim code', 'take': 'Move it to content.',
+            'rules': [self.NUMBERS, self.SIM], 'spots': [self.spot('src/sim.ts', 42), self.spot('src/rng.ts', 9)],
+            'deliberate': ['Commit abc says so.', 'A comment at the spot.'], 'exemplars': []})
+
+    def test_counts_a_spot_as_deviating_when_any_finding_says_it_deviates(self):
+        self.answered(unit0=[self.found(rules=[self.NUMBERS], spots=[self.spot('src/sim.ts', 42)])],
+                      unit1=[self.found(rules=[self.SIM], spots=[self.spot('src/sim.ts', 42, follows=True)])])
+
+        [finding] = self.built([self.group('0:0', '1:0', kind='conflict')])
+
+        self.assertEqual(finding['kind'], 'conflict')
+        self.assertEqual(finding['spots'], [self.spot('src/sim.ts', 42)])
+
+    def test_keeps_an_uncovered_choices_exemplars_in_the_finding_that_holds_it(self):
+        ways = [{'way': 'Loaded at startup', 'examples': ['src/load.ts:8']}]
+        self.answered(unit0=[self.found(rules=[self.NUMBERS], spots=[self.spot('src/load.ts', 3)])],
+                      uncovered=[self.found(kind='uncovered choice', spots=[self.spot('src/load.ts', 3)],
+                                            exemplars=ways)])
+
+        [finding] = self.built([self.group('0:0', '3:0')])
+
+        self.assertEqual(finding['exemplars'], ways)
+        self.assertEqual(finding['rules'], [self.NUMBERS])
+
+    def test_keeps_the_groups_in_the_order_the_agent_gave_them(self):
+        self.answered(unit0=[self.found()], unit1=[self.found()])
+
+        findings = self.built([self.group('1:0', headline='Second'), self.group('0:0', headline='First')])
+
+        self.assertEqual([f['headline'] for f in findings], ['Second', 'First'])
+
+    def test_refuses_groups_that_leave_out_repeat_or_invent_a_finders_finding(self):
+        self.answered(unit0=[self.found()], unit1=[self.found()])
+        for groups, says in (([self.group('0:0')], 'leave out 1:0'),
+                             ([self.group('0:0', '1:0'), self.group('1:0')], 'put 1:0 in more than one group'),
+                             ([self.group('0:0', '1:0', '9:9')], 'name 9:9, which no finder reported')):
+            with self.subTest(says=says):
+                run = self.step('submit-groups', input=json.dumps({'groups': groups}))
+
+                self.assertEqual(run.returncode, 1)
+                self.assertIn(says, run.stderr)
+                self.assertFalse((Path(self.run_dir) / 'findings.json').exists())

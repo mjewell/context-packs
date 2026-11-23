@@ -19,8 +19,12 @@ from change import Change, Refused, commit, git  # noqa: E402
 import report  # noqa: E402
 import schema  # noqa: E402
 import tables  # noqa: E402
-from units import PROMPTS, RULE_KIND, UNCOVERED_KIND, sources  # noqa: E402
 
+# The prompts and the schema live with the pack-findings skill, since an installed skill holds only its own folder.
+PROMPTS = REVIEW.parent / 'skills' / 'pack-findings'
+# The sentence after a finder's prompt that names the kind of finding it reports.
+RULE_KIND = 'Each rule with a deviating spot is one finding of kind `deviation`.'
+UNCOVERED_KIND = 'Each choice is one finding of kind `uncovered choice`, with no rules.'
 STATE = 'state.json'
 # How a brief's agent runs the wizard. Claude Code refuses a command it can't check before it runs, such as one with a
 # shell variable, so an agent that builds its own commands loses turns.
@@ -148,6 +152,14 @@ def brief(args):
         log=f'what `{cmd} log` prints', docs=docs.rstrip('\n'))
     print('\n\n'.join([text.rstrip('\n'), FINDER.format(exact=EXACT, served=served, kind=kind),
                        handing('answer', run.command('submit', str(finder)), claude.findings_schema())]))
+
+
+def sources(folder):
+    """Every finder's findings, from the unit-<n>.json answers in folder, numbered as <finder>:<index>, so the merging
+    agent can answer with ids and a script can build each finding from the ones it names."""
+    answers = sorted(Path(folder).glob('unit-*.json'), key=lambda path: int(path.stem.split('-')[1]))
+    return [{'id': f"{path.stem.split('-')[1]}:{n}", 'finding': finding} for path in answers
+            for n, finding in enumerate(json.loads(path.read_text(encoding='utf-8'))['findings'])]
 
 
 def handing(noun, submit, shape):

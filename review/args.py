@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""The claude_args the review hands claude-code-action, each as one line. The reviewer runs the pack-findings skill,
-whose wizard starts the finders and the merge. The older lines are a finder's, which checks one unit of the packs, and
-the merging agent's, which groups the finders' findings. Both get the schema their answer is checked against, tools
-that only read, and the git server, which reads the change. claude-code-action splits the line the way a shell would. output()
-writes a prompt, a claude_args line or the units' matrix as a GitHub step output."""
+"""The claude_args the review hands claude-code-action, as one line, and the schemas the wizard checks answers
+against. The reviewer runs the pack-findings skill, whose wizard starts the finders and the merge. claude-code-action
+splits the line the way a shell would. output() writes a prompt or a claude_args line as a GitHub step output."""
 import json
 import os
 from pathlib import Path
@@ -14,15 +12,6 @@ import uuid
 REVIEW = Path(__file__).resolve().parent
 # The schema lives with the pack-findings skill, so a local review and CI read one copy.
 SCHEMA = REVIEW.parent / 'skills' / 'pack-findings' / 'findings.schema.json'
-# The diff and the repo's files can hold text written to steer the agent, so its tools only read: confined by
-# --restricted to the checkout, without .git/config, where claude-code-action keeps its token, and to any folder it's
-# given. It gets no shell, since an allowed git command such as git log --output=<file> writes any file. It reads the
-# change through the git server instead, which runs fixed git commands, and that's its only MCP server, so nothing it
-# does reaches the PR. It starts no subagents: the workflow starts one finder per unit, so no agent can skip one.
-TOOLS = ['Read', 'Glob', 'Grep']
-# Allows every tool on the git server. A name starting with mcp__github would make claude-code-action add its own
-# GitHub servers.
-SERVER = 'mcp__git'
 
 
 def compact(value):
@@ -61,26 +50,6 @@ def groups_schema():
                             'kind': finding['kind'], 'headline': finding['headline'], 'take': finding['take']}}
     return {'type': 'object', 'additionalProperties': False, 'required': ['groups'],
             'properties': {'groups': {'type': 'array', 'items': group}}}
-
-
-def reading(base, head, model, schema):
-    """The arguments every agent that reads the change gets."""
-    servers = {'mcpServers': {'git': {'type': 'stdio', 'command': sys.executable,
-                                      'args': [str(REVIEW / 'git_server.py'), '--base', base, '--head', head]}}}
-    return ['--json-schema', compact(schema), '--tools', ','.join(TOOLS), '--allowedTools', ','.join([*TOOLS, SERVER]),
-            '--disallowedTools', 'Read(./.git/**)', *(['--model', model] if model else []), '--mcp-config',
-            compact(servers), '--restricted', '--strict-mcp-config']
-
-
-def finder(base, head, model):
-    """A finder's line: its prompt holds everything it needs, so it gets no skill and no folder."""
-    return line(reading(base, head, model, findings_schema()))
-
-
-def merger(inputs, base, head, model):
-    """The merging agent's line: its prompt holds its instructions, and it gets the folder holding the finders'
-    answers."""
-    return line(['--add-dir', inputs, *reading(base, head, model, groups_schema())])
 
 
 def reviewer(model):

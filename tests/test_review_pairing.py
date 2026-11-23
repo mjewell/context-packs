@@ -26,7 +26,7 @@ ALICE = {'id': 'RC_2', 'author': 'alice', 'at': '2026-11-02T10:00:00Z', 'text': 
 
 
 class PairingCase(ReviewCase):
-    """The pairing job, between find and post: the find job's report, and pack-review's threads as threads.py prints
+    """The pairing job, between review and post: the review job's report, and pack-review's threads as threads.py prints
     them."""
 
     def setUp(self):
