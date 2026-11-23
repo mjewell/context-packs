@@ -350,6 +350,9 @@ def main(argv=None):
         {'init': init, 'brief': brief, 'doc': doc, 'files': files, 'diff': diff, 'log': log, 'submit': submit,
          'next': next_step, 'sources': sources_step, 'submit-groups': submit_groups}[args.step](args)
     except Refused as refused:
+        # No `pack-review: ` prefix, unlike the review's other scripts: a refusal is the agent's next instruction, so
+        # its first word should be what to do. The other scripts' messages are read in a CI log, where the prefix
+        # names the tool that failed.
         sys.exit(str(refused))
 
 
