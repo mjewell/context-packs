@@ -128,8 +128,8 @@ def init(args):
     run = Run(folder)
     lines = [f'Reviewing {counted(commits, "commit")} that change {counted(len(change.paths()), "file")}, against '
              f'{counted(len(units), "unit")}.', '',
-             f'Start these {len(run.finders())} subagents now, in one message, so they run at once. Give each exactly '
-             'this prompt:']
+             f'Start these {len(run.finders())} subagents now, in the foreground, all in one message, so they run at '
+             'once and you wait for every answer. Give each exactly this prompt:']
     lines += [f'  {label}: {prompt}' for _, label, prompt in run.finders()]
     lines.append(f'When all of them have answered, run `{run.command("next")}`.')
     print('\n'.join(lines))
@@ -279,23 +279,25 @@ def next_step(args):
         return
     if phase == 'merge':
         print("Waiting on the merge, whose groups aren't in yet. If it stopped without its groups going in, start it "
-              f'again with the same prompt: Run `{run.command("brief", "merge")}` and follow what it says. When it has '
-              f'answered, run `{run.command("next")}` again.')
+              f'again in the foreground, with the same prompt: Run `{run.command("brief", "merge")}` and follow what '
+              f'it says. When it has answered, run `{run.command("next")}` again.')
         return
     finders = run.finders()
     waiting = [(label, prompt) for n, label, prompt in finders if not run.accepted(n).exists()]
     if waiting:
         lines = [f"Waiting on {counted(len(waiting), 'finder')}, whose answers aren't in yet:"]
         lines += [f'  {label}: {prompt}' for label, prompt in waiting]
-        lines.append('If one of them stopped without its answer going in, start it again with the same prompt. '
+        lines.append('If one of them stopped without its answer going in, start it again in the foreground, with the '
+                     'same prompt. '
                      f'When they have all answered, run `{run.command("next")}` again.')
         print('\n'.join(lines))
         return
     found = sources(run.accepted(0).parent)
     run.sources.write_text(json.dumps(found, ensure_ascii=False), encoding='utf-8')
     print(f'All {len(finders)} finders are in, with {counted(len(found), "finding")}.\n'
-          f'Start one subagent with exactly this prompt: Run `{run.command("brief", "merge")}` and follow what it '
-          f'says.\nWhen it has answered, run `{run.command("next")}`.')
+          'Start one subagent in the foreground, with exactly this prompt: '
+          f'Run `{run.command("brief", "merge")}` and follow what it says.\n'
+          f'When it has answered, run `{run.command("next")}`.')
 
 
 def submit_groups(args):

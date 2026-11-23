@@ -79,6 +79,7 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     w -> o: "Done, with the findings"
     ```
     - The orchestrator, the agent that ran the skill, runs `init` and `next`, starts the subagents they name, and reads no [[doc]] or diff {#orchestrator}
+      - It starts them in the foreground, and CI turns background subagents off. Why: a headless session ends with the orchestrator's turn, and a CI run whose finders started in the background ended before any answered
     - Each step does its deterministic work, keeps its state in a run folder, and prints the next step with every command in full {#run-folder}
       - No agent reads or writes the run folder. Agents reach it only through the wizard's commands, so the wizard decides what each one sees
       - `next` works from the run folder alone, so an [[orchestrator]] that lost its place picks the run back up

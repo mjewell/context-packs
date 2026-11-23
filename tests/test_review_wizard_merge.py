@@ -18,7 +18,8 @@ class NextTests(SubmitCase):
                          "Waiting on 2 finders, whose answers aren't in yet:\n"
                          f'  unit 1, 2 docs: Run `{self.command("brief", "1")}` and follow what it says.\n'
                          f'  the uncovered finder: Run `{self.command("brief", "3")}` and follow what it says.\n'
-                         'If one of them stopped without its answer going in, start it again with the same prompt. '
+                         'If one of them stopped without its answer going in, start it again in the foreground, with the same '
+                         'prompt. '
                          f'When they have all answered, run `{self.command("next")}` again.\n')
 
     def test_starts_the_merge_once_every_finder_is_in_and_numbers_their_findings(self):
@@ -31,7 +32,7 @@ class NextTests(SubmitCase):
 
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertEqual(run.stdout, 'All 4 finders are in, with 4 findings.\n'
-                                     'Start one subagent with exactly this prompt: Run '
+                                     'Start one subagent in the foreground, with exactly this prompt: Run '
                                      f'`{self.command("brief", "merge")}` and follow what it says.\n'
                                      f'When it has answered, run `{self.command("next")}`.\n')
         sources = json.loads((Path(self.run_dir) / 'sources.json').read_text())
@@ -109,7 +110,7 @@ class MergeTests(SubmitCase):
         run = self.step('next')
 
         self.assertEqual(run.stdout, "Waiting on the merge, whose groups aren't in yet. If it stopped without its "
-                                     'groups going in, start it again with the same prompt: Run '
+                                     'groups going in, start it again in the foreground, with the same prompt: Run '
                                      f'`{self.command("brief", "merge")}` and follow what it says. When it has '
                                      f'answered, run `{self.command("next")}` again.\n')
 

@@ -16,6 +16,9 @@ class InitTests(WizardCase):
     def test_names_a_finder_for_each_unit_and_the_uncovered_finder(self):
         out = self.init()
 
+        # A headless session ends with the orchestrator's turn, and takes any finder in the background with it.
+        self.assertIn('Start these 4 subagents now, in the foreground, all in one message, so they run at once and you '
+                      'wait for every answer. Give each exactly this prompt:', out)
         self.assertIn(f'unit 0, AGENTS.md: Run `{self.command("brief", "0")}` and follow what it says.', out)
         self.assertIn(f'unit 1, 2 docs: Run `{self.command("brief", "1")}` and follow what it says.', out)
         self.assertIn(f'unit 2, 1 doc: Run `{self.command("brief", "2")}` and follow what it says.', out)
