@@ -48,18 +48,65 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
       - Why: when the agent rewrote every [[findings|finding]], it could drop a [[rules|rule]] or a spot, and nothing noticed
     - Groups that leave out a [[finders|finder's]] finding, name one twice, or name one no finder reported stop the run
     - An [[uncovered-choice|uncovered choice]] joins a [[deviation]] about the same choice at the same [[findings|spots]], since a [[rules|rule]] covers it after all
-  - A [[local-review|local review]] and a [[ci-review|CI review]] give their agents the same three prompt files, so both check the same way. Finders answer in the findings schema in both {#shared-prompts}
+  - A [[local-review|local review]] and a [[ci-review|CI review]] give their agents the same three prompt files, so both check the same way, with answers in the findings schema {#shared-prompts}
     - In CI, the workflow starts the [[finders]]. Each prompt gains only what a CI agent needs: that it has no shell, to copy line numbers from the diff, and for the [[merge]], to answer with groups
     - The prompts, one each for a [[unit|unit's]] [[finders|finder]], the [[uncovered-finder|uncovered finder]] and the [[merge]], live with the schema in the pack-findings skill's folder, since an installed skill holds only its own folder
       - Why: with the schema in `review/`, a local agent fetched it from a GitHub URL the user never pinned
-  - Locally, the wizard runs the review: a command an agent runs one step at a time, which prints what to do next with every command in full {#wizard}
-    - It names a subagent for each [[unit]] and the [[uncovered-finder|uncovered finder]]. The agent starts them all at once and reads no [[doc]] itself
-    - It prints each unit's docs itself, and takes a unit's answer only once it printed every one
-    - An agent writes its answer to a file in its own scratchpad and passes it on stdin, so it needs only the wizard's one command, and never reads or writes the run folder
-      - The skill allows that command for the turn the finders start in. A headless run allows it at startup, and an interactive session asks about the agent's later calls
+  - Locally, the wizard runs the review: a command that agents run one step at a time {#wizard}
+    ```d2
+    shape: sequence_diagram
+    o: orchestrator
+    w: wizard
+    f: "finders, one per unit"
+    m: merging agent
+    o -> w: init
+    w -> o: "start these finders, each with this prompt"
+    o -> f: "Run `brief n`"
+    f -> w: "brief n"
+    w -> f: "prompt, doc commands, schema"
+    f -> w: "doc, files, diff, log"
+    f -> w: "submit n < answer file"
+    w -> f: "taken, or what's missing"
+    f -> o: "unit n is in"
+    o -> w: next
+    w -> o: "waiting on ..., or start the merge"
+    o -> m: "Run `brief merge`"
+    m -> w: "brief merge, sources"
+    m -> w: "submit-groups < groups file"
+    w -> m: findings built
+    m -> o: done
+    o -> w: next
+    w -> o: "Done, with the findings"
+    ```
+    - The orchestrator, the agent that ran the skill, runs `init` and `next`, starts the subagents they name, and reads no [[doc]] or diff {#orchestrator}
+    - Each step does its deterministic work, keeps its state in a run folder, and prints the next step with every command in full {#run-folder}
+      - No agent reads or writes the run folder. Agents reach it only through the wizard's commands, so the wizard decides what each one sees
+      - `next` works from the run folder alone, so an [[orchestrator]] that lost its place picks the run back up
+    - `init` and `next` tell the [[orchestrator]] what to do now {#next}
+      ```d2
+      direction: right
+      finders: waiting on finders
+      merge: waiting on the merge
+      done: done
+      finders -> merge: "every answer is in"
+      merge -> done: "the groups are in"
+      ```
+      - `init` checks that the checkout is the head and that the change touches a file, then names one [[finders|finder]] for each [[unit]] and the [[uncovered-finder|uncovered finder]], each with a one-line prompt
+      - While answers are missing, `next` names each finder that hasn't answered, with its prompt, so one that stopped can be started again
+      - Once every answer is in, `next` numbers the finders' findings and names the merging agent. Once its groups are in, `next` prints the [[findings]]
+    - A finder's brief is the skill's prompt for its kind, with the commands that read its docs and the change, and its answer's schema {#brief}
+      - `doc` prints one of the unit's docs and marks it served. `submit` takes a unit's answer only once every doc in it was served, and only in the schema's shape
+        - Why: the wizard keeps its own record of what it printed, so the check needs no transcript, see [[doc-names]]
+      - `files`, `diff` and `log` read the change from the merge base, through the same fixed git commands as the [[git-server|git server]]. `diff` takes only a path the change touches
+      - A refusal says what's missing and the command to run next. Once the [[merge]] starts, no finder's answer can change
+    - The merging agent reads the numbered findings through `sources`, and `submit-groups` builds the [[findings]] from its groups with the [[merge-job|merge job's]] checks
+    - An agent writes each answer to a file in its scratchpad and passes it on stdin, so it needs only the wizard's command
+      - The skill allows that command for the turn the finders start in. A headless run allows it at startup, and an interactive session asks about the [[orchestrator|orchestrator's]] later calls
       - Why: the subagents run in the author's session, which would otherwise ask about each call, and about each file outside the repo
-      - Rejected: the answer in a heredoc. Claude Code refuses a command with a brace before a quote, which every JSON object starts with
-    - The [[merge|merging]] agent answers with groups too, and the wizard builds the [[findings]] with the merge job's checks
+      - Rejected: the answer in the command, such as in a heredoc. Claude Code refuses a command with a brace before a quote, which every JSON object starts with, even when it writes a file
+    - Agents run each command exactly as printed, and the wizard takes only the arguments it names, spelled out
+      - Why: Claude Code refused commands that wrapped one in a shell variable or a `cd`, and each refusal cost the agent a turn
+      - Why: an allowed command prefix passes any arguments after it, and a shortened option would otherwise count as the full one
 - In CI, five jobs find, merge and post the [[findings]], as [[review-threads|threads]] and one summary comment. Only the last can write to the PR {#ci-review}
   ```d2
   direction: right
