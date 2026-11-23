@@ -111,6 +111,8 @@ def init(args):
     file = instructions(root)
     units = [[file.relative_to(root).as_posix()], *tables.units(root, region(root, file).block)]
     change = Change(args.base, head)
+    if not change.paths():
+        raise Refused(f'The change from {args.base} to {args.head} touches no files, so there is nothing to review.')
     commits = len(git('rev-list', f'{change.start}..{change.head}').split())
     folder = Path(tempfile.mkdtemp(prefix='pack-review-'))
     state = {'base': change.base, 'head': change.head, 'root': str(root), 'command': args.command, 'units': units}
@@ -267,7 +269,8 @@ def next_step(args):
         kinds = [counted(sum(found['kind'] == kind for found in findings), kind) for kind in KINDS
                  if any(found['kind'] == kind for found in findings)]
         listed = ', '.join(kinds[:-1]) + ' and ' * (len(kinds) > 1) + kinds[-1] if kinds else ''
-        print(f'Done: {counted(len(findings), "finding")}' + f', {listed}' * bool(listed) + f', in {run.findings}.')
+        print(f'Done: {counted(len(findings), "finding")}' + f', {listed}' * bool(listed)
+              + f', in {run.findings}. Here they are:\n{json.dumps(findings, ensure_ascii=False, indent=1)}')
         return
     if run.sources.exists():
         print("Waiting on the merge, whose groups aren't in yet. If it stopped without its groups going in, start it "

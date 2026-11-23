@@ -81,6 +81,13 @@ class InitTests(WizardCase):
         self.assertIn(f'When all of them have answered, run `{self.command("next")}`.', out)
         self.assertTrue(Path(self.run_dir).is_dir())
 
+    def test_refuses_a_change_that_touches_no_files(self):
+        run = self.wizard('init', '--base', 'HEAD', '--head', 'HEAD', '--command', 'review')
+
+        self.assertEqual(run.returncode, 1)
+        self.assertIn('The change from', run.stderr)
+        self.assertIn('touches no files, so there is nothing to review.', run.stderr)
+
     def test_refuses_a_checkout_that_isnt_the_head(self):
         self.git('checkout', '-q', self.base)
 
@@ -440,8 +447,10 @@ class MergeTests(SubmitCase):
         self.assertEqual((report['base'], report['head']), (self.base, self.head))
         self.assertEqual([(found['headline'], len(found['rules']), found['take']) for found in report['findings']],
                          [('One import, two rules', 1, 'T'), ('Where config lives', 0, 'U')])
-        self.assertEqual(self.step('next').stdout,
-                         f'Done: 2 findings, 1 deviation and 1 uncovered choice, in {path}.\n')
+        done = self.step('next').stdout
+        first, rest = done.split('\n', 1)
+        self.assertEqual(first, f'Done: 2 findings, 1 deviation and 1 uncovered choice, in {path}. Here they are:')
+        self.assertEqual(json.loads(rest), report['findings'])
 
 
 class ArgumentTests(WizardCase):
