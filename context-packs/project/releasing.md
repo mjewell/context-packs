@@ -8,6 +8,7 @@ when: Releasing a new version to npm
 `main` is protected, so the version commit lands through a PR. Merge it with a merge commit, not a squash, so the tagged commit itself ends up on `main`.
 
 ```bash
+npm ci && npm run typecheck
 python3 -m unittest discover tests
 git checkout -b release-<version>
 npm version patch --no-git-tag-version   # minor for a breaking change

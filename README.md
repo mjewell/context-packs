@@ -42,7 +42,7 @@ It works with any agent that reads `AGENTS.md` or `CLAUDE.md`. [The full example
 
 ## Quick start
 
-You need `git`, Node 18+ and Python 3.9+. On macOS, the command line tools provide `git` and Python.
+You need `git` and Node 22.18+. A local review also needs Python 3.9+, until its code moves to TypeScript. On macOS, the command line tools provide `git` and Python.
 
 ### 1. Write your repo's docs
 
@@ -136,4 +136,4 @@ Already sharing rules by symlinking Claude Code's `.claude/rules/`? See [Why not
 - [Reference](docs/reference.md): every command, pinning, and what the sync writes.
 - [Skills that grow your packs](docs/skills.md): how to run `pack-rule`, `pack-backfill`, `pack-findings` and `pack-review`.
 - [Why not symlinked rules?](docs/why.md): how `.claude/rules/` links load, and where they don't.
-- [Design](context-packs/project/design.md): the choices behind the format. To contribute, run the tests with `python3 -m unittest discover tests`.
+- [Design](context-packs/project/design.md): the choices behind the format. To contribute, run `npm install`, then `npm run typecheck` and the tests, with `python3 -m unittest discover tests`.
