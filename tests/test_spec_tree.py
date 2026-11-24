@@ -54,7 +54,7 @@ class TreeCase(unittest.TestCase):
 
 
 class CheckTests(TreeCase):
-    """`trees.py check` reads every tree in the repo, and fails on what the spec says CI fails on."""
+    """`trees.ts check` reads every tree in the repo, and fails on what the spec says CI fails on."""
 
     def test_passes_a_tree_that_follows_the_rules(self):
         self.write('review.tree.md', SMALL)
@@ -142,7 +142,7 @@ class CheckTests(TreeCase):
         self.assertEqual(self.trees('check').stdout, '')
 
 class SizeTests(TreeCase):
-    """`trees.py check` warns when a size passes its target, and fails at 1.5 times it."""
+    """`trees.ts check` warns when a size passes its target, and fails at 1.5 times it."""
 
     def test_warns_on_node_text_over_40_words(self):
         self.write('sizes.tree.md', tree(f'- {words(41)}'))
@@ -199,7 +199,7 @@ class SizeTests(TreeCase):
 
 
 class StatsTests(TreeCase):
-    """`trees.py stats` prints each view's size, child count and subtree size."""
+    """`trees.ts stats` prints each view's size, child count and subtree size."""
 
     def test_prints_sizes_for_each_view(self):
         self.write('review.tree.md', SMALL)
@@ -211,7 +211,7 @@ class StatsTests(TreeCase):
 
 
 class LinksToTests(TreeCase):
-    """`trees.py links-to <id>` lists the nodes that link to an ID, in every tree."""
+    """`trees.ts links-to <id>` lists the nodes that link to an ID, in every tree."""
 
     def test_lists_each_node_that_links_to_the_id(self):
         self.write('review.tree.md', SMALL)
@@ -235,7 +235,7 @@ class LinksToTests(TreeCase):
 
         run = self.trees('links-to', 'findres')
 
-        self.assertEqual((run.returncode, run.stderr), (1, 'trees.py: no node has the ID findres\n'))
+        self.assertEqual((run.returncode, run.stderr), (1, 'trees.ts: no node has the ID findres\n'))
 
     def test_lists_a_link_with_display_text(self):
         self.write('review.tree.md', SMALL.replace('see [[finders]]', 'by the [[finders|finders]]'))
@@ -247,7 +247,7 @@ class LinksToTests(TreeCase):
 
 
 class RenderTests(TreeCase):
-    """`trees.py render` writes a tree's page beside its file."""
+    """`trees.ts render` writes a tree's page beside its file."""
 
     def test_writes_the_page_beside_the_tree_file(self):
         self.write('review.tree.md', SMALL)
@@ -347,7 +347,7 @@ class RenderTests(TreeCase):
 
 @unittest.skipUnless(shutil.which('d2'), 'renders D2 diagrams through the d2 CLI')
 class D2RenderTests(TreeCase):
-    """`trees.py render` holds a D2 diagram's links to the rule Markdown links follow."""
+    """`trees.ts render` holds a D2 diagram's links to the rule Markdown links follow."""
 
     def diagram(self, source):
         self.write('review.tree.md', f'''

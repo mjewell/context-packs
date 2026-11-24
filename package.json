@@ -13,9 +13,9 @@
     "skills/pack-findings/*"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "build": "tsc",
-    "prepack": "tsc"
+    "typecheck": "tsc",
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "tsc -p tsconfig.build.json"
   },
   "engines": {
     "node": ">=22.18"

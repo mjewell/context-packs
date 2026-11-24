@@ -1,0 +1,7 @@
+{
+  // What npm pack compiles into dist/: the CLI and the review. The spec-tree skill's scripts ship as .ts in its own
+  // folder, so tsconfig.json only checks them.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": false },
+  "include": ["src/**/*.ts", "review/**/*.ts"]
+}

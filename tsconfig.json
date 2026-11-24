@@ -1,7 +1,7 @@
 {
   // Node runs the .ts sources directly, outside node_modules, by stripping their types. So the code uses only
-  // TypeScript that can be stripped, and names the .ts file in each import. tsc checks the types, and writes dist/
-  // for the npm package, since Node won't strip types under node_modules.
+  // TypeScript that can be stripped, and names the .ts file in each import. tsc checks the types, and
+  // tsconfig.build.json writes dist/ for the npm package, since Node won't strip types under node_modules.
   "compilerOptions": {
     "target": "es2023",
     "module": "nodenext",
@@ -14,7 +14,8 @@
     "rewriteRelativeImportExtensions": true,
     "types": ["node"],
     "rootDir": ".",
-    "outDir": "dist"
+    "outDir": "dist",
+    "noEmit": true
   },
-  "include": ["src/**/*.ts", "review/**/*.ts"]
+  "include": ["src/**/*.ts", "review/**/*.ts", "skills/spec-tree/scripts/**/*.ts"]
 }

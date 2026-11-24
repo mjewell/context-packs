@@ -8,7 +8,7 @@ description: Sync context packs, which are shared agent rules and docs kept in o
 Done when the target repo's packs are what the user asked for and synced, any workspace above it is updated too, and the user has seen what changed, left uncommitted.
 
 1. Pick the target: the repo the user names, else the root of the repo this session is working in. Ask when neither settles it. The folder above several repos, which isn't a git repo itself, is synced the same way, as a workspace.
-2. Run the tool through npx; it needs `git`, Node 18 or later and Python 3.9 or later:
+2. Run the tool through npx; it needs `git` and Node 22.18 or later:
    ```bash
    npx --yes context-packs@0.11.0 --dir <repo> <command>
    ```
