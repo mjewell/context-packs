@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, test } from 'node:test';
+import { BASE, HEAD } from './fake_github.ts';
 import { PairingCase } from './pairing_case.ts';
-import { BASE, HEAD, REVIEW } from './review_case.ts';
+import { REVIEW } from './review_case.ts';
 import { quote, split } from './shlex.ts';
 
 const ANSWERS = '/runner/temp/runs/pack-review-answers';
