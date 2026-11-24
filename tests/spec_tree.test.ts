@@ -469,8 +469,12 @@ function diagram(c: TreeCase, source: string): void {
 }
 
 /** `trees.ts render` holds a D2 diagram's links to the rule Markdown links follow. */
-describe('D2RenderTests', { skip: HAS_D2 ? false : 'renders D2 diagrams through the d2 CLI' }, () => {
-  test('renders a diagram with an https link', async (t) => {
+// Skipped one test at a time, since node:test counts no test in a skipped suite, and the run would never say they
+// didn't run.
+const D2 = { skip: HAS_D2 ? false : 'renders D2 diagrams through the d2 CLI' };
+
+describe('D2RenderTests', () => {
+  test('renders a diagram with an https link', D2, async (t) => {
     const c = new TreeCase(t);
     diagram(c, 'x.link: "https://e.com/docs"');
 
@@ -480,7 +484,7 @@ describe('D2RenderTests', { skip: HAS_D2 ? false : 'renders D2 diagrams through 
     includes(c.read('review.tree.html'), 'href="https://e.com/docs"');
   });
 
-  test('refuses a diagram link to a url scheme that can run script', async (t) => {
+  test('refuses a diagram link to a url scheme that can run script', D2, async (t) => {
     const c = new TreeCase(t);
     diagram(c, 'x.link: "javascript:alert(1)"');
 
