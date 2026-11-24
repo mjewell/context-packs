@@ -19,7 +19,15 @@ export class Refused extends Error {}
 
 /** What git printed. Every argument is fixed here or already checked, so none is the agent's text as an option. */
 export function git(...args: string[]): string {
-  const run = spawnSync('git', ['--literal-pathspecs', ...args], { maxBuffer: Infinity });
+  return gitWithEnv({}, ...args);
+}
+
+/** What git printed, run with env added to this process's environment, such as GIT_INDEX_FILE. */
+export function gitWithEnv(env: Readonly<Record<string, string>>, ...args: string[]): string {
+  const run = spawnSync('git', ['--literal-pathspecs', ...args], {
+    env: { ...process.env, ...env },
+    maxBuffer: Infinity,
+  });
   if (run.status !== 0) throw new Refused(`git said: ${String(run.stderr ?? run.error).trim()}`);
   return run.stdout.toString('utf8');
 }

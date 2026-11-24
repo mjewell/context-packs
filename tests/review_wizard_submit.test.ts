@@ -72,6 +72,66 @@ describe('submit', () => {
     );
   });
 
+  test('refuses spots that name no line at the head and keeps the answer it took', async (t) => {
+    const c = await SubmitCase.make(t);
+    await c.readDocs(1, 2);
+    exits(await c.submit(1, [deviation('Taken')]), 0);
+    const accepted = path.join(c.runDir, 'accepted', 'unit-1.json');
+    const before = fs.readFileSync(accepted, 'utf8');
+    const broken = deviation('Broken');
+    broken.spots = [
+      { path: 'src/gone.py', line: 1, follows: false },
+      { path: 'tests/test_app.py', line: 0, follows: false },
+      { path: 'tests/test_app.py', line: -3, follows: false },
+      { path: 'tests/test_app.py', line: 2, follows: false },
+    ];
+
+    const result = await c.submit(1, [deviation('Fine'), broken]);
+
+    exits(result, 1);
+    assert.equal(
+      result.stderr,
+      "Not taken: your answer names evidence that isn't there:\n" +
+        "  findings[1].spots[0]: src/gone.py isn't a file at the head\n" +
+        '  findings[1].spots[1]: lines count from 1, so there is no line 0\n' +
+        '  findings[1].spots[2]: lines count from 1, so there is no line -3\n' +
+        '  findings[1].spots[3]: tests/test_app.py has 1 line at the head, so there is no line 2\n' +
+        `Fix it, then submit it again with \`${c.command('submit', '1')}\`.\n`,
+    );
+    assert.equal(fs.readFileSync(accepted, 'utf8'), before);
+  });
+
+  test('refuses a rule from a file that isnt in the checkout', async (t) => {
+    const c = await SubmitCase.make(t);
+    await c.readDocs(1, 2);
+    const broken = deviation();
+    broken.rules = [
+      { file: 'docs/missing.md', quote: 'Test behavior.', routed: true },
+      { file: '../outside.md', quote: 'Test behavior.', routed: true },
+      { file: 'docs', quote: 'Test behavior.', routed: true },
+    ];
+
+    const result = await c.submit(1, [broken]);
+
+    exits(result, 1);
+    includes(
+      result.stderr,
+      "  findings[0].rules[0]: docs/missing.md isn't a file in the checkout\n" +
+        "  findings[0].rules[1]: ../outside.md isn't a file in the checkout\n" +
+        "  findings[0].rules[2]: docs isn't a file in the checkout\n",
+    );
+    assert.ok(!fs.existsSync(path.join(c.runDir, 'accepted', 'unit-1.json')));
+  });
+
+  test('takes a spot outside the diff and a rule from a doc outside the unit', async (t) => {
+    const c = await SubmitCase.make(t);
+    await c.readDocs(1, 2);
+    const found = deviation('Outside', 'AGENTS.md', 1);
+    found.rules = [{ file: 'docs/prose.md', quote: 'Short sentences.', routed: false }];
+
+    exits(await c.submit(1, [found]), 0);
+  });
+
   test('refuses an answer with a key the schema doesnt have', async (t) => {
     const c = await SubmitCase.make(t);
     const extra = { ...deviation(), severity: 'high' };

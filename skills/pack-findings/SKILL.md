@@ -1,7 +1,7 @@
 ---
 name: pack-findings
-description: Find where a PR, branch or commit range deviates from a repo's context packs, whether each rule's `when` reached the work, and the choices it makes that no rule covers. Run by the `pack-review` skill, which goes through the findings with the user.
-argument-hint: "[PR number or owner/repo#number, branch, or commit range] [checkout]"
+description: Find where a PR, branch, commit range or uncommitted changes deviate from a repo's context packs, whether each rule's `when` reached the work, and the choices it makes that no rule covers. Run by the `pack-review` skill, which goes through the findings with the user.
+argument-hint: "[PR number or owner/repo#number, branch, commit range, or uncommitted changes] [checkout]"
 # Each finder runs the wizard many times, and they start in the turn that invoked this skill, so this grant keeps
 # their calls from asking. It ends with that turn, so the orchestrator's later calls ask, unless the session allows the
 # command at startup, as a headless run does. The checkout CLI isn't granted, since its path is known only once the
@@ -27,7 +27,7 @@ Each finding is one of three kinds:
 ## Where it runs
 
 - **Run by another skill**, such as `pack-review`: every step below, then hand back to that skill the `next` command that printed the findings, so it reads them from the wizard. Don't show the findings here, since that skill shows them to the user one at a time, and the user would see each one twice. Once you've handed the command back, carry on with that skill's next step.
-- **Run by the user**, with a PR, branch or range: every step below, then show the findings. Give the number of each kind, then each finding in full, grouped by kind. Say that running `pack-review` in this session goes through them, without finding them again.
+- **Run by the user**, with a PR, branch, range or uncommitted changes: every step below, then show the findings. Give the number of each kind, then each finding in full, grouped by kind. Say that running `pack-review` in this session goes through them, without finding them again.
 
 A PR named as `owner/repo#number` is in that repo: from a folder above the repos, work in its checkout.
 
@@ -39,6 +39,8 @@ Every command below runs the CLI as `npx context-packs@0.12.0`, the version this
 
 Resolve what you were given to a base and a head: a PR's base and head, a branch against the default branch, or a range as given. For a GitHub PR, `git fetch origin pull/<number>/head` gets the head. Stop if a ref doesn't resolve.
 
+Uncommitted changes have no head to resolve. The wizard makes one in step 2, a commit built from the working files on top of `HEAD`, without changing the branch, the index or any file. Untracked files are in it, and ignored ones aren't. The base is `HEAD` for the uncommitted changes alone, or the branch's base when you were asked for the branch's commits too. Skip the rest of this step: the checkout is already what the review reads.
+
 The review reads the packs and the existing code from the checkout, so a change that updates a rule along with the code is judged by the new rule. Note any changes the diff makes to the packs, for whoever reads the findings. The checkout has to be the head. Compare `git rev-parse HEAD` with the head. When they differ, stop. Say which commit is checked out. Offer to check out the head. Once the checkout is the head, list any uncommitted changes to the instruction file or to a doc the CLI's `docs` command lists. The review reads those changes as the head's rules. Done when the checkout is the head and the user has seen any uncommitted changes to the rules.
 
 ## 2. Run the wizard
@@ -48,6 +50,8 @@ The wizard runs the review: it lists the finders, gives each one its brief, chec
 ```bash
 npx context-packs@0.12.0 review init --base <base> --head <head> --command "npx context-packs@0.12.0 review"
 ```
+
+For uncommitted changes, pass `--uncommitted` in place of `--head <head>`.
 
 Then do what each output says. Start every subagent it names in the foreground, all in one message when it names several, each with exactly the prompt it gives. A headless session ends when your turn does, and a subagent in the background ends with it. Don't read the docs, the diff or the finders' answers yourself: each subagent reads what its brief names, and the wizard checks what it hands back. When a subagent reports back, run the `next` command the wizard gave you. If a command is refused, do what its message says.
 
