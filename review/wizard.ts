@@ -143,8 +143,9 @@ class Run {
 }
 
 /**
- * Write text to file whole or not at all, by renaming a file written beside it. A phase starts when its file exists,
- * so a write cut short must never leave one.
+ * Write text to file whole or not at all, by renaming a file written beside it. The run's state is which files exist,
+ * such as a finder's accepted answer or the file that starts a phase, so a write cut short must never leave one.
+ * Every such file goes through here.
  */
 function publish(file: string, text: string): void {
   const partial = `${file}.partial`;
@@ -385,7 +386,7 @@ function submit(args: Values): void {
     );
   }
   fs.mkdirSync(path.dirname(run.accepted(finder)), { recursive: true });
-  fs.writeFileSync(run.accepted(finder), text, 'utf8');
+  publish(run.accepted(finder), text);
   const name = finder === run.uncovered ? "the uncovered finder's answer" : `unit ${finder}`;
   print(
     `${name[0]!.toUpperCase()}${name.slice(1)} is in, with ${counted(findings.length, 'finding')}. Tell whoever ` +
