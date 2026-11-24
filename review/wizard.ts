@@ -140,6 +140,16 @@ class Run {
   }
 }
 
+/**
+ * Write text to file whole or not at all, by renaming a file written beside it. A phase starts when its file exists,
+ * so a write cut short must never leave one.
+ */
+function publish(file: string, text: string): void {
+  const partial = `${file}.partial`;
+  fs.writeFileSync(partial, text, 'utf8');
+  fs.renameSync(partial, file);
+}
+
 /** A prompt file filled in as str.format fills it. */
 function prompt(name: string, values: Readonly<Record<string, string>>): string {
   return format(fs.readFileSync(path.join(PROMPTS, name), 'utf8'), values);
@@ -399,7 +409,7 @@ function nextStep(args: Values): void {
     return;
   }
   const found = sources(path.dirname(run.accepted(0)));
-  fs.writeFileSync(run.sources, dumps(found), 'utf8');
+  publish(run.sources, dumps(found));
   print(
     `All ${finders.length} finders are in, with ${counted(found.length, 'finding')}.\n` +
       'Start one subagent in the foreground, with exactly this prompt: ' +
@@ -410,23 +420,29 @@ function nextStep(args: Values): void {
 
 function submitGroups(args: Values): void {
   const run = new Run(String(args.run));
-  if (run.phase() === 'finders') {
+  const phase = run.phase();
+  if (phase === 'finders') {
     throw new Refused(
       `Not taken: the merge hasn't started. Run \`${run.command('next')}\` to see whose answers aren't in.`,
     );
   }
+  // A run that's done never changes: next prints its findings, so an agent that missed the first reply loses nothing.
+  if (phase === 'done') {
+    throw new Refused(
+      "Not taken: the findings are already built, so the groups can't change. Tell whoever started you, and stop.",
+    );
+  }
   const command = run.command('submit-groups');
-  const groups = path.join(run.folder, 'groups.json');
-  fs.writeFileSync(groups, answer('groups', run.answer('groups.json'), command, groupsSchema()), 'utf8');
+  const text = answer('groups', run.answer('groups.json'), command, groupsSchema());
   let findings: Finding[];
   try {
-    findings = findingsIn(groups, run.sources);
+    findings = findingsIn(text, run.sources);
   } catch (error) {
     if (!(error instanceof Rejected)) throw error;
     throw new Refused(`Not taken: ${error.message}. Fix your groups, then submit them again with \`${command}\`.`);
   }
-  const built = { base: run.state.base, head: run.state.head, findings };
-  fs.writeFileSync(run.findings, dumps(built), 'utf8');
+  publish(path.join(run.folder, 'groups.json'), text);
+  publish(run.findings, dumps({ base: run.state.base, head: run.state.head, findings }));
   print(`${counted(findings.length, 'finding')} are in ${run.findings}. Tell whoever started you, and stop.`);
 }
 

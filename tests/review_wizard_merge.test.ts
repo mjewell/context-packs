@@ -213,6 +213,29 @@ describe('the merge', () => {
     );
     assert.deepEqual(JSON.parse(done.slice(split + 1)), report.findings);
   });
+
+  test('refuses groups once the findings are built and keeps them', async (t) => {
+    const c = await MergeCase.make(t);
+    await c.allIn();
+    exits(await c.submitGroups([{ ids: ['0:0', '1:0', '3:0'], kind: 'deviation', headline: 'First', take: 'T' }]), 0);
+    const file = path.join(c.runDir, 'findings.json');
+    const before = fs.readFileSync(file, 'utf8');
+
+    for (const groups of [
+      [{ ids: ['0:0', '1:0', '3:0'], kind: 'deviation', headline: 'First', take: 'T' }],
+      [{ ids: ['0:0', '1:0', '3:0'], kind: 'deviation', headline: 'Second', take: 'T' }],
+      [{ ids: ['0:0'], kind: 'deviation', headline: 'Third', take: 'T' }],
+    ]) {
+      const result = await c.submitGroups(groups);
+
+      exits(result, 1);
+      assert.equal(
+        result.stderr,
+        "Not taken: the findings are already built, so the groups can't change. Tell whoever started you, and stop.\n",
+      );
+      assert.equal(fs.readFileSync(file, 'utf8'), before);
+    }
+  });
 });
 
 const NUMBERS = { file: 'AGENTS.md', quote: 'Game numbers live in content.', routed: true };

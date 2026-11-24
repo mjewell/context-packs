@@ -96,6 +96,8 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
       - While answers are missing, `next` names each finder that hasn't answered, with its prompt, so one that stopped can be started again
       - Once every answer is in, `next` numbers the finders' findings and names the merging agent. Once its groups are in, `next` prints the [[findings]]
       - The run's state is which files its folder holds. The wizard works it out on each step instead of storing it, and refuses a step whose checks fail
+        - A file that starts a phase is written beside its name and then renamed, so a write cut short starts no phase
+        - Once the [[findings]] are built, `submit-groups` refuses any groups, so a done run never changes. `next` still prints its findings
     - A finder's brief is the skill's prompt for its kind, with the commands that read its docs and the change, and its answer's schema {#brief}
       - `doc` prints one of the unit's docs and marks it served. `submit` takes a unit's answer only once every doc in it was served, and only in the schema's shape
         - Why: the wizard keeps its own record of what it printed, so the check needs no transcript, see [[doc-names]]
