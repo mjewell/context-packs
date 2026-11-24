@@ -114,8 +114,8 @@ class Run {
 
   /**
    * Which step the run is at: 'finders' until next starts the merge, 'merge' until submit-groups builds the findings,
-   * then 'done'. Each phase starts when the file that marks it is written, so this is the one place that knows which
-   * file that is.
+   * then 'done'. With no findings to merge, next builds them, and the run goes from 'finders' to 'done'. Each phase
+   * starts when the file that marks it is written, so this is the one place that knows which file that is.
    */
   phase(): 'finders' | 'merge' | 'done' {
     if (exists(this.findings)) return 'done';
@@ -345,7 +345,7 @@ function submit(args: Values): void {
   const finder = run.finder(String(args.finder));
   const command = run.command('submit', String(finder));
   if (run.phase() !== 'finders')
-    throw new Refused("Not taken: the merge has started, so the finders' answers can't change.");
+    throw new Refused("Not taken: every finder is in, so the finders' answers can't change.");
   if (finder !== run.uncovered) {
     const unread = run.units[finder]!.map((docPath, i): [number, string] => [i + 1, docPath]).filter(
       ([n]) => !exists(path.join(run.served(finder), String(n))),
@@ -372,19 +372,24 @@ function submit(args: Values): void {
   );
 }
 
+/** Print a done run's findings, counted by kind. */
+function printDone(run: Run): void {
+  const findings: Finding[] = JSON.parse(fs.readFileSync(run.findings, 'utf8')).findings;
+  const kinds = KINDS.filter((kind) => findings.some((found) => found.kind === kind)).map((kind) =>
+    counted(findings.filter((found) => found.kind === kind).length, kind),
+  );
+  const listed = kinds.length ? kinds.slice(0, -1).join(', ') + (kinds.length > 1 ? ' and ' : '') + kinds.at(-1) : '';
+  print(
+    `Done: ${counted(findings.length, 'finding')}${listed ? `, ${listed}` : ''}, in ${run.findings}. Here they ` +
+      `are:\n${JSON.stringify(findings, null, 1)}`,
+  );
+}
+
 function nextStep(args: Values): void {
   const run = new Run(String(args.run));
   const phase = run.phase();
   if (phase === 'done') {
-    const findings: Finding[] = JSON.parse(fs.readFileSync(run.findings, 'utf8')).findings;
-    const kinds = KINDS.filter((kind) => findings.some((found) => found.kind === kind)).map((kind) =>
-      counted(findings.filter((found) => found.kind === kind).length, kind),
-    );
-    const listed = kinds.length ? kinds.slice(0, -1).join(', ') + (kinds.length > 1 ? ' and ' : '') + kinds.at(-1) : '';
-    print(
-      `Done: ${counted(findings.length, 'finding')}${listed ? `, ${listed}` : ''}, in ${run.findings}. Here they ` +
-        `are:\n${JSON.stringify(findings, null, 1)}`,
-    );
+    printDone(run);
     return;
   }
   if (phase === 'merge') {
@@ -410,6 +415,12 @@ function nextStep(args: Values): void {
   }
   const found = sources(path.dirname(run.accepted(0)));
   publish(run.sources, dumps(found));
+  // With no findings there is nothing to group, so the findings are built here, as submit-groups would build them.
+  if (!found.length) {
+    publish(run.findings, dumps({ base: run.state.base, head: run.state.head, findings: [] }));
+    printDone(run);
+    return;
+  }
   print(
     `All ${finders.length} finders are in, with ${counted(found.length, 'finding')}.\n` +
       'Start one subagent in the foreground, with exactly this prompt: ' +

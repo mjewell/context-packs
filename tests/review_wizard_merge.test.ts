@@ -64,20 +64,35 @@ describe('next', () => {
 
   test('keeps the finders answers once the merge has started', async (t) => {
     const c = await SubmitCase.make(t);
-    for (const [unit, docs] of [
-      [0, 1],
-      [1, 2],
-      [2, 1],
-    ] as const) {
-      await c.submitUnit(unit, docs, []);
-    }
+    await c.submitUnit(0, 1, [deviation('A')]);
+    await c.submitUnit(1, 2, []);
+    await c.submitUnit(2, 1, []);
     await c.submit(3, []);
     await c.step('next');
 
     const result = await c.submit(1, []);
 
     exits(result, 1);
-    includes(result.stderr, "Not taken: the merge has started, so the finders' answers can't change.");
+    includes(result.stderr, "Not taken: every finder is in, so the finders' answers can't change.");
+  });
+
+  test('finishes with no findings and no merge when every finder found none', async (t) => {
+    const c = await SubmitCase.make(t);
+    await c.submitUnit(0, 1, []);
+    await c.submitUnit(1, 2, []);
+    await c.submitUnit(2, 1, []);
+    await c.submit(3, []);
+
+    const first = await c.step('next');
+    const again = await c.step('next');
+
+    exits(first, 0);
+    const file = path.join(c.runDir, 'findings.json');
+    assert.equal(first.stdout, `Done: 0 findings, in ${file}. Here they are:\n[]\n`);
+    assert.equal(again.stdout, first.stdout);
+    const report = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.deepEqual(report, { base: c.base, head: c.head, findings: [] });
+    exits(await c.submit(1, []), 1);
   });
 });
 
