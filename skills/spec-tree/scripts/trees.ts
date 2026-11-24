@@ -82,12 +82,13 @@ function main(argv: readonly string[]): void {
   if (command === undefined) usage('name a command');
   const takes = COMMANDS[command];
   if (takes === undefined) usage(`there's no command ${command}`);
-  const wrong = () => usage(`${command} takes ${takes || 'no arguments'}`);
+  // Typed, so a call to it ends the function as far as TypeScript can tell.
+  const wrong: () => never = () => usage(`${command} takes ${takes || 'no arguments'}`);
   let parsed: ReturnType<typeof read>;
   try {
     parsed = read(rest);
   } catch {
-    return wrong();
+    wrong();
   }
   const { positionals, values } = parsed;
   const count = command === 'links-to' || command === 'render' ? 1 : 0;

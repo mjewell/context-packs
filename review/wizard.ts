@@ -460,7 +460,7 @@ const PARSER: Parser = {
           dest: 'command',
           metavar: 'COMMAND',
           required: true,
-          help: 'how an agent runs the wizard, ' + 'such as "npx context-packs@0.11.0 review"',
+          help: 'how an agent runs the wizard, ' + 'such as "npx context-packs@0.12.0 review"',
         },
       ],
     },

@@ -79,8 +79,8 @@ For a new doc or a changed `when`, add prompts to the evals of the pack holding 
 - Rename the billing page's heading.
 ```
 
-Running them costs tokens, so offer `npx context-packs@0.11.0 eval <doc>` and run it only if the user agrees.
+Running them costs tokens, so offer `npx context-packs@0.12.0 eval <doc>` and run it only if the user agrees.
 
 ## 6. Resync and report
 
-Resync with `npx --yes context-packs@0.11.0`, or with the `context-packs` skill if it stops with an error. Report what changed, from `git status`, and leave it uncommitted.
+Resync with `npx --yes context-packs@0.12.0`, or with the `context-packs` skill if it stops with an error. Report what changed, from `git status`, and leave it uncommitted.
