@@ -9,6 +9,8 @@ import { MARKER } from './review_case.ts';
 import { deviation, WizardCase } from './review_wizard_case.ts';
 import { tempDir } from './temp.ts';
 
+// The title as posted summaries hold it. A change here would stop from-pr reading every summary already on a PR, so
+// this pins the text rather than importing TITLE.
 const TITLE = 'Findings for pack-review';
 
 /**
