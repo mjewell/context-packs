@@ -12,7 +12,7 @@ interface Source {
 }
 
 /** next tells the orchestrator what to do now, from what the run folder holds, so it can also pick a run back up. */
-describe('NextTests', () => {
+describe('next', () => {
   test('names each finder whose answer isnt in with its prompt', async (t) => {
     const c = await SubmitCase.make(t);
     await c.submitUnit(0, 1, []);
@@ -95,7 +95,7 @@ class MergeCase extends SubmitCase {
  * Once every finder is in, one subagent groups their findings, and the wizard builds the findings from its groups, as
  * the merge job's script does.
  */
-describe('MergeTests', () => {
+describe('the merge', () => {
   test('brief gives the merging agent the numbered findings and where its groups go', async (t) => {
     const c = await MergeCase.make(t);
     await c.allIn();
@@ -278,7 +278,7 @@ class GroupCase extends SubmitCase {
  * Each finding is built from the finders' findings its group names, so the merge can't drop what they found, and
  * groups that would drop, repeat or invent one are refused.
  */
-describe('GroupTests', () => {
+describe("the merge's groups", () => {
   test('builds a finding from every finding its group names', async (t) => {
     const c = await GroupCase.make(t);
     await c.answered({

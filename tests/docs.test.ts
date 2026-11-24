@@ -24,7 +24,7 @@ class DocsCase extends SyncCase {
 }
 
 /** The docs command, which lists every file the repo's tables point an agent at, by pack, for the review's prompt. */
-describe('DocsTests', () => {
+describe('docs', () => {
   test('prints every doc the tables point at grouped by pack', async (t) => {
     const c = await DocsCase.make(t);
     const result = await c.sync('docs');
@@ -69,7 +69,7 @@ describe('DocsTests', () => {
 });
 
 /** A folder inside a repo, whose tables' paths start from the repo root. */
-describe('SubfolderDocsTests', () => {
+describe('docs in a folder inside a repo', () => {
   test('lists and reads paths from the repo root', async (t) => {
     const c = await SyncCase.make(t);
     c.write('packages/web/context-packs/frontend/pack.md', doc('Editing `web/**`', 'Keep components small.\n'));

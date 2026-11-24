@@ -29,7 +29,7 @@ class ImportPackCase extends SyncCase {
   }
 }
 
-describe('ImportTests', () => {
+describe('import packs', () => {
   test('add at a nested id writes an import pack pinned to the latest commit', async (t) => {
     const c = await ImportPackCase.make(t);
     const result = await c.importRules('--when', 'Reviewing a PR');
@@ -278,7 +278,7 @@ describe('ImportTests', () => {
 });
 
 /** What stops a sync with import packs. */
-describe('ImportRuleTests', () => {
+describe('what stops a sync with import packs', () => {
   test('two import packs of one folder both render', async (t) => {
     const c = await ImportPackCase.make(t);
     await c.importRules();
@@ -380,7 +380,7 @@ class PathImportCase extends SyncCase {
   }
 }
 
-describe('PathImportTests', () => {
+describe('an import pack with a path and no from', () => {
   test('path import in a pack from git reads its repo at the packs ref', async (t) => {
     const c = await PathImportCase.make(t);
     const result = await c.add();
@@ -485,7 +485,7 @@ class SharedFolderCase extends SyncCase {
   }
 }
 
-describe('SharedFolderTests', () => {
+describe('two packs that include one folder', () => {
   test('folder both point at renders in each', async (t) => {
     const c = await SharedFolderCase.make(t);
     await c.addPack('web');

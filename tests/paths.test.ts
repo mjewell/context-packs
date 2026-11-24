@@ -18,7 +18,7 @@ class OutsideCase extends SyncCase {
 }
 
 /** A folder in no git repo, such as the one above the repos: sessions start anywhere, so rows are absolute. */
-describe('OutsideRepoTests', () => {
+describe('a folder in no repo', () => {
   test('rows are absolute', async (t) => {
     const c = await OutsideCase.make(t);
     c.write('context-packs/testing.md', doc('Writing tests'));
@@ -55,7 +55,7 @@ describe('OutsideRepoTests', () => {
  * A folder inside a repo, such as a package with its own AGENTS.md: sessions start at the repo root, so rows start
  * there too.
  */
-describe('SubfolderTests', () => {
+describe('a folder inside a repo', () => {
   test('rows start from the repo root', async (t) => {
     const c = await SyncCase.make(t);
     c.write('packages/web/context-packs/testing.md', doc('Writing tests'));

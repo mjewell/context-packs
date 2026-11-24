@@ -54,7 +54,7 @@ class TrustCase extends ReviewCase {
 }
 
 /** threads.ts prints pack-review's threads on one PR, open and resolved, for the pairing job's agents. */
-describe('ThreadsTests', () => {
+describe('threads', () => {
   test('prints pack reviews threads and leaves out others', async (t) => {
     const c = await TrustCase.make(t);
     const found = await c.threads(
@@ -121,7 +121,7 @@ describe('ThreadsTests', () => {
  * A reply's text comes back only when its author can write to the repo now, or pack-review wrote it. Anyone else's
  * text, and their login, which they chose, stay out of the agent's context.
  */
-describe('TrustTests', () => {
+describe('whose replies an agent sees', () => {
   test('gives a reply by someone who can write', async (t) => {
     const c = await TrustCase.make(t);
     assert.deepEqual(await c.replies(said('Kept on purpose.', { id: 'RC_2' })), [

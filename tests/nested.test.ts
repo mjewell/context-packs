@@ -34,7 +34,7 @@ class FolderCase extends SyncedCase {
 }
 
 /** A folder without a pack.md, which only groups files: its docs join the nearest pack's table. */
-describe('FolderTests', () => {
+describe('a folder without a pack.md', () => {
   test('folder docs join the packs table', async (t) => {
     const c = await FolderCase.make(t);
     const result = await c.add();
@@ -78,7 +78,7 @@ class NestedCase extends SyncedCase {
 }
 
 /** A folder with a pack.md inside the installed pack, which gets a row pointing at a generated index. */
-describe('NestedPackTests', () => {
+describe('a nested pack', () => {
   test('nested pack gets a row in its parents table', async (t) => {
     const c = await NestedCase.make(t);
     const result = await c.add();
@@ -237,7 +237,7 @@ class OverlapCase extends SyncCase {
   }
 }
 
-describe('OverlapTests', () => {
+describe('overlapping packs', () => {
   test('adding a folder inside an installed pack stops untouched', async (t) => {
     const c = await OverlapCase.make(t);
     await c.add();
@@ -297,7 +297,7 @@ class InstallPointCase extends SyncCase {
   }
 }
 
-describe('InstallPointTests', () => {
+describe('a nested pack installed on its own', () => {
   test('pack with a when line gets a row in the context table', async (t) => {
     const c = await InstallPointCase.make(t);
     const result = await c.addFolder('typescript');
@@ -352,7 +352,7 @@ class LocalNestedCase extends SyncCase {
   }
 }
 
-describe('LocalNestedPackTests', () => {
+describe("a nested pack in the repo's own docs", () => {
   test('nested packs index is generated and its docs stay where they are', async (t) => {
     const c = await LocalNestedCase.make(t);
     const result = await c.sync();

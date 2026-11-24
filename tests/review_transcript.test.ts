@@ -39,7 +39,7 @@ class TranscriptCase extends ReviewCase {
   }
 }
 
-describe('TranscriptTests', () => {
+describe('transcript', () => {
   test('lists each tool call with its input', async (t) => {
     const c = await TranscriptCase.make(t);
     const out = await c.show([

@@ -20,7 +20,7 @@ import {
   SyncCase,
 } from './sync_case.ts';
 
-describe('SyncTests', () => {
+describe('sync', () => {
   test('fresh repo gets agents md holding only the header', async (t) => {
     const c = await SyncCase.make(t);
     const result = await c.sync();
@@ -215,7 +215,7 @@ class AddRemoveCase extends SyncCase {
   }
 }
 
-describe('AddRemoveTests', () => {
+describe('add and remove', () => {
   test('add writes an import pack pinned to its origins latest commit', async (t) => {
     const c = await AddRemoveCase.make(t);
     const result = await c.add();
@@ -361,7 +361,7 @@ class RootCase extends SyncCase {
   }
 }
 
-describe('RootTests', () => {
+describe("the repo's own docs", () => {
   test('docs in context packs are listed where they are', async (t) => {
     const c = await RootCase.make(t);
     const result = await c.sync();
@@ -435,7 +435,7 @@ class SiblingCase extends SyncCase {
   }
 }
 
-describe('SiblingPackTests', () => {
+describe('a pack in a folder beside the repo', () => {
   test('sibling pack syncs its working tree and lists its docs where they are', async (t) => {
     const c = await SiblingCase.make(t);
     fs.writeFileSync(path.join(c.source, 'context', 'pack.md'), 'Prefer tiny PRs.\n');
@@ -558,7 +558,7 @@ describe('SiblingPackTests', () => {
   });
 });
 
-describe('PackShapeTests', () => {
+describe("a pack's docs", () => {
   test('doc is copied and listed', async (t) => {
     const c = await SyncCase.make(t);
     c.publish({ 'billing.md': doc('Billing', 'Charge once.\n') });
@@ -605,7 +605,7 @@ class PinningCase extends SyncCase {
   }
 }
 
-describe('PinningTests', () => {
+describe('pins', () => {
   test('plain resync keeps the pinned rules after the pack moves on', async (t) => {
     const c = await PinningCase.make(t);
     c.share('Prefer small PRs.\nWrite tests first.\n');
@@ -699,7 +699,7 @@ class VersionCase extends SyncCase {
   }
 }
 
-describe('VersionTests', () => {
+describe('a pack pinned to a tag', () => {
   test('add with a tag pins the pack to the tag', async (t) => {
     const c = await VersionCase.make(t);
     assert.equal(c.agents(), c.rules());
@@ -742,7 +742,7 @@ class SeveralCase extends SyncCase {
   }
 }
 
-describe('SeveralPacksTests', () => {
+describe('several packs', () => {
   test('packs render in the order of their folders each between markers naming it', async (t) => {
     const c = await SeveralCase.make(t);
     const result = await c.addAcme();

@@ -56,7 +56,7 @@ class ChangeCase extends GitCase {
 }
 
 /** files lists what the change touches, so a finder can pick what to read and how many pages each takes. */
-describe('FilesTests', () => {
+describe('files', () => {
   test('lists each changed path with the lines in its diff', async (t) => {
     const c = await ChangeCase.make(t);
     c.commit('Add two files', { 'a.txt': 'one\ntwo\nthree\n', 'docs/b.md': 'b\n' });
@@ -78,7 +78,7 @@ describe('FilesTests', () => {
 });
 
 /** The report reads the head lines each diff shows, since a review comment can be left only on one of them. */
-describe('ShownTests', () => {
+describe('shown', () => {
   test('prints the head lines each diff shows', async (t) => {
     const c = await ChangeCase.make(t);
     c.commit('Add', { 'a.txt': TWELVE, 'gone.txt': 'x\n' });
@@ -98,7 +98,7 @@ describe('ShownTests', () => {
  * diff shows one path's change, with each line the head has numbered as it is there, so a finding can name a line
  * without counting.
  */
-describe('DiffTests', () => {
+describe('diff', () => {
   test('numbers each line the head has and leaves removed lines blank', async (t) => {
     const c = await ChangeCase.make(t);
     c.commit('Add', { 'a.txt': TWELVE });
@@ -218,7 +218,7 @@ class PagingCase extends ChangeCase {
 }
 
 /** Long output comes in pages of 1000 lines, so one step can't fill a finder's context. */
-describe('PagingTests', () => {
+describe('pages', () => {
   test('gives the first page and says how to get the next', async (t) => {
     const c = await PagingCase.make(t);
     const lines = (await c.text('diff', 'long.txt')).trimEnd().split('\n');
@@ -250,7 +250,7 @@ describe('PagingTests', () => {
 });
 
 /** log lists the change's commits with their messages, since a message can say a choice was deliberate. */
-describe('LogTests', () => {
+describe('log', () => {
   test('lists the changes commits newest first and none from the base branch', async (t) => {
     const c = await ChangeCase.make(t);
     c.commit('Add', { 'a.txt': 'a\n' });

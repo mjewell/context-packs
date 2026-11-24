@@ -7,7 +7,7 @@ import { exits, includes } from './expect.ts';
 import { doc, names, read, SyncCase } from './sync_case.ts';
 
 /** check, which exits 1 when a sync would change anything, and writes nothing. */
-describe('CheckTests', () => {
+describe('check', () => {
   test('synced repo passes silently', async (t) => {
     const c = await SyncCase.make(t);
     c.share('Prefer small PRs.\n');

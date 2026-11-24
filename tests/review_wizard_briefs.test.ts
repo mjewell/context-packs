@@ -19,7 +19,7 @@ class BriefCase extends StartedCase {
  * brief gives one finder its prompt: the skill's prompt for its kind of finder, with the commands that read its docs
  * and the change, and where its answer goes.
  */
-describe('BriefTests', () => {
+describe('brief', () => {
   test('names each of a units docs with the command that reads it', async (t) => {
     const c = await BriefCase.make(t);
     const brief = await c.brief('1');
@@ -77,7 +77,7 @@ describe('BriefTests', () => {
 });
 
 /** doc prints one of a unit's docs, as the file is at the head. */
-describe('DocTests', () => {
+describe('doc', () => {
   test('prints the doc a units brief numbers', async (t) => {
     const c = await StartedCase.make(t);
     const result = await c.step('doc', '1', '2');
@@ -107,7 +107,7 @@ describe('DocTests', () => {
  * The submit command a brief prints works as written, run through a shell, once the answer is where the brief says
  * to write it.
  */
-describe('ShellTests', () => {
+describe('commands run through a shell', () => {
   test('the briefs submit command takes the answer the brief named through bash', async (t) => {
     const c = await WizardCase.make(t);
     const launcher = shell('review/wizard');

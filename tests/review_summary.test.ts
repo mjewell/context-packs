@@ -99,7 +99,7 @@ class SummaryCase extends ReviewCase {
  * The one summary comment each review keeps current: counts for people, and every finding as JSON for the author's
  * local run.
  */
-describe('SummaryTests', () => {
+describe('the summary comment', () => {
   test('posts a summary counting the findings and holding them all', async (t) => {
     const c = await SummaryCase.make(t);
     const findings = [

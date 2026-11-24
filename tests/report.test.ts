@@ -18,7 +18,7 @@ class ReportCase extends SyncCase {
 }
 
 /** What a sync prints about the changes it made. */
-describe('ReportTests', () => {
+describe('what a sync prints', () => {
   test('add names the pack and its ref', async (t) => {
     const c = await ReportCase.make(t);
     const result = await c.add();

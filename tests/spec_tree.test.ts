@@ -19,7 +19,7 @@ function tree(...bullets: string[]): string {
 }
 
 /** `trees.ts check` reads every tree in the repo, and fails on what the spec says CI fails on. */
-describe('CheckTests', () => {
+describe('check', () => {
   test('passes a tree that follows the rules', async (t) => {
     const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL);
@@ -143,7 +143,7 @@ describe('CheckTests', () => {
 });
 
 /** `trees.ts check` warns when a size passes its target, and fails at 1.5 times it. */
-describe('SizeTests', () => {
+describe('sizes', () => {
   test('warns on node text over 40 words', async (t) => {
     const c = await TreeCase.make(t);
     c.write('sizes.tree.md', tree(`- ${words(41)}`));
@@ -233,7 +233,7 @@ describe('SizeTests', () => {
 });
 
 /** `trees.ts stats` prints each view's size, child count and subtree size. */
-describe('StatsTests', () => {
+describe('stats', () => {
   test('prints sizes for each view', async (t) => {
     const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL);
@@ -248,7 +248,7 @@ describe('StatsTests', () => {
 });
 
 /** A command given the wrong arguments says what it takes, and lists every command. */
-describe('UsageTests', () => {
+describe('usage', () => {
   test('says what a command takes and exits 2', async (t) => {
     const c = await TreeCase.make(t);
     for (const [args, says] of [
@@ -275,7 +275,7 @@ describe('UsageTests', () => {
 });
 
 /** `trees.ts links-to <id>` lists the nodes that link to an ID, in every tree. */
-describe('LinksToTests', () => {
+describe('links-to', () => {
   test('lists each node that links to the id', async (t) => {
     const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL);
@@ -327,7 +327,7 @@ describe('LinksToTests', () => {
 });
 
 /** `trees.ts render` writes a tree's page beside its file. */
-describe('RenderTests', () => {
+describe('render', () => {
   test('writes the page beside the tree file', async (t) => {
     const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL);
@@ -473,7 +473,7 @@ function diagram(c: TreeCase, source: string): void {
 // didn't run.
 const D2 = { skip: HAS_D2 ? false : 'renders D2 diagrams through the d2 CLI' };
 
-describe('D2RenderTests', () => {
+describe('render with D2', () => {
   test('renders a diagram with an https link', D2, async (t) => {
     const c = await TreeCase.make(t);
     diagram(c, 'x.link: "https://e.com/docs"');
@@ -497,7 +497,7 @@ describe('D2RenderTests', () => {
 });
 
 /** This repo's own trees follow the spec's rules, so the test suite checks them until a CI workflow does. */
-describe('RepoTreesTests', () => {
+describe("this repo's trees", () => {
   test('this repos trees have no failures', async () => {
     const result = await run([...command('skills/spec-tree/scripts/trees'), 'check'], { cwd: ROOT });
 

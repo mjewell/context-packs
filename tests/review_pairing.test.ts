@@ -39,7 +39,7 @@ const ALICE = {
  * The pairing agent gets this run's findings and the findings pack-review's threads were opened for, and no comment
  * anyone wrote, so no comment can bias which thread a finding lands in.
  */
-describe('PromptTests', () => {
+describe('pair-prompt', () => {
   test('gives the new findings and each threads opening comment and no reply', async (t) => {
     const c = await PairingCase.make(t);
     c.given([F1, F3], [opened('T_1', finding('A magic number in the sim'), [ALICE])]);
@@ -93,7 +93,7 @@ class CheckCase extends PairingCase {
 }
 
 /** The post job gets only pairs that name a new finding and one of pack-review's threads, each at most once. */
-describe('CheckTests', () => {
+describe('pair-check', () => {
   test('writes the pairs for the post job', async (t) => {
     const c = await CheckCase.make(t);
     const run = await c.check([{ finding: 0, thread: 'T_1' }]);
@@ -199,7 +199,7 @@ class CommentCase extends PairingCase {
  * The commentary agent gets every paired finding with its thread, told which comments are its own and which replies
  * came after its last one, so it can tell what it already said.
  */
-describe('CommentPromptTests', () => {
+describe('comment-prompt', () => {
   test('gives each paired finding with its threads replies and the commit it was found at', async (t) => {
     const c = await CommentCase.make(t);
     const prompt = (await c.commentPrompt()).prompt!;
@@ -269,7 +269,7 @@ describe('CommentPromptTests', () => {
 });
 
 /** The post job gets commentary only on paired findings, one each, cleaned like the findings. */
-describe('CommentCheckTests', () => {
+describe('comment-check', () => {
   test('adds the commentary to the pairs', async (t) => {
     const c = await CommentCase.make(t);
     const run = await c.commentCheck([{ finding: 0, text: `Alice says it​ is deliberate. ghp_${'a'.repeat(36)}` }]);

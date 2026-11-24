@@ -77,7 +77,7 @@ function firstThread(added: Input | null): Input {
 }
 
 /** A finding no thread was opened for gets a thread of its own, on the spot report.ts anchored it to. */
-describe('NewThreadTests', () => {
+describe('a new finding', () => {
   test('opens a thread on each new findings anchor', async (t) => {
     const c = await PostCase.make(t);
     const result = await c.post(
@@ -208,7 +208,7 @@ describe('NewThreadTests', () => {
 });
 
 /** A finding that continues a thread is answered in it only when there's something to say. */
-describe('PairedTests', () => {
+describe('a finding that continues a thread', () => {
   test('stays quiet on an open thread with nothing to add', async (t) => {
     const c = await PostCase.make(t);
     c.threads(reviewThread('T_1'));
@@ -267,7 +267,7 @@ describe('PairedTests', () => {
   });
 });
 
-describe('StaleTests', () => {
+describe('a PR that moved on', () => {
   test('posts nothing when the pr moved on or to another base', async (t) => {
     const c = await PostCase.make(t);
     for (const [answer, says] of [
@@ -286,7 +286,7 @@ describe('StaleTests', () => {
 });
 
 /** Every check that can fail runs before the first write, so a run that stops leaves the PR as it was. */
-describe('BeforeWritingTests', () => {
+describe('checks before the first write', () => {
   test('writes nothing when the summary wont fit though each thread would', async (t) => {
     const c = await PostCase.make(t);
     const findings = [
@@ -316,7 +316,7 @@ async function reply(c: PostCase, text: string, resolved = false): Promise<strin
 /**
  * Commentary is posted in its finding's thread, open or resolved, as a quote that can't notify anyone or hide text.
  */
-describe('CommentaryTests', () => {
+describe('commentary', () => {
   test('replies with the commentary on an open thread', async (t) => {
     const c = await PostCase.make(t);
     assert.equal(

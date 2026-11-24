@@ -46,7 +46,7 @@ class EvalCase extends SyncCase {
   }
 }
 
-describe('EvalTests', () => {
+describe('eval', () => {
   test('reads prompt whose doc gets read passes', async (t) => {
     const c = await EvalCase.make(t);
     c.cases('## Reads\n\n- Help me with writing tests for the parser\n');
@@ -378,7 +378,7 @@ class PackCase extends EvalCase {
   }
 }
 
-describe('PackTests', () => {
+describe("a pack's eval prompts", () => {
   test('installed packs prompts run with only that pack', async (t) => {
     const c = await PackCase.make(t);
     await c.install();

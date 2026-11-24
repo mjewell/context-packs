@@ -57,7 +57,7 @@ class FindingsCase extends ReviewCase {
   }
 }
 
-describe('FindingsTests', () => {
+describe('report', () => {
   test('reports the wizards findings with their anchors', async (t) => {
     const c = await FindingsCase.make(t);
     const found = finding('0:0', { rules: [NUMBERS], spots: [spot('src/sim.ts', 42)] });

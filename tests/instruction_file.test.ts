@@ -27,7 +27,7 @@ class InstructionCase extends SyncCase {
  * Which file the sync writes: whichever of AGENTS.md and CLAUDE.md holds the block, else AGENTS.md or CLAUDE.md if
  * one exists, else a new AGENTS.md with CLAUDE.md linked to it.
  */
-describe('InstructionFileTests', () => {
+describe('which instruction file the sync writes', () => {
   test('claude md alone is synced and keeps its own text', async (t) => {
     const c = await InstructionCase.make(t);
     fs.writeFileSync(c.claudeMd, `# Repo\n\n${EMPTY}\nUse named exports.\n`);

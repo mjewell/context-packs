@@ -16,7 +16,7 @@ function repo(t: TestContext): string {
 }
 
 /** The npm package's bin, which npx runs, runs the CLI that packing the package compiled. */
-describe('NpmBinTests', () => {
+describe("the npm package's bin", () => {
   const bin = packedBin();
 
   test('bin runs the cli in the current folder', async (t) => {

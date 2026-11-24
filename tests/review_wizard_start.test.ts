@@ -12,7 +12,7 @@ import { run } from './scripts.ts';
  * init sets up a run and tells the orchestrator which finders to start, one per unit and the uncovered finder, each
  * with the one-line prompt it gives that finder.
  */
-describe('InitTests', () => {
+describe('init', () => {
   test('names a finder for each unit and the uncovered finder', async (t) => {
     const c = await WizardCase.make(t);
     const out = await c.init();
@@ -65,7 +65,7 @@ describe('InitTests', () => {
  * Claude Code's allow rule passes any arguments after the wizard's command, so the wizard takes only the ones it
  * names, spelled out.
  */
-describe('ArgumentTests', () => {
+describe('arguments', () => {
   test('refuses an option cut short', async (t) => {
     const c = await WizardCase.make(t);
     const result = await c.wizard('init', '--base', c.base, '--head', 'HEAD', '--comm', 'review');
@@ -89,7 +89,7 @@ describe('ArgumentTests', () => {
  * A run folder can be gone by the time a step names it, such as after the system clears TMPDIR, so a step on one
  * says so and how to start again.
  */
-describe('MissingRunTests', () => {
+describe('a run folder that is gone', () => {
   test('refuses a step on a run folder that doesnt exist', async (t) => {
     const c = await WizardCase.make(t);
     await c.init();
@@ -107,7 +107,7 @@ describe('MissingRunTests', () => {
 });
 
 /** A local review runs the wizard as `npx context-packs@<version> review`, from the npm package alone. */
-describe('PackageTests', () => {
+describe('the wizard from the npm package', () => {
   const bin = packedBin();
 
   function packaged(c: WizardCase, ...args: string[]) {

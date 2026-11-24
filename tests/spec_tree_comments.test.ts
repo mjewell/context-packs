@@ -19,7 +19,7 @@ class AnchorCase extends TreeCase {
 }
 
 /** The page gives the comment script what it anchors a comment on: each node's source text, and the tree's file. */
-describe('CommentAnchorTests', () => {
+describe('what the page anchors comments on', () => {
   test('each node carries its source text without its id', async (t) => {
     const c = await AnchorCase.make(t);
     c.write('review.tree.md', SMALL.replace('Finders check the diff', 'Finders check `the diff` & "more"'));
@@ -82,7 +82,7 @@ function said(id: string, text: string, ...rest: string[]) {
 }
 
 /** The page's pure comment logic: matching stored comments to nodes, and the Markdown copied for an agent. */
-describe('CommentLogicTests', () => {
+describe('the comment logic', () => {
   test('places each comment on the node with its path', () => {
     const [a, b] = [comment('1', 'Top', 'Child'), comment('2', 'Top')];
     const paths = [['Top'], ['Top', 'Child'], ['Other']];

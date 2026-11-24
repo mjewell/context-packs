@@ -8,7 +8,7 @@ import { ROOT } from './scripts.ts';
 const NPX = /npx (?:--yes )?context-packs(?:@[\w.-]+)?/g;
 
 /** Each skill runs the CLI version it was written for, so a version published later can't change what it runs. */
-describe('SkillPinTests', () => {
+describe("the skills' npx pins", () => {
   test('every npx command in a skill pins the packages version', () => {
     const { version } = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
     const skills = path.join(ROOT, 'skills');

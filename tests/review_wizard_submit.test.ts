@@ -10,7 +10,7 @@ import { deviation, SubmitCase } from './review_wizard_case.ts';
  * submit takes a finder's answer only when it's whole: in the schema's shape, and after every doc of its unit was read
  * through doc. A refusal says what to do, then to submit again.
  */
-describe('SubmitTests', () => {
+describe('submit', () => {
   test('takes an answer once every doc was read', async (t) => {
     const c = await SubmitCase.make(t);
     await c.readDocs(1, 2);

@@ -31,7 +31,7 @@ function flag(args: readonly string[], name: string): string | undefined {
   return args[args.indexOf(name) + 1];
 }
 
-describe('StartTests', () => {
+describe('start', () => {
   test('asks for the pack findings skill on the reviewed range', async (t) => {
     const c = await StartCase.make(t);
     assert.equal(
