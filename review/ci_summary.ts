@@ -73,25 +73,13 @@ export async function read(
   target: Pr,
   bot: string,
 ): Promise<{ readonly head: string; readonly baseRef: string; readonly report: Report }> {
-  let found: {
+  const found = await github.graphql<{
     repository: {
       pullRequest: { headRefOid: string; baseRefName: string; comments: github.Connection<Comment> };
     };
-  };
-  try {
-    found = await github.graphql('SummaryComments', SUMMARY_COMMENTS, { ...target }, token());
-  } catch (error) {
-    if (!(error instanceof github.GitHubError)) throw error;
-    throw new Refused(error.message);
-  }
+  }>('SummaryComments', SUMMARY_COMMENTS, { ...target }, token());
   const pull = found.repository.pullRequest;
-  let comments: Comment[];
-  try {
-    comments = github.nodes(pull.comments, 'comments');
-  } catch (error) {
-    if (!(error instanceof github.GitHubError)) throw error;
-    throw new Refused(error.message);
-  }
+  const comments = github.nodes(pull.comments, 'comments');
   const blocks = (comment: Comment) => comment.body.split(`<summary>${TITLE}</summary>`).length - 1;
   const withBlocks = comments.filter((comment) => blocks(comment));
   if (!withBlocks.length) {

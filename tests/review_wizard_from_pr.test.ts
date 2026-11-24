@@ -188,6 +188,33 @@ describe('findings from a CI review', () => {
     assert.ok(!second.stdout.includes('commentary:'), second.stdout);
   });
 
+  // A GitHub failure is the agent's next instruction, as any refusal is, not a crash.
+  test('refuses with what GitHub said when it refuses the request', async (t) => {
+    const c = await FromPrCase.make(t);
+    c.github.responses.SummaryComments = [401, { message: 'Bad credentials' }];
+    const result = await c.fromPr();
+
+    exits(result, 1);
+    assert.equal(result.stderr, 'GitHub refused SummaryComments with HTTP 401: Bad credentials\n');
+  });
+
+  test('refuses a PR with more comments than one page', async (t) => {
+    const c = await FromPrCase.make(t);
+    c.github.responses.SummaryComments = ok({
+      repository: {
+        pullRequest: {
+          headRefOid: c.head,
+          baseRefName: 'main',
+          comments: connection([summaryComment(c.report)], true),
+        },
+      },
+    });
+    const result = await c.fromPr();
+
+    exits(result, 1);
+    assert.equal(result.stderr, 'The PR has more than 100 comments, and pack-review reads only one page of them.\n');
+  });
+
   test('refuses a PR with no summary from pack-review', async (t) => {
     const c = await FromPrCase.make(t);
     c.comments([{ author: { login: 'alice' }, body: 'Looks good', bodyText: 'Looks good' }]);

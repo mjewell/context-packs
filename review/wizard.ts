@@ -20,6 +20,7 @@ import { units as tableUnits } from '../src/tables.ts';
 import { Change, commit, git, Refused } from './change.ts';
 import * as ciSummary from './ci_summary.ts';
 import { type Cited, evidenceErrors } from './evidence.ts';
+import { GitHubError } from './github.ts';
 import { aKind, kindText } from './kinds.ts';
 import { type Finding, findingsIn, Rejected } from './report.ts';
 import { counted, newRun, publish, Run } from './run.ts';
@@ -590,8 +591,8 @@ export async function main(argv: readonly string[]): Promise<void> {
     await STEPS[step]!(args);
   } catch (error) {
     // No `pack-review: ` prefix, unlike the review's other scripts: a refusal is the agent's next instruction, so its
-    // first word should be what to do.
-    if (!(error instanceof Refused) && !(error instanceof Stop)) throw error;
+    // first word should be what to do. A step that reads GitHub refuses with what GitHub said.
+    if (!(error instanceof Refused) && !(error instanceof Stop) && !(error instanceof GitHubError)) throw error;
     process.stderr.write(`${error.message}\n`);
     process.exitCode = 1;
   }
