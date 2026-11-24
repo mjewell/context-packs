@@ -19,5 +19,5 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
-      # The runner's own Python runs the tests. The D2 render tests skip, since the runner has no d2 CLI.
-      - run: python3 -m unittest discover tests
+      # The D2 render tests skip, since the runner has no d2 CLI.
+      - run: npm test

@@ -136,4 +136,4 @@ Already sharing rules by symlinking Claude Code's `.claude/rules/`? See [Why not
 - [Reference](docs/reference.md): every command, pinning, and what the sync writes.
 - [Skills that grow your packs](docs/skills.md): how to run `pack-rule`, `pack-backfill`, `pack-findings` and `pack-review`.
 - [Why not symlinked rules?](docs/why.md): how `.claude/rules/` links load, and where they don't.
-- [Design](context-packs/project/design.md): the choices behind the format. To contribute, run `npm install`, then `npm run typecheck`, `npm run lint` and the tests, with `python3 -m unittest discover tests`.
+- [Design](context-packs/project/design.md): the choices behind the format. To contribute, run `npm install`, then `npm run typecheck`, `npm run lint` and `npm test`.
