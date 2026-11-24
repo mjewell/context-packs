@@ -54,3 +54,13 @@ export class TreeCase extends Case {
     return run([...command('skills/spec-tree/scripts/trees'), ...args], { cwd: this.root });
   }
 }
+
+/** n distinct words, so a text's size is known without counting by hand. */
+export function words(n: number, start = 0): string {
+  return Array.from({ length: n }, (_, i) => `w${start + i}`).join(' ');
+}
+
+/** A tree file whose root sentence is three words, with the given bullet lines under it. */
+export function tree(...bullets: string[]): string {
+  return `# Sizes {#sizes}\n\nThree word root.\n\n${bullets.map((line) => `${line}\n`).join('')}`;
+}
