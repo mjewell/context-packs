@@ -1,0 +1,23 @@
+name: test
+# Type checks, lints and tests every PR. It needs no secrets, so it runs on drafts and on PRs from forks too.
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          # The lowest Node that package.json's engines allows, so the run checks that promise. Change both together.
+          # node-version-file would read engines' range as the newest Node that meets it, not the lowest.
+          node-version: '22.18'
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      # The runner's own Python runs the tests. The D2 render tests skip, since the runner has no d2 CLI.
+      - run: python3 -m unittest discover tests
