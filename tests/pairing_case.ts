@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { ReviewCase } from './review_case.ts';
+import { BASE, HEAD, ReviewCase } from './review_case.ts';
 
 /** A finding at one spot, as the review's report holds it. */
 export function finding(headline: string, { file = 'src/sim.ts', line = 42, kind = 'deviation' } = {}) {
@@ -35,10 +35,10 @@ export class PairingCase extends ReviewCase {
     this.env.GITHUB_OUTPUT = this.output;
   }
 
-  given(findings: readonly unknown[], threads: readonly unknown[], head = 'h'.repeat(40)): void {
+  given(findings: readonly unknown[], threads: readonly unknown[], head = HEAD): void {
     fs.writeFileSync(
       path.join(this.root, 'report.json'),
-      JSON.stringify({ base: 'b'.repeat(40), base_ref: 'main', head, findings }),
+      JSON.stringify({ base: BASE, base_ref: 'main', head, findings }),
     );
     fs.writeFileSync(path.join(this.root, 'threads.json'), JSON.stringify(threads));
   }

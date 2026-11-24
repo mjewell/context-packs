@@ -3,11 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 import { PairingCase } from './pairing_case.ts';
-import { REVIEW } from './review_case.ts';
+import { BASE, HEAD, REVIEW } from './review_case.ts';
 import { quote, split } from './shlex.ts';
 
-const BASE = 'b'.repeat(40);
-const HEAD = 'h'.repeat(40);
 const ANSWERS = '/runner/temp/runs/pack-review-answers';
 const CLI = `node ${path.dirname(REVIEW)}/src/cli.ts`;
 
