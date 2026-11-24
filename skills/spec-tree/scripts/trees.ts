@@ -16,7 +16,7 @@ import { parseArgs } from 'node:util';
 
 import { check, linksTo, stats } from './tree_check.ts';
 import { parse } from './tree_model.ts';
-import { Stop, page } from './tree_render.ts';
+import { page, Stop } from './tree_render.ts';
 
 const USAGE = 'usage: trees.ts {check,stats,links-to,render} ...';
 
@@ -36,7 +36,8 @@ function repoRoot(folder: string): string {
 function runCheck(): void {
   const repo = repoRoot(process.cwd());
   const problems = check(repo);
-  for (const [file, level, message] of problems) process.stdout.write(`${path.relative(repo, file)}: ${level}: ${message}\n`);
+  for (const [file, level, message] of problems)
+    process.stdout.write(`${path.relative(repo, file)}: ${level}: ${message}\n`);
   process.exitCode = problems.some(([, level]) => level === 'fail') ? 1 : 0;
 }
 
@@ -78,7 +79,8 @@ function main(argv: readonly string[]): void {
   const expected: Record<string, number> = { check: 0, stats: 0, 'links-to': 1, render: 1 };
   if (command === undefined) usage('the following arguments are required: command');
   if (!(command in expected)) usage(`argument command: invalid choice: '${command}'`);
-  if (positionals.length < expected[command]!) usage(`the following arguments are required: ${command === 'render' ? 'tree' : 'id'}`);
+  if (positionals.length < expected[command]!)
+    usage(`the following arguments are required: ${command === 'render' ? 'tree' : 'id'}`);
   if (positionals.length > expected[command]! || (values.out !== undefined && command !== 'render')) {
     usage(`unrecognized arguments: ${rest.join(' ')}`);
   }

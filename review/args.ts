@@ -45,15 +45,28 @@ export function reviewer(answers: string, model: string): string {
   const cli = `node ${ROOT}/src/cli.ts`;
   // git rev-parse and git status have no option that writes a file, unlike git log's --output.
   const allowed = [
-    'Skill(context-packs:pack-findings)', `Bash(${cli} review:*)`, `Bash(${cli} docs)`, 'Bash(git rev-parse:*)',
+    'Skill(context-packs:pack-findings)',
+    `Bash(${cli} review:*)`,
+    `Bash(${cli} docs)`,
+    'Bash(git rev-parse:*)',
     'Bash(git status:*)',
     // A headless run writes outside its working directory only with both this rule and --add-dir. The rule's //
     // makes the path absolute, where one / would start from the settings file.
     `Edit(/${answers}/**)`,
   ];
   return line([
-    '--plugin-dir', ROOT, '--add-dir', answers, '--tools', 'Read,Glob,Grep,Write,Bash,Agent,Skill',
-    '--allowedTools', allowed.join(','), '--disallowedTools', 'Read(./.git/**)', ...(model ? ['--model', model] : []),
-    '--restricted', '--strict-mcp-config',
+    '--plugin-dir',
+    ROOT,
+    '--add-dir',
+    answers,
+    '--tools',
+    'Read,Glob,Grep,Write,Bash,Agent,Skill',
+    '--allowedTools',
+    allowed.join(','),
+    '--disallowedTools',
+    'Read(./.git/**)',
+    ...(model ? ['--model', model] : []),
+    '--restricted',
+    '--strict-mcp-config',
   ]);
 }

@@ -6,5 +6,8 @@
 export const SECRETS = /sk-ant-[A-Za-z0-9_-]+|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}/g;
 
 export function clean(text: string): string {
-  return text.replace(/\p{Cf}/gu, '').replace(SECRETS, '[redacted]').trim();
+  return text
+    .replace(/\p{Cf}/gu, '')
+    .replace(SECRETS, '[redacted]')
+    .trim();
 }

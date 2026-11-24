@@ -8,19 +8,42 @@ import { parse } from '../src/argparse.ts';
 import { Stop } from '../src/stop.ts';
 import { output, reviewer } from './args.ts';
 
-const args = parse({
-  prog: 'start.ts', help: '',
-  options: [
-    { flag: '--base', dest: 'base', metavar: 'BASE', required: true, help: 'the commit the reviewed change starts from' },
-    { flag: '--head', dest: 'head', metavar: 'HEAD', required: true, help: 'the commit that is reviewed' },
-    { flag: '--answers', dest: 'answers', metavar: 'ANSWERS', required: true, help: "the wizard's pack-review-answers "
-      + 'folder, the one place the agent may write, made already' },
-    { flag: '--model', dest: 'model', metavar: 'MODEL', default: '', help: "the model to review with, if not Claude "
-      + "Code's default" },
-  ],
-}, process.argv.slice(2)) as Record<string, string>;
+const args = parse(
+  {
+    prog: 'start.ts',
+    help: '',
+    options: [
+      {
+        flag: '--base',
+        dest: 'base',
+        metavar: 'BASE',
+        required: true,
+        help: 'the commit the reviewed change starts from',
+      },
+      { flag: '--head', dest: 'head', metavar: 'HEAD', required: true, help: 'the commit that is reviewed' },
+      {
+        flag: '--answers',
+        dest: 'answers',
+        metavar: 'ANSWERS',
+        required: true,
+        help: "the wizard's pack-review-answers " + 'folder, the one place the agent may write, made already',
+      },
+      {
+        flag: '--model',
+        dest: 'model',
+        metavar: 'MODEL',
+        default: '',
+        help: 'the model to review with, if not Claude ' + "Code's default",
+      },
+    ],
+  },
+  process.argv.slice(2),
+) as Record<string, string>;
 try {
-  output('prompt', `Use the pack-findings skill on the commit range ${args.base}..${args.head}, with the checkout CLI.`);
+  output(
+    'prompt',
+    `Use the pack-findings skill on the commit range ${args.base}..${args.head}, with the checkout CLI.`,
+  );
   output('claude-args', reviewer(args.answers!, args.model!));
 } catch (error) {
   if (!(error instanceof Stop)) throw error;

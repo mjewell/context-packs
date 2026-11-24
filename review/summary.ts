@@ -27,7 +27,9 @@ export interface Report {
 
 function counted(findings: readonly Finding[]): string {
   return KINDS.map((kind): [string, number] => [kind, findings.filter((f) => f.kind === kind).length])
-    .filter(([, n]) => n).map(([kind, n]) => `${n} ${kind}${n !== 1 ? 's' : ''}`).join(', ');
+    .filter(([, n]) => n)
+    .map(([kind, n]) => `${n} ${kind}${n !== 1 ? 's' : ''}`)
+    .join(', ');
 }
 
 /**
@@ -46,8 +48,9 @@ function listed(finding: Finding, anchor: Anchor): string {
  */
 export function body(repo: string, number: number, report: Report): string {
   const findings = report.findings;
-  let text = `pack-review checked \`${report.head.slice(0, 7)}\` against this repo's context packs and found `
-    + `${counted(findings) || 'nothing'}.`;
+  let text =
+    `pack-review checked \`${report.head.slice(0, 7)}\` against this repo's context packs and found ` +
+    `${counted(findings) || 'nothing'}.`;
   if (findings.length) {
     text += '\n\n' + findings.map((finding, n) => listed(finding, report.anchors[n] ?? null)).join('\n');
     text += `\n\nTo go through them, run \`/pack-review ${repo}#${number}\`.`;
@@ -55,7 +58,9 @@ export function body(repo: string, number: number, report: Report): string {
   // Backticks and < only occur inside JSON strings, where ` and < mean the same. So nothing can close the
   // fence, and the block's title, which the local run counts, appears nowhere else.
   const data = JSON.stringify({ base: report.base, base_ref: report.base_ref, head: report.head, findings }, null, 2)
-    .replaceAll('`', '\\u0060').replaceAll('<', '\\u003c');
-  return github.signed(`${text}\n\n<details><summary>Findings for pack-review</summary>\n\n\`\`\`json\n${data}\n`
-                       + '```\n\n</details>');
+    .replaceAll('`', '\\u0060')
+    .replaceAll('<', '\\u003c');
+  return github.signed(
+    `${text}\n\n<details><summary>Findings for pack-review</summary>\n\n\`\`\`json\n${data}\n` + '```\n\n</details>',
+  );
 }

@@ -33,21 +33,37 @@ function where(packs: readonly EvalPack[], repo: string): string {
   const repos = packs.filter((pack) => pack.top && !isDir(path.join(repo, pack.evals, 'fixture'))).length;
   const empty = packs.length - fixtures - repos;
   return [
-    ...Array<string>(repos).fill('a copy of the repo'), ...(fixtures ? [plural(fixtures, 'fixture')] : []),
+    ...Array<string>(repos).fill('a copy of the repo'),
+    ...(fixtures ? [plural(fixtures, 'fixture')] : []),
     ...(empty ? [plural(empty, 'empty folder')] : []),
   ].join(', ');
 }
 
 /** The first line: what's about to run, where, and on which model. */
-export function heading(prompts: number, docs: number, runs: number, packs: readonly EvalPack[], repo: string,
-                        model: string): void {
+export function heading(
+  prompts: number,
+  docs: number,
+  runs: number,
+  packs: readonly EvalPack[],
+  repo: string,
+  model: string,
+): void {
   const times = runs > 1 ? `, ${runs} times each` : '';
-  print(`Running ${plural(prompts, 'prompt')} for ${plural(docs, 'doc')}${times}, in ${where(packs, repo)}, on ${model}…`);
+  print(
+    `Running ${plural(prompts, 'prompt')} for ${plural(docs, 'doc')}${times}, in ${where(packs, repo)}, on ${model}…`,
+  );
 }
 
 /** Print how the case's runs went, with their errors, or the docs they read. */
-export function report(item: Case, results: readonly Run[], verdict: Verdict, doc: string, copy: string, repo: string,
-                       runs: number): void {
+export function report(
+  item: Case,
+  results: readonly Run[],
+  verdict: Verdict,
+  doc: string,
+  copy: string,
+  repo: string,
+  runs: number,
+): void {
   const errors = [...new Set(results.filter((r) => r.error).map((r) => r.error!))];
   const reads = results.filter((r) => !r.error).map((r) => r.read);
   status(null, null);
@@ -55,8 +71,14 @@ export function report(item: Case, results: readonly Run[], verdict: Verdict, do
   const first = item.prompt.split('\n')[0];
   print(`${MARKS[verdict.outcome]} ${item.name}  ${item.expect}  ${count}${first}`);
   for (const error of errors) print(`    error: ${error}`);
-  const docs = [...new Set(reads.flatMap((read) => [...read]).filter((file) => path.extname(file) === '.md')
-    .map((file) => shown(file, copy, repo)))].sort(compare);
+  const docs = [
+    ...new Set(
+      reads
+        .flatMap((read) => [...read])
+        .filter((file) => path.extname(file) === '.md')
+        .map((file) => shown(file, copy, repo)),
+    ),
+  ].sort(compare);
   const others = docs.filter((file) => file !== shown(doc, copy, repo));
   if (verdict.outcome === 'failed') {
     print(docs.length ? `    read: ${docs.join(', ')}` : '    read no docs');
@@ -70,17 +92,32 @@ export function report(item: Case, results: readonly Run[], verdict: Verdict, do
  * Every case, in the order its file gives it, as (case, its runs, its verdict, the copy it ran in, the repo), with
  * each run's files, as JSON.
  */
-export function document(cases: readonly (readonly [Case, readonly Run[], Verdict, string, string])[], model: string,
-                         runs: number): string {
-  return JSON.stringify({
-    model, runs, cases: cases.map(([item, results, verdict, copy, repo]) => ({
-      doc: item.name, expect: item.expect, prompt: item.prompt, outcome: verdict.outcome, passes: verdict.passes,
-      runs: results.map((result) => ({
-        read: [...result.read].map((file) => shown(file, copy, repo)).sort(compare), error: result.error,
-        cost_usd: result.costUsd, duration_ms: result.durationMs,
+export function document(
+  cases: readonly (readonly [Case, readonly Run[], Verdict, string, string])[],
+  model: string,
+  runs: number,
+): string {
+  return JSON.stringify(
+    {
+      model,
+      runs,
+      cases: cases.map(([item, results, verdict, copy, repo]) => ({
+        doc: item.name,
+        expect: item.expect,
+        prompt: item.prompt,
+        outcome: verdict.outcome,
+        passes: verdict.passes,
+        runs: results.map((result) => ({
+          read: [...result.read].map((file) => shown(file, copy, repo)).sort(compare),
+          error: result.error,
+          cost_usd: result.costUsd,
+          duration_ms: result.durationMs,
+        })),
       })),
-    })),
-  }, null, 2);
+    },
+    null,
+    2,
+  );
 }
 
 /** The last line: how many passed, or how many failed and errored. */

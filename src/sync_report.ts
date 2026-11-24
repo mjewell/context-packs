@@ -18,8 +18,15 @@ function at(imported: Import): string {
  * before it became the ones after, where each pinned pack in updating stayed, and otherwise whether the block it found
  * differs from the one it wrote.
  */
-export function changes(found: Region, written: string, created: boolean, linked: boolean, before: readonly Import[],
-                        after: readonly Import[], updating: readonly string[] = []): string[] {
+export function changes(
+  found: Region,
+  written: string,
+  created: boolean,
+  linked: boolean,
+  before: readonly Import[],
+  after: readonly Import[],
+  updating: readonly string[] = [],
+): string[] {
   const was = new Map(before.map((i) => [i.id, i]));
   const now = new Map(after.map((i) => [i.id, i]));
   const lines = [...(created ? ['Created AGENTS.md'] : []), ...(linked ? ['Linked CLAUDE.md to AGENTS.md'] : [])];

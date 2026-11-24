@@ -7,14 +7,29 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { LINK_SOURCE, type Node, type Root, collectIds, labelOf, nodes, strip } from './tree_model.ts';
+import { collectIds, LINK_SOURCE, labelOf, type Node, nodes, type Root, strip } from './tree_model.ts';
 
 const MERMAID = 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
 // ELK lays out nested containers more tidily than D2's default, and its spacing is tightened so a diagram stays small.
 // Theme 200 is D2's dark theme, which the SVG switches to through prefers-color-scheme.
-const D2_ARGS = ['--layout', 'elk', '--elk-nodeNodeBetweenLayers', '30', '--elk-edgeNodeBetweenLayers', '15',
-                 '--elk-padding', '[top=20,left=12,bottom=12,right=12]', '--theme', '0', '--dark-theme', '200', '--pad', '4',
-                 '-', '-'];
+const D2_ARGS = [
+  '--layout',
+  'elk',
+  '--elk-nodeNodeBetweenLayers',
+  '30',
+  '--elk-edgeNodeBetweenLayers',
+  '15',
+  '--elk-padding',
+  '[top=20,left=12,bottom=12,right=12]',
+  '--theme',
+  '0',
+  '--dark-theme',
+  '200',
+  '--pad',
+  '4',
+  '-',
+  '-',
+];
 // Smaller text than D2's 16px default, set here so a tree's diagrams don't each repeat it.
 const D2_STYLE = '**.style.font-size: 13\n(** -> **)[*].style.font-size: 12\n';
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
@@ -36,7 +51,11 @@ export class Stop extends Error {}
 
 /** text with &, <, >, " and ' escaped, as Python's html.escape escapes them. */
 function escape(text: string): string {
-  return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
+  return text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
     .replaceAll("'", '&#x27;');
 }
 
@@ -71,20 +90,32 @@ function repr(text: string): string {
 /** Escape, then render code spans, bold, Markdown links, and [[slug]] and [[slug|text]] links. */
 function inline(text: string, ids: ReadonlySet<string>): string {
   // Whichever starts first wins, so a code span can hold a link's syntax and a link's text can hold a code span.
-  return text.split(PARTS).map((part) => {
-    const m = LINK_WHOLE.exec(part);
-    if (m) return link(m[1]!, codeSpans(m[2] ?? m[1]!), ids);
-    if (part.startsWith('`') && part.endsWith('`') && part.length > 1) return `<code>${escape(part.slice(1, -1))}</code>`;
-    // Quotes too, since a link's URL lands in an href.
-    return escape(part).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, shown: string, url: string) => `<a href="${href(url)}">${shown}</a>`);
-  }).join('');
+  return text
+    .split(PARTS)
+    .map((part) => {
+      const m = LINK_WHOLE.exec(part);
+      if (m) return link(m[1]!, codeSpans(m[2] ?? m[1]!), ids);
+      if (part.startsWith('`') && part.endsWith('`') && part.length > 1)
+        return `<code>${escape(part.slice(1, -1))}</code>`;
+      // Quotes too, since a link's URL lands in an href.
+      return escape(part)
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(
+          /\[([^\]]+)\]\(([^)\s]+)\)/g,
+          (_m, shown: string, url: string) => `<a href="${href(url)}">${shown}</a>`,
+        );
+    })
+    .join('');
 }
 
 /** A link's display text, escaped, with its code spans rendered. */
 function codeSpans(text: string): string {
-  return text.split(/(`[^`]*`)/).map((p) => (
-    p.startsWith('`') && p.endsWith('`') && p.length > 1 ? `<code>${escape(p.slice(1, -1))}</code>` : escape(p))).join('');
+  return text
+    .split(/(`[^`]*`)/)
+    .map((p) =>
+      p.startsWith('`') && p.endsWith('`') && p.length > 1 ? `<code>${escape(p.slice(1, -1))}</code>` : escape(p),
+    )
+    .join('');
 }
 
 /** A Markdown link's URL, already escaped, once checkLink allows it. */
@@ -103,7 +134,9 @@ function checkLink(url: string, what: string): void {
   // Not printable as Python's str.isprintable says: a control, format or unassigned character, or a separator but space.
   const unprintable = /[\p{C}\p{Z}]/u.test(url.replaceAll(' ', ''));
   if (unprintable || (scheme && !SAFE_SCHEMES.has(scheme[0].toLowerCase()))) {
-    throw new Stop(`trees.ts: ${what} goes to ${repr(url)}, and a page links only to relative, http(s): and mailto: URLs.`);
+    throw new Stop(
+      `trees.ts: ${what} goes to ${repr(url)}, and a page links only to relative, http(s): and mailto: URLs.`,
+    );
   }
 }
 
@@ -121,11 +154,13 @@ function renderText(n: Node, ids: ReadonlySet<string>): string {
 }
 
 function renderDiagrams(n: Node): string {
-  return n.diagrams.map((d) => {
-    if (d.lang === 'mermaid') return `<pre class="mermaid" data-pending="1">${escape(d.source)}</pre>`;
-    if (d.lang === 'd2') return `<div class="d2">${d2Svg(d.source, n)}</div>`;
-    return `<pre class="block"><code>${escape(d.source)}</code></pre>`;
-  }).join('');
+  return n.diagrams
+    .map((d) => {
+      if (d.lang === 'mermaid') return `<pre class="mermaid" data-pending="1">${escape(d.source)}</pre>`;
+      if (d.lang === 'd2') return `<div class="d2">${d2Svg(d.source, n)}</div>`;
+      return `<pre class="block"><code>${escape(d.source)}</code></pre>`;
+    })
+    .join('');
 }
 
 function d2Svg(source: string, n: Node): string {
@@ -138,7 +173,8 @@ function d2Svg(source: string, n: Node): string {
   // Inline, so the SVG keeps D2's links and selectable text. So every href in it, which d2 writes as both href and
   // xlink:href, is held to the rule a Markdown link follows.
   const what = `a link in the D2 diagram under "${under}"`;
-  for (const [, , value] of result.stdout.matchAll(/\bhref\s*=\s*(["'])(.*?)\1/g)) checkLink(unescape(value!, what), what);
+  for (const [, , value] of result.stdout.matchAll(/\bhref\s*=\s*(["'])(.*?)\1/g))
+    checkLink(unescape(value!, what), what);
   return result.stdout.replace(/^<\?xml[^>]*\?>/, '');
 }
 
@@ -152,8 +188,10 @@ function shownText(n: Node, ids: ReadonlySet<string>): string {
 function renderNode(n: Node, ids: ReadonlySet<string>): string {
   // The node's source text, which a comment is anchored on and an agent searches the tree's file for, and the text
   // the comment editor and sidebar show a person.
-  const idAttr = (n.id ? ` id="${n.id}"` : '') + ` data-src="${escape(strip(n.text))}"`
-    + ` data-text="${escape(shownText(n, ids))}"`;
+  const idAttr =
+    (n.id ? ` id="${n.id}"` : '') +
+    ` data-src="${escape(strip(n.text))}"` +
+    ` data-text="${escape(shownText(n, ids))}"`;
   const text = renderText(n, ids);
   if (!n.children.length && !n.diagrams.length) return `<li class="leaf row" tabindex="-1"${idAttr}>${text}</li>`;
   // Every node below, not just the children: the size rules keep a node's children to about 7, so that count would
@@ -162,17 +200,23 @@ function renderNode(n: Node, ids: ReadonlySet<string>): string {
   const title = `${below} node${below === 1 ? '' : 's'} below`;
   const meta = below ? `<span class="count" title="${title}">${below}</span>` : '';
   const kids = n.children.map((c) => renderNode(c, ids)).join('');
-  return `<li class="branch"${idAttr}><details><summary class="row" tabindex="-1">${text}${meta}</summary>`
-    + `${renderDiagrams(n)}<ul>${kids}</ul></details></li>`;
+  return (
+    `<li class="branch"${idAttr}><details><summary class="row" tabindex="-1">${text}${meta}</summary>` +
+    `${renderDiagrams(n)}<ul>${kids}</ul></details></li>`
+  );
 }
 
 /** The page for a parsed tree, whose file is named by its path from the repo root. */
 export function page(root: Root, file: string): string {
   const ids = collectIds(root, new Set());
   const values: Record<string, string> = {
-    title: escape(root.title), intro: inline(root.intro.join(' '), ids), root_diagrams: renderDiagrams(root),
-    tree: root.children.map((c) => renderNode(c, ids)).join(''), file: escape(file),
-    script: SCRIPT.replace('__MERMAID__', JSON.stringify(MERMAID)), comments_css: COMMENTS_CSS,
+    title: escape(root.title),
+    intro: inline(root.intro.join(' '), ids),
+    root_diagrams: renderDiagrams(root),
+    tree: root.children.map((c) => renderNode(c, ids)).join(''),
+    file: escape(file),
+    script: SCRIPT.replace('__MERMAID__', JSON.stringify(MERMAID)),
+    comments_css: COMMENTS_CSS,
     comments_script: COMMENTS_SCRIPT,
   };
   return TEMPLATE.replace(/@@(\w+)@@/g, (_m, key: string) => values[key]!);

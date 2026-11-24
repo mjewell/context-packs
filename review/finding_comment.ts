@@ -36,7 +36,10 @@ export function escaped(text: string): string {
 
 /** The agent's text, escaped, as a quote block. */
 export function quoted(text: string): string {
-  return escaped(text).split('\n').map((line) => (line ? `> ${line}` : '>')).join('\n');
+  return escaped(text)
+    .split('\n')
+    .map((line) => (line ? `> ${line}` : '>'))
+    .join('\n');
 }
 
 /** The agent's items, escaped, as a list under a title. */
@@ -51,16 +54,28 @@ function listed(title: string, items: readonly string[]): string {
 export function body(finding: Finding, head: string, anchor: { readonly path: string; readonly line: number }): string {
   // The kind is set in code like the commit, so both read as tags at the start of the comment.
   const parts = [`\`${finding.kind}\` \`${head.slice(0, 7)}\` **${escaped(finding.headline)}**`];
-  parts.push(...(finding.rules as Rule[]).map((rule) => (
-    `From \`${escaped(rule.file)}\`${rule.routed ? '' : UNROUTED}:\n\n${quoted(rule.quote)}`)));
+  parts.push(
+    ...(finding.rules as Rule[]).map(
+      (rule) => `From \`${escaped(rule.file)}\`${rule.routed ? '' : UNROUTED}:\n\n${quoted(rule.quote)}`,
+    ),
+  );
   // The thread's own line shows one spot. The anchor can be a spot that follows the rule, when the diff shows no
   // deviating one, so every deviating spot but the anchor is named.
-  const others = finding.spots.filter((spot) => !spot.follows && !(spot.path === anchor.path && spot.line === anchor.line));
-  if (others.length) parts.push('Also found at ' + others.map((spot) => `\`${escaped(spot.path)}:${spot.line}\``).join(', ') + '.');
+  const others = finding.spots.filter(
+    (spot) => !spot.follows && !(spot.path === anchor.path && spot.line === anchor.line),
+  );
+  if (others.length)
+    parts.push('Also found at ' + others.map((spot) => `\`${escaped(spot.path)}:${spot.line}\``).join(', ') + '.');
   if (finding.deliberate.length) parts.push(listed('Signs it may be deliberate', finding.deliberate as string[]));
   if (finding.exemplars.length) {
-    parts.push(listed('How the code does it now', (finding.exemplars as Exemplar[]).map((exemplar) => (
-      `${exemplar.way}: ` + exemplar.examples.map((example) => `\`${example}\``).join(', ')))));
+    parts.push(
+      listed(
+        'How the code does it now',
+        (finding.exemplars as Exemplar[]).map(
+          (exemplar) => `${exemplar.way}: ` + exemplar.examples.map((example) => `\`${example}\``).join(', '),
+        ),
+      ),
+    );
   }
   parts.push(escaped(finding.take));
   return github.signed(parts.join('\n\n'));

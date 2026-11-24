@@ -23,24 +23,44 @@ export interface Schema {
   readonly description?: string;
 }
 
-const KNOWN = new Set(['type', 'required', 'properties', 'additionalProperties', 'items', 'enum', 'minItems', 'description']);
+const KNOWN = new Set([
+  'type',
+  'required',
+  'properties',
+  'additionalProperties',
+  'items',
+  'enum',
+  'minItems',
+  'description',
+]);
 const ARTICLES = {
-  object: 'an object', array: 'an array', string: 'a string', integer: 'an integer', boolean: 'true or false',
+  object: 'an object',
+  array: 'an array',
+  string: 'a string',
+  integer: 'an integer',
+  boolean: 'true or false',
 } as const;
 
 function isType(value: unknown, kind: NonNullable<Schema['type']>): boolean {
   switch (kind) {
-    case 'object': return value !== null && typeof value === 'object' && !Array.isArray(value);
-    case 'array': return Array.isArray(value);
-    case 'string': return typeof value === 'string';
-    case 'integer': return Number.isInteger(value);
-    case 'boolean': return typeof value === 'boolean';
+    case 'object':
+      return value !== null && typeof value === 'object' && !Array.isArray(value);
+    case 'array':
+      return Array.isArray(value);
+    case 'string':
+      return typeof value === 'string';
+    case 'integer':
+      return Number.isInteger(value);
+    case 'boolean':
+      return typeof value === 'boolean';
   }
 }
 
 /** Stop when any part of schema uses a keyword errors() doesn't check, even a part no value reaches. */
 export function supported(schema: Schema, where = 'the schema'): void {
-  const unknown = Object.keys(schema).filter((key) => !KNOWN.has(key)).sort();
+  const unknown = Object.keys(schema)
+    .filter((key) => !KNOWN.has(key))
+    .sort();
   if (unknown.length) throw new Error(`${where} uses ${unknown.join(', ')}, which schema.ts can't check`);
   for (const [key, part] of Object.entries(schema.properties ?? {})) supported(part, `${where}.${key}`);
   if (schema.items) supported(schema.items, `${where}[]`);
@@ -64,10 +84,15 @@ function broken(value: unknown, schema: Schema, where: string | null): string[] 
   if (kind === 'object') {
     const object = value as Record<string, unknown>;
     const properties = schema.properties ?? {};
-    found.push(...(schema.required ?? []).filter((key) => !Object.hasOwn(object, key)).map((key) => `${named} needs ${key}`));
+    found.push(
+      ...(schema.required ?? []).filter((key) => !Object.hasOwn(object, key)).map((key) => `${named} needs ${key}`),
+    );
     if (schema.additionalProperties === false) {
-      found.push(...Object.keys(object).filter((key) => !Object.hasOwn(properties, key))
-        .map((key) => `${named} has ${key}, which the schema has no place for`));
+      found.push(
+        ...Object.keys(object)
+          .filter((key) => !Object.hasOwn(properties, key))
+          .map((key) => `${named} has ${key}, which the schema has no place for`),
+      );
     }
     for (const [key, part] of Object.entries(properties)) {
       if (Object.hasOwn(object, key)) found.push(...broken(object[key], part, where ? `${where}.${key}` : key));
@@ -92,11 +117,25 @@ export function findingsSchema(): Schema {
 export function groupsSchema(): Schema {
   const finding = findingsSchema().properties!.findings!.items!.properties!;
   const group: Schema = {
-    type: 'object', additionalProperties: false, required: ['ids', 'kind', 'headline', 'take'],
+    type: 'object',
+    additionalProperties: false,
+    required: ['ids', 'kind', 'headline', 'take'],
     properties: {
-      ids: { type: 'array', minItems: 1, items: { type: 'string' }, description: "The ids of the finders' findings this one merges." },
-      kind: finding.kind!, headline: finding.headline!, take: finding.take!,
+      ids: {
+        type: 'array',
+        minItems: 1,
+        items: { type: 'string' },
+        description: "The ids of the finders' findings this one merges.",
+      },
+      kind: finding.kind!,
+      headline: finding.headline!,
+      take: finding.take!,
     },
   };
-  return { type: 'object', additionalProperties: false, required: ['groups'], properties: { groups: { type: 'array', items: group } } };
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['groups'],
+    properties: { groups: { type: 'array', items: group } },
+  };
 }

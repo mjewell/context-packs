@@ -10,7 +10,9 @@ export function ascii(json: string): string {
 export function dumps(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(dumps).join(', ')}]`;
   if (value !== null && typeof value === 'object') {
-    return `{${Object.entries(value).map(([key, item]) => `${JSON.stringify(key)}: ${dumps(item)}`).join(', ')}}`;
+    return `{${Object.entries(value)
+      .map(([key, item]) => `${JSON.stringify(key)}: ${dumps(item)}`)
+      .join(', ')}}`;
   }
   return JSON.stringify(value) ?? 'null';
 }

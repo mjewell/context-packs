@@ -57,16 +57,23 @@ function shown(option: Option): string {
 
 function usage(prog: string, command: Command, commands = false): string {
   const options = (command.options ?? []).map((o) => (o.required ? shown(o) : `[${shown(o)}]`));
-  const positionals = (command.positionals ?? []).map((p) => (
-    p.nargs === '*' ? `[${p.dest} ...]` : p.nargs === '?' ? `[${p.dest}]` : p.dest));
+  const positionals = (command.positionals ?? []).map((p) =>
+    p.nargs === '*' ? `[${p.dest} ...]` : p.nargs === '?' ? `[${p.dest}]` : p.dest,
+  );
   return ['usage:', prog, '[-h]', ...options, ...positionals, ...(commands ? ['command ...'] : [])].join(' ');
 }
 
-function help(prog: string, command: Command, description?: string, commands?: Readonly<Record<string, Command>>): string {
+function help(
+  prog: string,
+  command: Command,
+  description?: string,
+  commands?: Readonly<Record<string, Command>>,
+): string {
   const lines = [usage(prog, command, !!commands), ''];
   if (description) lines.push(description, '');
   const positionals = command.positionals ?? [];
-  if (positionals.length) lines.push('positional arguments:', ...positionals.map((p) => `  ${p.dest}  ${p.help ?? ''}`.trimEnd()), '');
+  if (positionals.length)
+    lines.push('positional arguments:', ...positionals.map((p) => `  ${p.dest}  ${p.help ?? ''}`.trimEnd()), '');
   lines.push('options:', '  -h, --help  show this help message and exit');
   lines.push(...(command.options ?? []).map((o) => `  ${shown(o)}  ${o.help}`));
   if (commands) {
@@ -99,7 +106,7 @@ export function usageOf(parser: Parser): string {
 function defaults(command: Command, values: Record<string, unknown>): void {
   for (const option of command.options ?? []) values[option.dest] = option.default ?? (option.metavar ? null : false);
   for (const positional of command.positionals ?? []) {
-    values[positional.dest] = positional.nargs === '*' ? [] : positional.default ?? null;
+    values[positional.dest] = positional.nargs === '*' ? [] : (positional.default ?? null);
   }
 }
 
@@ -123,18 +130,30 @@ function read(parser: Parser, argv: readonly string[]): Values {
   readArgs(parser.prog, topUsage, parser, own, values, () => help(parser.prog, parser, parser.description, commands));
   const name = argv[i++];
   if (name === undefined) {
-    if (parser.commandRequired) throw new UsageError(topUsage, parser.prog, 'the following arguments are required: command');
+    if (parser.commandRequired)
+      throw new UsageError(topUsage, parser.prog, 'the following arguments are required: command');
     return values as Values;
   }
   const command = commands[name];
   if (!command) {
-    const choices = Object.keys(commands).map((c) => `'${c}'`).join(', ');
+    const choices = Object.keys(commands)
+      .map((c) => `'${c}'`)
+      .join(', ');
     throw new UsageError(topUsage, parser.prog, `argument command: invalid choice: '${name}' (choose from ${choices})`);
   }
   values[parser.commandDest ?? 'command'] = name;
   defaults(command, values);
   const prog = `${parser.prog} ${name}`;
-  readArgs(prog, usage(prog, command), command, argv.slice(i), values, () => help(prog, command), topUsage, parser.prog);
+  readArgs(
+    prog,
+    usage(prog, command),
+    command,
+    argv.slice(i),
+    values,
+    () => help(prog, command),
+    topUsage,
+    parser.prog,
+  );
   return values as Values;
 }
 
@@ -147,8 +166,16 @@ function split(arg: string): [string, string | undefined] {
  * Read one parser's or command's options and positionals from argv into values. Arguments it doesn't take are an
  * error at the top level, as argparse reports them after every command has parsed what it knows.
  */
-function readArgs(prog: string, usageLine: string, command: Command, argv: readonly string[],
-                  values: Record<string, unknown>, helpText: () => string, topUsage = usageLine, topProg = prog): void {
+function readArgs(
+  prog: string,
+  usageLine: string,
+  command: Command,
+  argv: readonly string[],
+  values: Record<string, unknown>,
+  helpText: () => string,
+  topUsage = usageLine,
+  topProg = prog,
+): void {
   const options = command.options ?? [];
   const positionals: string[] = [];
   const unknown: string[] = [];
@@ -192,11 +219,13 @@ function readArgs(prog: string, usageLine: string, command: Command, argv: reado
     ...options.filter((o) => o.required && !given.has(o.dest)).map((o) => o.flag),
     ...single.slice(positionals.length).map((p) => p.dest),
   ];
-  if (missing.length) throw new UsageError(usageLine, prog, `the following arguments are required: ${missing.join(', ')}`);
+  if (missing.length)
+    throw new UsageError(usageLine, prog, `the following arguments are required: ${missing.join(', ')}`);
   let next = 0;
   for (const spec of specs) {
     if (!spec.nargs) values[spec.dest] = positionals[next++];
-    else if (spec.nargs === '?') values[spec.dest] = positionals[next] !== undefined ? positionals[next++] : spec.default ?? null;
+    else if (spec.nargs === '?')
+      values[spec.dest] = positionals[next] !== undefined ? positionals[next++] : (spec.default ?? null);
     else values[spec.dest] = positionals.slice(next, (next = positionals.length));
   }
   unknown.push(...positionals.slice(next));

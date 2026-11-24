@@ -52,7 +52,8 @@ async function send(url: string, body: unknown, what: string): Promise<any> {
     method: body === undefined ? 'GET' : 'POST',
     body: body === undefined ? undefined : JSON.stringify(body),
     headers: {
-      Authorization: `bearer ${process.env.GITHUB_TOKEN}`, 'Content-Type': 'application/json',
+      Authorization: `bearer ${process.env.GITHUB_TOKEN}`,
+      'Content-Type': 'application/json',
       Accept: 'application/vnd.github+json',
     },
   });
@@ -72,7 +73,9 @@ export async function graphql(operation: string, query: string, variables: Recor
   const url = process.env.GITHUB_GRAPHQL_URL || 'https://api.github.com/graphql';
   const answer = await send(url, { operationName: operation, query, variables }, operation);
   if (answer.errors?.length) {
-    throw new GitHubError(`GitHub refused ${operation}: ` + answer.errors.map((e: { message: string }) => e.message).join('; '));
+    throw new GitHubError(
+      `GitHub refused ${operation}: ` + answer.errors.map((e: { message: string }) => e.message).join('; '),
+    );
   }
   return answer.data;
 }

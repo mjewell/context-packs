@@ -7,7 +7,7 @@ import path from 'node:path';
 
 import type { Args } from './args.ts';
 import * as origins from './origins.ts';
-import { ROOT, local } from './packs.ts';
+import { local, ROOT } from './packs.ts';
 import { byParts, exists, isDir, parts, walk } from './paths.ts';
 import { fail } from './stop.ts';
 import * as tree from './tree.ts';
@@ -34,7 +34,9 @@ export function scan(repo: string): Import[] {
   const root = path.join(repo, ROOT);
   if (!isDir(root)) return [];
   const found: Import[] = [];
-  const packMds = walk(root).filter((file) => path.basename(file) === 'pack.md').sort(byParts);
+  const packMds = walk(root)
+    .filter((file) => path.basename(file) === 'pack.md')
+    .sort(byParts);
   for (const packMd of packMds) {
     const rel = path.relative(root, packMd);
     const relParts = parts(rel);
@@ -45,7 +47,12 @@ export function scan(repo: string): Import[] {
       const file = path.join(ROOT, rel);
       const [fields] = tree.front(text, file, tree.IMPORT_KEYS);
       found.push({
-        id: path.dirname(rel), file, text, origin: fields.from ?? '.', path: fields.path ?? '', ref: fields.ref ?? null,
+        id: path.dirname(rel),
+        file,
+        text,
+        origin: fields.from ?? '.',
+        path: fields.path ?? '',
+        ref: fields.ref ?? null,
       });
     }
   }
@@ -60,14 +67,19 @@ export function command(args: Args, repo: string, imports: readonly Import[]): E
   const ids = imports.map((i) => i.id);
   if (args.command === 'add') {
     if (!ID.test(args.id) || args.id.split('/')[0] === 'gen') {
-      fail(`context-packs: ${args.id} can't name a pack. Use a folder under ${ROOT}/, other than `
-           + 'gen/, named with letters, digits, dots, dashes and underscores, not starting with a dot.');
+      fail(
+        `context-packs: ${args.id} can't name a pack. Use a folder under ${ROOT}/, other than ` +
+          'gen/, named with letters, digits, dots, dashes and underscores, not starting with a dot.',
+      );
     }
     const target = path.join(ROOT, args.id);
-    if (exists(path.join(repo, target))) fail(`context-packs: ${target} already exists. Choose another id, or remove it.`);
+    if (exists(path.join(repo, target)))
+      fail(`context-packs: ${target} already exists. Choose another id, or remove it.`);
     if (local(args.origin) && args.ref) {
-      fail(`context-packs: ${args.origin} is a folder on disk, which syncs from its working tree, so `
-           + 'it takes no --ref.');
+      fail(
+        `context-packs: ${args.origin} is a folder on disk, which syncs from its working tree, so ` +
+          'it takes no --ref.',
+      );
     }
     let [origin, folderPath, ref]: [string | null, string, string | null] = [args.origin, args.path, null];
     if (local(args.origin)) {
@@ -77,15 +89,22 @@ export function command(args: Args, repo: string, imports: readonly Import[]): E
     } else {
       ref = args.ref ? origins.pin(args.origin, args.ref) : origins.tip(args.origin);
     }
-    const text = '---\n' + (args.when ? `when: ${args.when}\n` : '') + (origin ? `from: ${origin}\n` : '')
-      + (folderPath ? `path: ${folderPath}\n` : '') + (ref ? `ref: ${ref}\n` : '') + '---\n';
+    const text =
+      '---\n' +
+      (args.when ? `when: ${args.when}\n` : '') +
+      (origin ? `from: ${origin}\n` : '') +
+      (folderPath ? `path: ${folderPath}\n` : '') +
+      (ref ? `ref: ${ref}\n` : '') +
+      '---\n';
     return [[path.join(target, 'pack.md'), text]];
   }
   const named = args.command === 'remove' ? [args.id] : args.command === 'update' ? args.ids : [];
   const unknown = named.filter((n) => !ids.includes(n));
   if (unknown.length) {
-    fail(`context-packs: ${args.dir} has no import pack ${unknown.join(', ')} in ${ROOT}/. `
-         + `Its import packs: ${ids.join(', ') || 'none'}.`);
+    fail(
+      `context-packs: ${args.dir} has no import pack ${unknown.join(', ')} in ${ROOT}/. ` +
+        `Its import packs: ${ids.join(', ') || 'none'}.`,
+    );
   }
   if (args.command === 'remove') return imports.filter((i) => i.id === args.id).map((i) => [i.file, null]);
   if (args.command !== 'update') return [];
@@ -95,8 +114,10 @@ export function command(args: Args, repo: string, imports: readonly Import[]): E
     if (named.length && !named.includes(imported.id)) continue;
     if (local(imported.origin)) {
       if (args.ref) {
-        fail(`context-packs: the ${imported.id} pack syncs from the working tree of ${imported.origin}, `
-             + 'so it takes no --ref.');
+        fail(
+          `context-packs: the ${imported.id} pack syncs from the working tree of ${imported.origin}, ` +
+            'so it takes no --ref.',
+        );
       }
       continue;
     }

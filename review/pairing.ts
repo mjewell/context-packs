@@ -9,19 +9,30 @@
  */
 import fs from 'node:fs';
 
-import { type Command, type Values, parse } from '../src/argparse.ts';
+import { type Command, parse, type Values } from '../src/argparse.ts';
 import { ascii, dumps } from '../src/pyjson.ts';
 import { format, repr } from '../src/pystr.ts';
-import { Stop, fail } from '../src/stop.ts';
+import { fail, Stop } from '../src/stop.ts';
 import { compact, line, output } from './args.ts';
 import type { Finding } from './report.ts';
 import { clean } from './sanitize.ts';
 import type { Shown, Thread } from './trust.ts';
 
 const SCHEMA = {
-  type: 'object', additionalProperties: false, required: ['pairs'], properties: { pairs: {
-    type: 'array', items: { type: 'object', additionalProperties: false, required: ['finding', 'thread'],
-                            properties: { finding: { type: 'integer', minimum: 0 }, thread: { type: 'string' } } } } },
+  type: 'object',
+  additionalProperties: false,
+  required: ['pairs'],
+  properties: {
+    pairs: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['finding', 'thread'],
+        properties: { finding: { type: 'integer', minimum: 0 }, thread: { type: 'string' } },
+      },
+    },
+  },
 };
 const PAIR = `You pair the findings from a review of a pull request's newest commit with the findings pack-review opened \
 threads for on earlier commits, so each finding that's still there is answered in its own thread. Each thread is \
@@ -45,9 +56,20 @@ Threads, by id, with where each is and the comment pack-review opened it with:
 Answer with the pairs, each a new finding's number and a thread's id.`;
 
 const COMMENTARY = {
-  type: 'object', additionalProperties: false, required: ['commentary'], properties: {
-    commentary: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['finding', 'text'],
-                                          properties: { finding: { type: 'integer', minimum: 0 }, text: { type: 'string' } } } } },
+  type: 'object',
+  additionalProperties: false,
+  required: ['commentary'],
+  properties: {
+    commentary: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['finding', 'text'],
+        properties: { finding: { type: 'integer', minimum: 0 }, text: { type: 'string' } },
+      },
+    },
+  },
 };
 const COMMENT = `The review of a pull request ran again at {head} and still finds each finding below. Each continues a \
 thread you, pack-review, opened for it on an earlier commit. Its comments follow it, oldest first: yours are marked \
@@ -95,8 +117,15 @@ function openedWith(threads: readonly Thread[]): Map<string, [Thread, string]> {
  * and the agent would answer in text.
  */
 function claudeArgs(schema: unknown, model: string): string {
-  return line(['--tools', 'StructuredOutput', '--json-schema', compact(schema), ...(model ? ['--model', model] : []),
-               '--restricted', '--strict-mcp-config']);
+  return line([
+    '--tools',
+    'StructuredOutput',
+    '--json-schema',
+    compact(schema),
+    ...(model ? ['--model', model] : []),
+    '--restricted',
+    '--strict-mcp-config',
+  ]);
 }
 
 /**
@@ -105,30 +134,42 @@ function claudeArgs(schema: unknown, model: string): string {
  */
 function threadLines(comments: readonly Shown[]): string {
   const last = Math.max(...comments.flatMap((comment, n) => ('ours' in comment && comment.ours ? [n] : [])));
-  return comments.map((comment, n) => {
-    if ('hidden' in comment) return `- ${comment.id}: hidden, ${comment.hidden}`;
-    const minimized = 'minimized' in comment ? `, minimized as ${comment.minimized}` : '';
-    if (comment.ours) {
-      const when = n === 0 ? 'opening the thread' : `at ${comment.at}`;
-      return `- you (pack-review), ${when}${minimized}: ${dumps(comment.text)}`;
-    }
-    const isNew = n > last ? ', new since your last comment' : '';
-    return `- ${comment.author} at ${comment.at}${isNew}${minimized}: ${dumps(comment.text)}`;
-  }).join('\n');
+  return comments
+    .map((comment, n) => {
+      if ('hidden' in comment) return `- ${comment.id}: hidden, ${comment.hidden}`;
+      const minimized = 'minimized' in comment ? `, minimized as ${comment.minimized}` : '';
+      if (comment.ours) {
+        const when = n === 0 ? 'opening the thread' : `at ${comment.at}`;
+        return `- you (pack-review), ${when}${minimized}: ${dumps(comment.text)}`;
+      }
+      const isNew = n > last ? ', new since your last comment' : '';
+      return `- ${comment.author} at ${comment.at}${isNew}${minimized}: ${dumps(comment.text)}`;
+    })
+    .join('\n');
 }
 
 function commentPrompt(args: Values): void {
   const report = load(String(args.report));
   const findings: Finding[] = report.findings;
-  const threads = new Map<string, Thread>((load(String(args.threads)) as Thread[]).map((thread) => [thread.id, thread]));
+  const threads = new Map<string, Thread>(
+    (load(String(args.threads)) as Thread[]).map((thread) => [thread.id, thread]),
+  );
   const pairs: Pair[] = load(String(args.paired)).pairs;
   output('needed', pairs.length ? 'true' : 'false');
   if (!pairs.length) return;
-  output('prompt', format(COMMENT, {
-    head: report.head.slice(0, 7),
-    pairs: pairs.map((pair) => `Finding ${pair.finding}: ${dumps(findings[pair.finding])}\n`
-      + `Its thread:\n${threadLines(threads.get(pair.thread)!.comments)}`).join('\n\n'),
-  }));
+  output(
+    'prompt',
+    format(COMMENT, {
+      head: report.head.slice(0, 7),
+      pairs: pairs
+        .map(
+          (pair) =>
+            `Finding ${pair.finding}: ${dumps(findings[pair.finding])}\n` +
+            `Its thread:\n${threadLines(threads.get(pair.thread)!.comments)}`,
+        )
+        .join('\n\n'),
+    }),
+  );
   output('claude-args', claudeArgs(COMMENTARY, String(args.model)));
 }
 
@@ -157,7 +198,8 @@ function commentCheck(args: Values): void {
     const seen = new Set<number>();
     for (const item of items as { finding: number; text: string }[]) {
       const [finding, text] = [item.finding, clean(item.text)];
-      if (!paired.has(finding)) fail(`pack-review: the commentary names finding ${finding}, which isn't paired with a thread.`);
+      if (!paired.has(finding))
+        fail(`pack-review: the commentary names finding ${finding}, which isn't paired with a thread.`);
       if (seen.has(finding)) fail(`pack-review: the commentary has more than one entry for finding ${finding}.`);
       if (!text) fail(`pack-review: the commentary on finding ${finding} is empty.`);
       seen.add(finding);
@@ -173,11 +215,15 @@ function pairPrompt(args: Values): void {
   const needed = !!(findings.length && threads.size);
   output('needed', needed ? 'true' : 'false');
   if (!needed) return;
-  output('prompt', format(PAIR, {
-    findings: findings.map((finding, n) => `${n}: ${dumps(finding)}`).join('\n\n'),
-    threads: [...threads].map(([id, [thread, text]]) => (
-      `${ascii(JSON.stringify(id))} on ${thread.path}:${thread.line}: ${dumps(text)}`)).join('\n\n'),
-  }));
+  output(
+    'prompt',
+    format(PAIR, {
+      findings: findings.map((finding, n) => `${n}: ${dumps(finding)}`).join('\n\n'),
+      threads: [...threads]
+        .map(([id, [thread, text]]) => `${ascii(JSON.stringify(id))} on ${thread.path}:${thread.line}: ${dumps(text)}`)
+        .join('\n\n'),
+    }),
+  );
   output('claude-args', claudeArgs(SCHEMA, String(args.model)));
 }
 
@@ -195,37 +241,84 @@ function pairCheck(args: Values): void {
     if (!(finding >= 0 && finding < findings.length)) {
       fail(`pack-review: the pairing names finding ${finding}, and the review has ${findings.length}.`);
     }
-    if (!threads.has(thread)) fail(`pack-review: the pairing names ${thread}, which isn't one of pack-review's threads.`);
+    if (!threads.has(thread))
+      fail(`pack-review: the pairing names ${thread}, which isn't one of pack-review's threads.`);
     if (seenFindings.has(finding)) fail(`pack-review: the pairing pairs finding ${finding} more than once.`);
     if (seenThreads.has(thread)) fail(`pack-review: the pairing pairs ${thread} more than once.`);
     seenFindings.add(finding);
     seenThreads.add(thread);
   }
-  fs.writeFileSync(String(args.out), dumps({ pairs: pairs.map(({ finding, thread }) => ({ finding, thread })) }), 'utf8');
+  fs.writeFileSync(
+    String(args.out),
+    dumps({ pairs: pairs.map(({ finding, thread }) => ({ finding, thread })) }),
+    'utf8',
+  );
 }
 
-const report = { flag: '--report', dest: 'report', metavar: 'REPORT', required: true, help: "the find job's report" } as const;
-const threadsOption = { flag: '--threads', dest: 'threads', metavar: 'THREADS', required: true,
-                        help: "pack-review's threads, as threads.ts prints them" } as const;
-const model = { flag: '--model', dest: 'model', metavar: 'MODEL', default: '', help: "the model to use, if not Claude Code's default" } as const;
-const paired = { flag: '--paired', dest: 'paired', metavar: 'PAIRED', required: true, help: 'the pairs, as pair-check wrote them' } as const;
+const report = {
+  flag: '--report',
+  dest: 'report',
+  metavar: 'REPORT',
+  required: true,
+  help: "the find job's report",
+} as const;
+const threadsOption = {
+  flag: '--threads',
+  dest: 'threads',
+  metavar: 'THREADS',
+  required: true,
+  help: "pack-review's threads, as threads.ts prints them",
+} as const;
+const model = {
+  flag: '--model',
+  dest: 'model',
+  metavar: 'MODEL',
+  default: '',
+  help: "the model to use, if not Claude Code's default",
+} as const;
+const paired = {
+  flag: '--paired',
+  dest: 'paired',
+  metavar: 'PAIRED',
+  required: true,
+  help: 'the pairs, as pair-check wrote them',
+} as const;
 const COMMANDS: Record<string, Command> = {
-  'pair-prompt': { help: 'write the pairing prompt and claude_args as step outputs', options: [report, threadsOption, model] },
-  'comment-prompt': { help: 'write the commentary prompt and claude_args as step outputs', options: [report, threadsOption, paired, model] },
+  'pair-prompt': {
+    help: 'write the pairing prompt and claude_args as step outputs',
+    options: [report, threadsOption, model],
+  },
+  'comment-prompt': {
+    help: 'write the commentary prompt and claude_args as step outputs',
+    options: [report, threadsOption, paired, model],
+  },
   'pair-check': {
     help: 'check the pairs and write them for the post job',
-    options: [report, threadsOption,
-              { flag: '--pairs', dest: 'pairs', metavar: 'PAIRS', help: "the pairing agent's structured output, if it ran" },
-              { flag: '--out', dest: 'out', metavar: 'OUT', required: true, help: 'where to write the pairs' }],
+    options: [
+      report,
+      threadsOption,
+      { flag: '--pairs', dest: 'pairs', metavar: 'PAIRS', help: "the pairing agent's structured output, if it ran" },
+      { flag: '--out', dest: 'out', metavar: 'OUT', required: true, help: 'where to write the pairs' },
+    ],
   },
   'comment-check': {
     help: "check the commentary and add it to the pairs' file",
-    options: [paired, { flag: '--commentary', dest: 'commentary', metavar: 'COMMENTARY',
-                        help: "the commentary agent's structured output, if it ran" }],
+    options: [
+      paired,
+      {
+        flag: '--commentary',
+        dest: 'commentary',
+        metavar: 'COMMENTARY',
+        help: "the commentary agent's structured output, if it ran",
+      },
+    ],
   },
 };
 const STEPS: Record<string, (args: Values) => void> = {
-  'pair-prompt': pairPrompt, 'pair-check': pairCheck, 'comment-prompt': commentPrompt, 'comment-check': commentCheck,
+  'pair-prompt': pairPrompt,
+  'pair-check': pairCheck,
+  'comment-prompt': commentPrompt,
+  'comment-check': commentCheck,
 };
 
 const args = parse({ prog: 'pairing.ts', help: '', commandRequired: true, commands: COMMANDS }, process.argv.slice(2));

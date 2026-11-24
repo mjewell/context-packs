@@ -62,7 +62,10 @@ export function strip(text: string): string {
  */
 export function parse(file: string): Root {
   const root: Root = {
-    ...node('', -1, file), title: path.basename(file).replace(/\.tree\.md$/, ''), intro: [], problems: [],
+    ...node('', -1, file),
+    title: path.basename(file).replace(/\.tree\.md$/, ''),
+    intro: [],
+    problems: [],
   };
   const stack: Node[] = [root];
   let fence: Diagram | null = null;
@@ -154,7 +157,10 @@ export function words(text: string): number {
   let t = strip(text).replace(/^(Why|Rejected):/, ' ');
   t = t.replace(LINK, (_m, _slug, shown?: string) => ` ${shown ?? ''} `).replace(/`[^`]*`/g, ' ');
   t = t.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
-  return t.replace(/[*_]/g, ' ').split(/\s+/).filter((w) => w && new RegExp(W, 'u').test(w)).length;
+  return t
+    .replace(/[*_]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w && new RegExp(W, 'u').test(w)).length;
 }
 
 /** Words in what a node shows: its text, or for the root, the sentence under its title. */

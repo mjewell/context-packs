@@ -14,9 +14,9 @@ import { createInterface } from 'node:readline';
 import type { Args } from './args.ts';
 import * as output from './eval_output.ts';
 import * as imports from './imports.ts';
-import { GEN, REPO, ROOT, local, synced, type Pack } from './packs.ts';
+import { GEN, local, type Pack, REPO, ROOT, synced } from './packs.ts';
 import { byParts, compare, exists, isDir, normpath, pjoin, resolve, walk } from './paths.ts';
-import { Stack, Stop, fail } from './stop.ts';
+import { fail, Stack, Stop } from './stop.ts';
 import * as tree from './tree.ts';
 
 const HEADING = /^## (Reads|Skips)$/;
@@ -85,9 +85,11 @@ function parse(text: string, at: string): ['reads' | 'skips', string][] {
     } else if (found.length && (line.startsWith('  ') || !line.trim())) {
       found.at(-1)![1].push(line.slice(2));
     } else if (line.trim()) {
-      fail(`context-packs: ${at}:${i + 1} is neither a \`## Reads\` or \`## Skips\` heading, a \`- \` item `
-           + 'under one, nor a line indented under an item. Indent it under its item, or start an item '
-           + 'with `- `.');
+      fail(
+        `context-packs: ${at}:${i + 1} is neither a \`## Reads\` or \`## Skips\` heading, a \`- \` item ` +
+          'under one, nor a line indented under an item. Indent it under its item, or start an item ' +
+          'with `- `.',
+      );
     }
   });
   return found.map(([kind, lines]) => [kind, lines.join('\n').replace(/\n+$/, '')]);
@@ -97,12 +99,18 @@ function parse(text: string, at: string): ['reads' | 'skips', string][] {
 function cases(pack: EvalPack, repo: string): Case[] {
   const evals = path.join(repo, pack.evals);
   if (!isDir(evals)) return [];
-  const files = walk(evals).filter((file) => file.endsWith('.md') && !isDir(file)).sort(byParts);
+  const files = walk(evals)
+    .filter((file) => file.endsWith('.md') && !isDir(file))
+    .sort(byParts);
   return files.flatMap((file) => {
     const doc = path.relative(evals, file);
     if (doc.split('/')[0] === 'fixture') return [];
     return parse(fs.readFileSync(file, 'utf8'), path.join(pack.evals, doc)).map(([expect, prompt]) => ({
-      pack, doc, expect, prompt, name: pack.top ? doc : path.join(pack.folder, doc),
+      pack,
+      doc,
+      expect,
+      prompt,
+      name: pack.top ? doc : path.join(pack.folder, doc),
     }));
   });
 }
@@ -128,7 +136,8 @@ function init(copy: string): void {
 /** Copy the folder from to to, keeping symlinks as they are, and leaving out the names skip says to. */
 function copyTree(from: string, to: string, skip: (folder: string, name: string) => boolean): void {
   fs.cpSync(from, to, {
-    recursive: true, verbatimSymlinks: true,
+    recursive: true,
+    verbatimSymlinks: true,
     filter: (source) => source === from || !skip(path.dirname(source), path.basename(source)),
   });
 }
@@ -150,16 +159,21 @@ function stage(repo: string, pack: EvalPack, into: string): void {
     // Resolved, so a fixture linked from elsewhere is copied like a folder.
     copyTree(resolve(fixture), into, leftOut);
     if (exists(path.join(into, ROOT))) {
-      fail(`context-packs: ${path.join(pack.evals, 'fixture')} has a ${ROOT}/ folder of its own, and eval `
-           + 'puts the pack it tests there. Remove it from the fixture.');
+      fail(
+        `context-packs: ${path.join(pack.evals, 'fixture')} has a ${ROOT}/ folder of its own, and eval ` +
+          'puts the pack it tests there. Remove it from the fixture.',
+      );
     }
   } else {
     fs.mkdirSync(into);
   }
   if (pack.top) {
     const packs = path.join(repo, ROOT);
-    copyTree(packs, path.join(into, ROOT),
-             (folder, name) => leftOut(folder, name) || (folder === packs && name === path.basename(GEN)));
+    copyTree(
+      packs,
+      path.join(into, ROOT),
+      (folder, name) => leftOut(folder, name) || (folder === packs && name === path.basename(GEN)),
+    );
     for (const imported of imports.scan(repo)) {
       fs.writeFileSync(path.join(into, imported.file), pointed(imported, repo), 'utf8');
     }
@@ -197,7 +211,9 @@ function docs(copy: string, pack: EvalPack): Map<string, string> {
     stack.close();
   }
   const prefix = pack.top ? '' : `${name(pack)}/`;
-  return new Map([...found].filter(([doc]) => doc.startsWith(prefix)).map(([doc, at]) => [doc.slice(prefix.length), at]));
+  return new Map(
+    [...found].filter(([doc]) => doc.startsWith(prefix)).map(([doc, at]) => [doc.slice(prefix.length), at]),
+  );
 }
 
 /**
@@ -217,13 +233,32 @@ export interface Run {
  * them without asking; no MCP server loads, nor any settings but the copy's own.
  */
 function session(prompt: string, cwd: string, model: string): Promise<Run> {
-  const command = ['-p', prompt, '--output-format', 'stream-json', '--verbose', '--setting-sources', 'project',
-                   '--tools', 'Read,Glob,Grep', '--allowedTools', 'Read,Glob,Grep', '--strict-mcp-config',
-                   '--max-turns', '8', '--model', model];
+  const command = [
+    '-p',
+    prompt,
+    '--output-format',
+    'stream-json',
+    '--verbose',
+    '--setting-sources',
+    'project',
+    '--tools',
+    'Read,Glob,Grep',
+    '--allowedTools',
+    'Read,Glob,Grep',
+    '--strict-mcp-config',
+    '--max-turns',
+    '8',
+    '--model',
+    model,
+  ];
   const read = new Set<string>();
   const start = performance.now();
-  const ended = (error: string | null, costUsd: number | null = null): Run => (
-    { read, error, costUsd, durationMs: Math.round(performance.now() - start) });
+  const ended = (error: string | null, costUsd: number | null = null): Run => ({
+    read,
+    error,
+    costUsd,
+    durationMs: Math.round(performance.now() - start),
+  });
   return new Promise((done, failed) => {
     const child = spawn('claude', command, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
     let stderr = '';
@@ -245,8 +280,9 @@ function session(prompt: string, cwd: string, model: string): Promise<Run> {
         if (part.type === 'tool_use' && part.name === 'Read') read.add(resolve(part.input.file_path));
       }
     });
-    child.on('close', (code) => done(
-      result ?? ended(stderr.trim() || `claude exited with code ${code} without a result`)));
+    child.on('close', (code) =>
+      done(result ?? ended(stderr.trim() || `claude exited with code ${code} without a result`)),
+    );
   });
 }
 
@@ -267,7 +303,10 @@ function judge(item: Case, results: readonly Run[], doc: string, runs: number): 
 }
 
 /** Runs jobs four at a time, calling finished with each one's index as it ends. */
-async function pool<T>(jobs: readonly (() => Promise<T>)[], finished: (index: number, value: T) => void): Promise<void> {
+async function pool<T>(
+  jobs: readonly (() => Promise<T>)[],
+  finished: (index: number, value: T) => void,
+): Promise<void> {
   let next = 0;
   const worker = async (): Promise<void> => {
     while (next < jobs.length) {
@@ -281,17 +320,22 @@ async function pool<T>(jobs: readonly (() => Promise<T>)[], finished: (index: nu
 export async function run(root: tree.Node, repoPath: string, args: Args): Promise<void> {
   const repo = resolve(repoPath);
   const packs = args.pack
-    ? [evalPack(path.relative(repo, resolve(path.join(repo, args.pack))) || '.', false)] : [...installed(root, repo)];
+    ? [evalPack(path.relative(repo, resolve(path.join(repo, args.pack))) || '.', false)]
+    : [...installed(root, repo)];
   let found = packs.flatMap((pack) => cases(pack, repo));
   if (!found.length) {
-    fail('context-packs: no pack has eval prompts. Write the prompts for a doc in .evals/<doc>.md at the root '
-         + 'of its pack, as `- ` items under `## Reads` and `## Skips`.');
+    fail(
+      'context-packs: no pack has eval prompts. Write the prompts for a doc in .evals/<doc>.md at the root ' +
+        'of its pack, as `- ` items under `## Reads` and `## Skips`.',
+    );
   }
   const names = new Set(found.flatMap((item) => [item.doc, item.name]));
   const unknown = args.docs.filter((doc) => !names.has(doc));
   if (unknown.length) {
-    fail(`context-packs: ${unknown.join(', ')} has no eval prompts. Docs with them: `
-         + `${[...new Set(found.map((item) => item.name))].sort(compare).join(', ')}.`);
+    fail(
+      `context-packs: ${unknown.join(', ')} has no eval prompts. Docs with them: ` +
+        `${[...new Set(found.map((item) => item.name))].sort(compare).join(', ')}.`,
+    );
   }
   found = found.filter((item) => !args.docs.length || args.docs.includes(item.doc) || args.docs.includes(item.name));
   const staged = [...new Set(found.map((item) => item.pack))];
@@ -309,8 +353,10 @@ export async function run(root: tree.Node, repoPath: string, args: Args): Promis
     }
     for (const item of found) {
       if (!paths.get(item.pack)!.has(item.doc)) {
-        fail(`context-packs: ${path.join(item.pack.evals, item.doc)} names no doc in ${item.pack.folder}. Name its `
-             + 'file by the doc\'s path in the pack.');
+        fail(
+          `context-packs: ${path.join(item.pack.evals, item.doc)} names no doc in ${item.pack.folder}. Name its ` +
+            "file by the doc's path in the pack.",
+        );
       }
     }
     if (!args.json) {
@@ -320,23 +366,37 @@ export async function run(root: tree.Node, repoPath: string, args: Args): Promis
     const verdicts = new Map<number, Verdict>();
     const jobs = found.flatMap((item, index) => Array.from({ length: args.runs }, () => ({ item, index })));
     let done = 0;
-    await pool(jobs.map(({ item }) => () => session(item.prompt, copies.get(item.pack)!, args.model)), (job, result) => {
-      const { item, index } = jobs[job]!;
-      results[index]!.push(result);
-      if (results[index]!.length === args.runs) {
-        const doc = paths.get(item.pack)!.get(item.doc)!;
-        verdicts.set(index, judge(item, results[index]!, doc, args.runs));
-        if (!args.json) output.report(item, results[index]!, verdicts.get(index)!, doc, copies.get(item.pack)!, repo, args.runs);
-      }
-      if (!args.json) output.status(++done, jobs.length);
-    });
+    await pool(
+      jobs.map(
+        ({ item }) =>
+          () =>
+            session(item.prompt, copies.get(item.pack)!, args.model),
+      ),
+      (job, result) => {
+        const { item, index } = jobs[job]!;
+        results[index]!.push(result);
+        if (results[index]!.length === args.runs) {
+          const doc = paths.get(item.pack)!.get(item.doc)!;
+          verdicts.set(index, judge(item, results[index]!, doc, args.runs));
+          if (!args.json)
+            output.report(item, results[index]!, verdicts.get(index)!, doc, copies.get(item.pack)!, repo, args.runs);
+        }
+        if (!args.json) output.status(++done, jobs.length);
+      },
+    );
     const outcomes = [...verdicts.values()].map((verdict) => verdict.outcome);
     failed = outcomes.filter((o) => o === 'failed').length;
     errored = outcomes.filter((o) => o === 'errored').length;
     if (args.json) {
-      process.stdout.write(output.document(found.map((item, index) => (
-        [item, results[index]!, verdicts.get(index)!, copies.get(item.pack)!, repo] as const)), args.model, args.runs)
-        + '\n');
+      process.stdout.write(
+        output.document(
+          found.map(
+            (item, index) => [item, results[index]!, verdicts.get(index)!, copies.get(item.pack)!, repo] as const,
+          ),
+          args.model,
+          args.runs,
+        ) + '\n',
+      );
     } else {
       output.status(null, null);
       process.stdout.write(`${output.summary(found.length, failed, errored)}\n`);

@@ -8,10 +8,22 @@ import { dumps } from '../src/pyjson.ts';
 import { GitHubError } from './github.ts';
 import { threads } from './trust.ts';
 
-const args = parse({
-  prog: 'threads.ts', help: '',
-  options: [{ flag: '--pr', dest: 'pr', metavar: 'PR', required: true, help: 'the PR number, in the repo GITHUB_REPOSITORY names' }],
-}, process.argv.slice(2));
+const args = parse(
+  {
+    prog: 'threads.ts',
+    help: '',
+    options: [
+      {
+        flag: '--pr',
+        dest: 'pr',
+        metavar: 'PR',
+        required: true,
+        help: 'the PR number, in the repo GITHUB_REPOSITORY names',
+      },
+    ],
+  },
+  process.argv.slice(2),
+);
 try {
   process.stdout.write(`${dumps(await threads(Number(args.pr)))}\n`);
 } catch (error) {

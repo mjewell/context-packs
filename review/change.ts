@@ -53,8 +53,9 @@ export class Change {
 
   /** The head lines each path's diff shows, which a review comment can be left on. */
   shown(): Record<string, number[]> {
-    return Object.fromEntries(this.paths().map((path) => [
-      path, marked(this.raw(path)).flatMap(([n]) => (typeof n === 'number' ? [n] : []))]));
+    return Object.fromEntries(
+      this.paths().map((path) => [path, marked(this.raw(path)).flatMap(([n]) => (typeof n === 'number' ? [n] : []))]),
+    );
   }
 
   /** The path's diff, each line numbered as numbered() says. */
@@ -63,11 +64,17 @@ export class Change {
   }
 
   changed(): string {
-    return this.paths().map((path) => `${this.lines(path).length}\t${path}\n`).join('');
+    return this.paths()
+      .map((path) => `${this.lines(path).length}\t${path}\n`)
+      .join('');
   }
 
   log(page = 1): string {
-    return paged('the log', splitlines(git('log', '--no-decorate', '--format=medium', `${this.start}..${this.head}`)), page);
+    return paged(
+      'the log',
+      splitlines(git('log', '--no-decorate', '--format=medium', `${this.start}..${this.head}`)),
+      page,
+    );
   }
 
   diff(path: string, page = 1): string {
@@ -85,7 +92,10 @@ function pages(count: number): number {
 function paged(name: string, lines: readonly string[], page: number): string {
   const count = pages(lines.length);
   if (page > count) throw new Refused(`${name} has ${count} pages.`);
-  const text = lines.slice((page - 1) * LINES, page * LINES).map((line) => `${line}\n`).join('');
+  const text = lines
+    .slice((page - 1) * LINES, page * LINES)
+    .map((line) => `${line}\n`)
+    .join('');
   if (count === 1) return text;
   const more = page < count ? `: run it again with page ${page + 1} for more` : '';
   return `${text}(page ${page} of ${count}${more})\n`;
@@ -140,14 +150,25 @@ function numbered(diff: readonly string[]): string[] {
 }
 
 function main(): void {
-  const args = parse({
-    prog: 'change.ts', help: '', commandRequired: true,
-    options: [
-      { flag: '--base', dest: 'base', metavar: 'BASE', required: true, help: 'the commit the reviewed change starts from' },
-      { flag: '--head', dest: 'head', metavar: 'HEAD', required: true, help: 'the commit that is reviewed' },
-    ],
-    commands: { shown: { help: 'print as JSON the head lines each diff shows' } },
-  }, process.argv.slice(2));
+  const args = parse(
+    {
+      prog: 'change.ts',
+      help: '',
+      commandRequired: true,
+      options: [
+        {
+          flag: '--base',
+          dest: 'base',
+          metavar: 'BASE',
+          required: true,
+          help: 'the commit the reviewed change starts from',
+        },
+        { flag: '--head', dest: 'head', metavar: 'HEAD', required: true, help: 'the commit that is reviewed' },
+      ],
+      commands: { shown: { help: 'print as JSON the head lines each diff shows' } },
+    },
+    process.argv.slice(2),
+  );
   process.stdout.write(`${JSON.stringify(new Change(String(args.base), String(args.head)).shown())}\n`);
 }
 

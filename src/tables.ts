@@ -36,8 +36,10 @@ export function units(repo: string, block: string): string[][] {
         // resolve, since a row's path is absolute when the tables' paths are.
         const file = path.resolve(root, rowPath);
         if (!isFile(file)) {
-          fail(`context-packs: a table points at ${rowPath}, which doesn't exist. Run \`npx context-packs\` `
-               + 'and commit the result.');
+          fail(
+            `context-packs: a table points at ${rowPath}, which doesn't exist. Run \`npx context-packs\` ` +
+              'and commit the result.',
+          );
         }
         const content = read(file);
         if (new RegExp(TABLE.source, 'm').test(content)) queue.push([rowPath, content]);

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
+import fs from 'node:fs';
 /**
  * Write the review job's report for the pairing and post jobs: the findings the wizard built, cleaned again, and the
  * line each one's thread can open on. findingsIn() builds findings from the finders' findings each of the merging
  * agent's groups names, for the wizard's submit-groups. It reaches nothing outside the runner.
  */
 import { isDeepStrictEqual } from 'node:util';
-import fs from 'node:fs';
 
 import { parse } from '../src/argparse.ts';
 import { runAsScript } from '../src/main.ts';
@@ -56,9 +56,12 @@ function groupsIn(file: string): Group[] {
   } catch {
     output = null;
   }
-  const groups = output !== null && typeof output === 'object' && !Array.isArray(output)
-    ? (output as Record<string, unknown>).groups : undefined;
-  if (!Array.isArray(groups)) throw new Rejected(`the merge returned no groups: ${repr([...text].slice(0, 500).join(''))}`);
+  const groups =
+    output !== null && typeof output === 'object' && !Array.isArray(output)
+      ? (output as Record<string, unknown>).groups
+      : undefined;
+  if (!Array.isArray(groups))
+    throw new Rejected(`the merge returned no groups: ${repr([...text].slice(0, 500).join(''))}`);
   return groups as Group[];
 }
 
@@ -80,9 +83,13 @@ function built(group: Group, sources: ReadonlyMap<string, Finding>): Finding {
     spots.set(key, earlier ? { ...spot, follows: earlier.follows && spot.follows } : spot);
   }
   return {
-    kind: group.kind, headline: group.headline, rules: unique(found.flatMap((finding) => finding.rules)),
-    spots: [...spots.values()], deliberate: unique(found.flatMap((finding) => finding.deliberate)),
-    exemplars: unique(found.flatMap((finding) => finding.exemplars)), take: group.take,
+    kind: group.kind,
+    headline: group.headline,
+    rules: unique(found.flatMap((finding) => finding.rules)),
+    spots: [...spots.values()],
+    deliberate: unique(found.flatMap((finding) => finding.deliberate)),
+    exemplars: unique(found.flatMap((finding) => finding.exemplars)),
+    take: group.take,
   };
 }
 
@@ -120,26 +127,36 @@ function builtByWizard(file: string, head: string): Finding[] {
  */
 function anchors(findings: readonly Finding[], shown: Readonly<Record<string, number[]>>) {
   return findings.map((finding) => {
-    const spots = finding.spots.filter((spot) => (shown[spot.path] ?? []).includes(spot.line))
+    const spots = finding.spots
+      .filter((spot) => (shown[spot.path] ?? []).includes(spot.line))
       .sort((a, b) => Number(a.follows) - Number(b.follows));
     return spots[0] ? { path: spots[0].path, line: spots[0].line } : null;
   });
 }
 
 function main(): void {
-  const string = (flag: string, help: string) => (
-    { flag, dest: flag.slice(2).replace('-', '_'), metavar: flag.slice(2).toUpperCase().replace('-', '_'), required: true as const, help });
-  const args = parse({
-    prog: 'report.ts', help: '',
-    options: [
-      string('--base', 'the commit the reviewed change starts from'),
-      string('--base-ref', 'the branch the PR was to merge into when it was reviewed'),
-      string('--head', 'the commit that was reviewed'),
-      string('--findings', "the findings the review's wizard built"),
-      string('--shown', 'the head lines each diff shows, as `change.ts shown` prints them'),
-      string('--out', 'where to write the report'),
-    ],
-  }, process.argv.slice(2)) as Record<string, string>;
+  const string = (flag: string, help: string) => ({
+    flag,
+    dest: flag.slice(2).replace('-', '_'),
+    metavar: flag.slice(2).toUpperCase().replace('-', '_'),
+    required: true as const,
+    help,
+  });
+  const args = parse(
+    {
+      prog: 'report.ts',
+      help: '',
+      options: [
+        string('--base', 'the commit the reviewed change starts from'),
+        string('--base-ref', 'the branch the PR was to merge into when it was reviewed'),
+        string('--head', 'the commit that was reviewed'),
+        string('--findings', "the findings the review's wizard built"),
+        string('--shown', 'the head lines each diff shows, as `change.ts shown` prints them'),
+        string('--out', 'where to write the report'),
+      ],
+    },
+    process.argv.slice(2),
+  ) as Record<string, string>;
   let findings: Finding[];
   try {
     findings = builtByWizard(args.findings!, args.head!);
@@ -149,7 +166,10 @@ function main(): void {
     process.exit(1);
   }
   const report = {
-    base: args.base, base_ref: args.base_ref, head: args.head, findings,
+    base: args.base,
+    base_ref: args.base_ref,
+    head: args.head,
+    findings,
     anchors: anchors(findings, JSON.parse(fs.readFileSync(args.shown!, 'utf8'))),
   };
   fs.writeFileSync(args.out!, JSON.stringify(report), 'utf8');

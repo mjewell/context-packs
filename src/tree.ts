@@ -7,7 +7,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import {
-  REPO, type Pack, type Place, fetch, folder, generated, isLocal, local, overlap, place, same, samePlace, synced, where,
+  fetch,
+  folder,
+  generated,
+  isLocal,
+  local,
+  overlap,
+  type Pack,
+  type Place,
+  place,
+  REPO,
+  same,
+  samePlace,
+  synced,
+  where,
 } from './packs.ts';
 import { byParts, compare, isDir, isFile, normpath, pjoin } from './paths.ts';
 import { fail, type Stack } from './stop.ts';
@@ -74,24 +87,30 @@ export function importsAPack(text: string): boolean {
 /** text's front matter as fields, keeping only those named in keys, and the text after it. */
 export function front(text: string, at: string, keys: readonly string[]): [Fields, string] {
   const match = FRONT.exec(text);
-  const pairs = match ? match[1]!.split('\n').map((line) => {
-    const colon = line.indexOf(': ');
-    return colon === -1 ? [line] : [line.slice(0, colon), line.slice(colon + 2)];
-  }) : [];
+  const pairs = match
+    ? match[1]!.split('\n').map((line) => {
+        const colon = line.indexOf(': ');
+        return colon === -1 ? [line] : [line.slice(0, colon), line.slice(colon + 2)];
+      })
+    : [];
   const fields: Fields = Object.fromEntries(pairs.filter((pair) => pair.length === 2));
   if (Object.keys(fields).length !== pairs.length) {
     fail(`context-packs: ${at} has front matter that isn't \`key: value\` lines.`);
   }
   const names = Object.keys(fields).sort(compare);
   if (names.length && !keys.length) {
-    fail(`context-packs: ${at} takes no front matter, since its pack rules are always inlined. `
-         + `Remove ${names.join(', ')}.`);
+    fail(
+      `context-packs: ${at} takes no front matter, since its pack rules are always inlined. ` +
+        `Remove ${names.join(', ')}.`,
+    );
   }
   const unknown = names.filter((name) => !keys.includes(name));
   if (unknown.length) {
-    fail(`context-packs: ${at} has front matter context-packs doesn't know: ${unknown.join(', ')}. `
-         + `It takes only ${keys.map((k) => `\`${k}\``).join(', ')}. Remove it, or update context-packs if the `
-         + 'pack needs a newer version.');
+    fail(
+      `context-packs: ${at} has front matter context-packs doesn't know: ${unknown.join(', ')}. ` +
+        `It takes only ${keys.map((k) => `\`${k}\``).join(', ')}. Remove it, or update context-packs if the ` +
+        'pack needs a newer version.',
+    );
   }
   return [fields, match ? text.slice(match[0].length) : text];
 }
@@ -120,8 +139,10 @@ export function load(repo: string, stack: Stack): Node {
     for (const [other, there] of claimed) {
       const shared = samePlace(here, there) && !loading.some((p) => same(p, other));
       if (overlap(here, there) && !shared) {
-        fail(`context-packs: the ${other.id || 'context-packs'} and ${pack.id} packs overlap: one's `
-             + 'folder holds the other\'s, so its rules would sync twice. Keep only one of them.');
+        fail(
+          `context-packs: the ${other.id || 'context-packs'} and ${pack.id} packs overlap: one's ` +
+            "folder holds the other's, so its rules would sync twice. Keep only one of them.",
+        );
       }
     }
     claimed.push([pack, here]);
@@ -132,8 +153,10 @@ export function load(repo: string, stack: Stack): Node {
     const at = where(holder, path.join(rel, 'pack.md'));
     const others = entries(path.join(source, rel)).filter((name) => name !== 'pack.md' && !name.startsWith('.'));
     if (others.length) {
-      fail(`context-packs: ${where(holder, rel)} is an import pack, so it holds only its pack.md. Move `
-           + `${others.join(', ')} beside it.`);
+      fail(
+        `context-packs: ${where(holder, rel)} is an import pack, so it holds only its pack.md. Move ` +
+          `${others.join(', ')} beside it.`,
+      );
     }
     let [fields, rules] = front(read(path.join(source, rel, 'pack.md')), at, IMPORT_KEYS);
     const id = [holder.id, rel].filter(Boolean).join('/');
@@ -142,19 +165,25 @@ export function load(repo: string, stack: Stack): Node {
     const origin = fields.from;
     let folderPath = folder('.', fields.path ?? '');
     if (folderPath === '..' || folderPath.startsWith('../') || folderPath.startsWith('/')) {
-      fail(`context-packs: ${at} imports ${folderPath}, which is outside the repo `
-           + `${origin ? 'its from names' : 'it is in'}. Name the other repo in \`from\`, and the folder in `
-           + 'it in `path`.');
+      fail(
+        `context-packs: ${at} imports ${folderPath}, which is outside the repo ` +
+          `${origin ? 'its from names' : 'it is in'}. Name the other repo in \`from\`, and the folder in ` +
+          'it in `path`.',
+      );
     }
     folderPath = folderPath === '.' ? '' : folderPath;
     if (origin && !isLocal(holder)) {
-      fail(`context-packs: ${at} imports ${origin}, but it sits in a pack from git, which can import only `
-           + 'folders of its own repo, with `path` alone.');
+      fail(
+        `context-packs: ${at} imports ${origin}, but it sits in a pack from git, which can import only ` +
+          'folders of its own repo, with `path` alone.',
+      );
     }
     if ((!origin || local(origin)) && 'ref' in fields) {
-      fail(`context-packs: ${at} pins a folder on disk to a ref, but a folder on disk is read from its `
-           + 'working tree, and a folder of the pack\'s own repo moves with that pack. Remove the ref line, '
-           + 'or import the pack by its git URL to pin it.');
+      fail(
+        `context-packs: ${at} pins a folder on disk to a ref, but a folder on disk is read from its ` +
+          "working tree, and a folder of the pack's own repo moves with that pack. Remove the ref line, " +
+          'or import the pack by its git URL to pin it.',
+      );
     }
     let pack: Pack;
     if (!origin) {
@@ -163,8 +192,10 @@ export function load(repo: string, stack: Stack): Node {
       pack = { id, origin: folder(holder.origin, origin), path: folderPath, ref: null };
     } else {
       if (!('ref' in fields)) {
-        fail(`context-packs: ${at} imports ${origin} without a ref to pin it to. Add \`ref: <tag or `
-             + 'commit>`, or delete the folder and add the pack again.');
+        fail(
+          `context-packs: ${at} imports ${origin} without a ref to pin it to. Add \`ref: <tag or ` +
+            'commit>`, or delete the folder and add the pack again.',
+        );
       }
       pack = { id, origin, path: folderPath, ref: fields.ref! };
     }
@@ -187,12 +218,15 @@ export function load(repo: string, stack: Stack): Node {
     const home = id || '.';
     const packMd = path.join(source, home, 'pack.md');
     let [fields, rules]: [Fields, string] = isFile(packMd)
-      ? front(read(packMd), where(pack, path.join(home, 'pack.md')), keys) : [{}, ''];
+      ? front(read(packMd), where(pack, path.join(home, 'pack.md')), keys)
+      : [{}, ''];
     // A nested pack's when is its row in its parent's table. The top-level pack needs none: without one, it's
     // inlined.
     if (id && !('when' in fields)) {
-      fail(`context-packs: ${where(pack, path.join(home, 'pack.md'))} must start with front matter saying when to `
-           + 'read it, since it\'s nested in another pack:\n\n---\nwhen: Editing `web/**`\n---');
+      fail(
+        `context-packs: ${where(pack, path.join(home, 'pack.md'))} must start with front matter saying when to ` +
+          "read it, since it's nested in another pack:\n\n---\nwhen: Editing `web/**`\n---",
+      );
     }
     // The end marker has to start its own line, or the next sync can't find the block.
     if (rules && !rules.endsWith('\n')) rules += '\n';
@@ -215,8 +249,10 @@ export function load(repo: string, stack: Stack): Node {
           }
           const twin = path.join(path.dirname(entryPath), `${name}.md`);
           if (isFile(path.join(source, twin))) {
-            fail(`context-packs: ${where(pack, entryPath)} holds a pack.md and sits beside `
-                 + `${where(pack, twin)}, so its index and that doc would both be ${twin}. Rename one.`);
+            fail(
+              `context-packs: ${where(pack, entryPath)} holds a pack.md and sits beside ` +
+                `${where(pack, twin)}, so its index and that doc would both be ${twin}. Rename one.`,
+            );
           }
           children.push(tree(pack, source, entryPath, ['when']));
         } else if (isDir(entry)) {
@@ -241,12 +277,16 @@ export function load(repo: string, stack: Stack): Node {
 function when(pack: Pack, docPath: string, text: string): string {
   const [fields] = front(text, where(pack, docPath), ['when']);
   if (!('when' in fields)) {
-    fail(`context-packs: ${where(pack, docPath)} must start with front matter saying when to read it:\n\n`
-         + '---\nwhen: Editing `**/*.ts`\n---');
+    fail(
+      `context-packs: ${where(pack, docPath)} must start with front matter saying when to read it:\n\n` +
+        '---\nwhen: Editing `**/*.ts`\n---',
+    );
   }
   if (fields.when === 'always') {
-    fail(`context-packs: ${where(pack, docPath)} has \`when: always\`, but only a pack.md is inlined. Move its `
-         + 'rules into the pack.md of the pack holding it, or give it a when saying when to read it.');
+    fail(
+      `context-packs: ${where(pack, docPath)} has \`when: always\`, but only a pack.md is inlined. Move its ` +
+        'rules into the pack.md of the pack holding it, or give it a when saying when to read it.',
+    );
   }
   return fields.when!;
 }
@@ -259,8 +299,10 @@ function index(node: Node, pack: Pack): string {
 /** A table of (when, path) rows under its heading, or nothing without rows, each path starting from base. */
 function table(heading: string, rows: [string, string][], base: string): string {
   if (!rows.length) return '';
-  return `${heading}\n\n| When | Read |\n|---|---|\n`
-    + rows.map(([when, rowPath]) => `| ${when} | \`${normpath(pjoin(base, rowPath))}\` |\n`).join('');
+  return (
+    `${heading}\n\n| When | Read |\n|---|---|\n` +
+    rows.map(([when, rowPath]) => `| ${when} | \`${normpath(pjoin(base, rowPath))}\` |\n`).join('')
+  );
 }
 
 /** The pack's folder under context-packs/, '' for context-packs/ itself. */
@@ -277,8 +319,10 @@ function heading(node: Node, pack: Pack): string {
  * reading the file where each pack starts and ends.
  */
 function inline(node: Node, pack: Pack, base: string): string {
-  return `<!-- context-packs:pack ${name(node, pack)} -->\n${render(node, pack, base)}`
-    + `<!-- context-packs:pack-end ${name(node, pack)} -->\n`;
+  return (
+    `<!-- context-packs:pack ${name(node, pack)} -->\n${render(node, pack, base)}` +
+    `<!-- context-packs:pack-end ${name(node, pack)} -->\n`
+  );
 }
 
 /**
@@ -287,17 +331,31 @@ function inline(node: Node, pack: Pack, base: string): string {
  */
 export function render(node: Node, pack: Pack, base: string): string {
   const rows: [string, string, string][] = [
-    ...node.docs.map((d): [string, string, string] => [d.path.slice(0, -'.md'.length), d.when, pjoin(synced(pack), d.path)]),
+    ...node.docs.map((d): [string, string, string] => [
+      d.path.slice(0, -'.md'.length),
+      d.when,
+      pjoin(synced(pack), d.path),
+    ]),
     ...node.children.filter(row).map((c): [string, string, string] => [c.id, c.fields.when!, index(c, pack)]),
-    ...node.imports.filter((i) => row(i.root))
+    ...node.imports
+      .filter((i) => row(i.root))
       .map((i): [string, string, string] => [i.id, i.root.fields.when!, index(i.root, i.pack)]),
   ].sort((a, b) => compare(a[0], b[0]) || compare(a[1], b[1]) || byParts(a[2], b[2]));
   const inlined = [
     ...node.children.filter((c) => !row(c)).map((c) => inline(c, pack, base)),
     ...node.imports.filter((i) => !row(i.root)).map((i) => inline(i.root, i.pack, base)),
   ];
-  return [node.rules, table(heading(node, pack), rows.map(([, when, rowPath]) => [when, rowPath]), base), ...inlined]
-    .filter(Boolean).join('\n');
+  return [
+    node.rules,
+    table(
+      heading(node, pack),
+      rows.map(([, when, rowPath]) => [when, rowPath]),
+      base,
+    ),
+    ...inlined,
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 /**

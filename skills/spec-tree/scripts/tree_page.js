@@ -6,18 +6,20 @@ async function draw(scope) {
     mermaid = mermaid || (await import(__MERMAID__)).default;
     const dark = matchMedia('(prefers-color-scheme: dark)').matches;
     mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'neutral' });
-    pending.forEach(p => p.removeAttribute('data-pending'));
+    pending.forEach((p) => p.removeAttribute('data-pending'));
     await mermaid.run({ nodes: pending });
-  } catch (e) { console.error('mermaid', e); }
+  } catch (e) {
+    console.error('mermaid', e);
+  }
 }
-document.querySelectorAll('details').forEach(d => d.addEventListener('toggle', () => d.open && draw(d)));
+document.querySelectorAll('details').forEach((d) => d.addEventListener('toggle', () => d.open && draw(d)));
 draw(document.querySelector('main'));
 
 // Rows are each branch's <summary> and each leaf <li>. One row at a time has tabindex 0 (a roving tabindex).
-const isBranch = row => row.tagName === 'SUMMARY';
-const detailsOf = row => row.parentElement;
-const rowOf = li => li.classList.contains('leaf') ? li : li.querySelector(':scope > details > summary');
-const parentRow = row => {
+const isBranch = (row) => row.tagName === 'SUMMARY';
+const detailsOf = (row) => row.parentElement;
+const rowOf = (li) => (li.classList.contains('leaf') ? li : li.querySelector(':scope > details > summary'));
+const parentRow = (row) => {
   const li = isBranch(row) ? detailsOf(row).parentElement : row;
   const d = li.parentElement.closest('details');
   return d ? d.querySelector(':scope > summary') : null;
@@ -41,7 +43,7 @@ function focusRow(row, { keepBack = false } = {}) {
   row.focus({ preventScroll: true });
   row.scrollIntoView({ block: 'nearest' });
 }
-document.addEventListener('focusin', e => {
+document.addEventListener('focusin', (e) => {
   const row = e.target.closest('.row');
   if (row && row !== current) focusRow(row);
 });
@@ -51,7 +53,10 @@ function open(id) {
   if (!el) return null;
   const opened = [];
   for (let d = el.parentElement.closest('details'); d; d = d.parentElement.closest('details')) {
-    if (!d.open) { d.open = true; opened.push(d); }
+    if (!d.open) {
+      d.open = true;
+      opened.push(d);
+    }
   }
   return { row: rowOf(el.closest('li')), opened };
 }
@@ -71,14 +76,16 @@ function jump(id, from) {
 }
 function goBack() {
   const { row, opened } = back.pop();
-  opened.forEach(d => { d.open = false; });
+  opened.forEach((d) => {
+    d.open = false;
+  });
   focusRow(row, { keepBack: true });
   row.scrollIntoView({ block: 'center' });
 }
 // Links are followed with Tab and Enter, as on any page. → used to follow a row's first link, which made it jump
 // on most rows once a tree linked every term.
 
-document.addEventListener('keydown', e => {
+document.addEventListener('keydown', (e) => {
   if (e.altKey || e.ctrlKey || e.metaKey) return;
   // Keys typed into a text field, such as a comment's, move its cursor instead.
   if (e.target.matches('textarea, input')) return;
@@ -95,17 +102,24 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Home') return focusRow(visible[0]);
   if (e.key === 'End') return focusRow(visible[visible.length - 1]);
   if (e.key === 'ArrowRight') {
-    if (isBranch(row) && !detailsOf(row).open) { back.length = 0; detailsOf(row).open = true; return; }
+    if (isBranch(row) && !detailsOf(row).open) {
+      back.length = 0;
+      detailsOf(row).open = true;
+      return;
+    }
     const next = visible[i + 1];
     if (next && parentRow(next) === row) focusRow(next);
     return;
   }
   if (back.length) return goBack();
-  if (isBranch(row) && detailsOf(row).open) { detailsOf(row).open = false; return; }
+  if (isBranch(row) && detailsOf(row).open) {
+    detailsOf(row).open = false;
+    return;
+  }
   focusRow(parentRow(row));
 });
 
-document.addEventListener('click', e => {
+document.addEventListener('click', (e) => {
   const a = e.target.closest('a.jump, a.anchor');
   if (a) {
     e.preventDefault();
@@ -116,9 +130,18 @@ document.addEventListener('click', e => {
     return focusRow(from);
   }
   const b = e.target.closest('button[data-act]');
-  if (b) document.querySelectorAll('details').forEach(d => { d.open = b.dataset.act === 'open'; });
+  if (b)
+    document.querySelectorAll('details').forEach((d) => {
+      d.open = b.dataset.act === 'open';
+    });
 });
 
 const first = location.hash && open(location.hash.slice(1));
-if (first) { focusRow(first.row); first.row.scrollIntoView({ block: 'center' }); flash(first.row); }
-else { current = document.querySelector('.row'); if (current) current.tabIndex = 0; }
+if (first) {
+  focusRow(first.row);
+  first.row.scrollIntoView({ block: 'center' });
+  flash(first.row);
+} else {
+  current = document.querySelector('.row');
+  if (current) current.tabIndex = 0;
+}

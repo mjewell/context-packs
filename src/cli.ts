@@ -7,18 +7,17 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-
+import { main as wizard } from '../review/wizard.ts';
 import { type Args, parse } from './args.ts';
-import { block, header, instructions, region, snapshot, type Region } from './blocks.ts';
+import { block, header, instructions, type Region, region, snapshot } from './blocks.ts';
 import * as evals from './evals.ts';
 import * as imports from './imports.ts';
-import { GEN, REPO, base, synced } from './packs.ts';
+import { base, GEN, REPO, synced } from './packs.ts';
 import { exists, isDir, lexists, pjoin, walk } from './paths.ts';
-import { Stack, Stop, fail } from './stop.ts';
+import { fail, Stack, Stop } from './stop.ts';
 import * as syncReport from './sync_report.ts';
 import * as tables from './tables.ts';
 import * as tree from './tree.ts';
-import { main as wizard } from '../review/wizard.ts';
 
 /** Each import pack: its id, where its pack comes from, and its pin. */
 function show(found: readonly imports.Import[]): void {
@@ -39,8 +38,11 @@ function generate(root: tree.Node, out: string, repo: string): string {
 function generated(out: string): Map<string, Buffer> {
   const folder = path.join(out, GEN);
   if (!isDir(folder)) return new Map();
-  return new Map(walk(folder).filter((file) => fs.statSync(file).isFile())
-    .map((file) => [path.join(GEN, path.relative(folder, file)), fs.readFileSync(file)]));
+  return new Map(
+    walk(folder)
+      .filter((file) => fs.statSync(file).isFile())
+      .map((file) => [path.join(GEN, path.relative(folder, file)), fs.readFileSync(file)]),
+  );
 }
 
 /**
@@ -49,17 +51,22 @@ function generated(out: string): Map<string, Buffer> {
  */
 function check(file: string, found: Region, written: string, out: string, repo: string): void {
   if (!exists(file)) {
-    fail(`context-packs: ${file} doesn't exist, so the repo was never synced. Run \`npx context-packs\` and `
-         + 'commit the result.');
+    fail(
+      `context-packs: ${file} doesn't exist, so the repo was never synced. Run \`npx context-packs\` and ` +
+        'commit the result.',
+    );
   }
   if (written === found.block) return;
   const [fresh, current] = [generated(out), generated(repo)];
   const differs = (a?: Buffer, b?: Buffer) => (a && b ? !a.equals(b) : a !== b);
-  const stale = [...new Set([...fresh.keys(), ...current.keys()])].filter((p) => differs(fresh.get(p), current.get(p)))
+  const stale = [...new Set([...fresh.keys(), ...current.keys()])]
+    .filter((p) => differs(fresh.get(p), current.get(p)))
     .sort();
-  fail(`context-packs: ${file}: the context-packs block is stale`
-       + (stale.length ? ', as are these generated files:\n\n' + stale.map((p) => `  ${p}\n`).join('') : '.\n')
-       + '\nRun `npx context-packs` and commit the result.');
+  fail(
+    `context-packs: ${file}: the context-packs block is stale` +
+      (stale.length ? ', as are these generated files:\n\n' + stale.map((p) => `  ${p}\n`).join('') : '.\n') +
+      '\nRun `npx context-packs` and commit the result.',
+  );
 }
 
 async function sync(args: Args): Promise<void> {
@@ -74,7 +81,12 @@ async function sync(args: Args): Promise<void> {
     return;
   }
   if (args.command === 'docs') {
-    process.stdout.write(tables.units(repo, found.block).map((unit) => unit.map((p) => `${p}\n`).join('')).join('\n'));
+    process.stdout.write(
+      tables
+        .units(repo, found.block)
+        .map((unit) => unit.map((p) => `${p}\n`).join(''))
+        .join('\n'),
+    );
     return;
   }
   const edits = imports.command(args, repo, before);
@@ -107,8 +119,8 @@ async function sync(args: Args): Promise<void> {
   // instruction files keeps them as they are.
   const linked = created && !lexists(path.join(repo, 'CLAUDE.md'));
   if (linked) fs.symlinkSync('AGENTS.md', path.join(repo, 'CLAUDE.md'));
-  const updating = args.command === 'update'
-    ? before.filter((i) => !args.ids.length || args.ids.includes(i.id)).map((i) => i.id) : [];
+  const updating =
+    args.command === 'update' ? before.filter((i) => !args.ids.length || args.ids.includes(i.id)).map((i) => i.id) : [];
   for (const line of syncReport.changes(found, written, created, linked, before, imports.scan(repo), updating)) {
     process.stdout.write(`${line}\n`);
   }

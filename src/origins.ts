@@ -50,10 +50,12 @@ function fetched(url: string, ref: string): string | null {
 /** url's tags or branches, by name. */
 function remote(url: string, kind: 'tags' | 'heads'): Map<string, string> {
   const lines = git('ls-remote', `--${kind}`, '--refs', url).split('\n').filter(Boolean);
-  return new Map(lines.map((line) => {
-    const [sha, ref] = line.split('\t') as [string, string];
-    return [ref.split('/').slice(2).join('/'), sha];
-  }));
+  return new Map(
+    lines.map((line) => {
+      const [sha, ref] = line.split('\t') as [string, string];
+      return [ref.split('/').slice(2).join('/'), sha];
+    }),
+  );
 }
 
 /** The commit at the tip of url's default branch. */
@@ -67,8 +69,10 @@ export function tip(url: string): string {
 export function pin(url: string, ref: string): string {
   if (remote(url, 'tags').has(ref)) return ref;
   if (remote(url, 'heads').has(ref)) {
-    fail(`context-packs: ${ref} is a branch in ${url}, and a branch moves. Pin to a tag or a commit, `
-         + 'or leave out --ref to follow the default branch on update.');
+    fail(
+      `context-packs: ${ref} is a branch in ${url}, and a branch moves. Pin to a tag or a commit, ` +
+        'or leave out --ref to follow the default branch on update.',
+    );
   }
   const folder = fetched(url, ref);
   if (!folder) fail(`context-packs: ${url} has no tag or commit ${ref}.`);

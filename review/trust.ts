@@ -37,8 +37,14 @@ interface Page<T> {
 /** A comment as an agent may see it: hidden, with why, or shown, with its text. */
 export type Shown =
   | { readonly id: string; readonly hidden: string }
-  | { readonly id: string; readonly author: string; readonly at: string; readonly text: string; readonly ours: boolean;
-      readonly minimized?: string | null };
+  | {
+      readonly id: string;
+      readonly author: string;
+      readonly at: string;
+      readonly text: string;
+      readonly ours: boolean;
+      readonly minimized?: string | null;
+    };
 
 export interface Thread {
   readonly id: string;
@@ -49,8 +55,13 @@ export interface Thread {
 }
 
 /** Every item of a list from after on, reading each page in turn. field finds the list in an answer. */
-async function every<T>(operation: string, query: string, variables: Record<string, unknown>,
-                        field: (data: any) => Page<T>, after: string | null = null): Promise<T[]> {
+async function every<T>(
+  operation: string,
+  query: string,
+  variables: Record<string, unknown>,
+  field: (data: any) => Page<T>,
+  after: string | null = null,
+): Promise<T[]> {
   const items: T[] = [];
   for (;;) {
     const page = field(await github.graphql(operation, query, { ...variables, after }));
@@ -100,7 +111,13 @@ async function shown(node: Node, access: Access): Promise<Shown> {
   else if (author === null || !(await access.writes(author.login))) why = 'author lacks write access';
   if (why) return { id: node.id, hidden: why };
   // ours lets the commentary agent tell its own earlier replies from people's, so it doesn't repeat itself.
-  const seen = { id: node.id, author: author!.login, at: node.createdAt, text: clean(node.bodyText), ours: github.own(node) };
+  const seen = {
+    id: node.id,
+    author: author!.login,
+    at: node.createdAt,
+    text: clean(node.bodyText),
+    ours: github.own(node),
+  };
   // A minimized comment still comes through, since only pack-review and people who can write get this far. GitHub's
   // reason, such as outdated, tells the commentary agent whether it still applies.
   return node.isMinimized ? { ...seen, minimized: node.minimizedReason } : seen;
@@ -111,19 +128,37 @@ export async function threads(number: number): Promise<Thread[]> {
   const [owner, name] = github.repository();
   const access = new Access(owner, name);
   const found: Thread[] = [];
-  const listed = await every<{ id: string; path: string; line: number | null; isResolved: boolean; comments: Page<Node> }>(
-    'Threads', THREADS, { owner, name, number }, (data) => data.repository.pullRequest.reviewThreads);
+  const listed = await every<{
+    id: string;
+    path: string;
+    line: number | null;
+    isResolved: boolean;
+    comments: Page<Node>;
+  }>('Threads', THREADS, { owner, name, number }, (data) => data.repository.pullRequest.reviewThreads);
   for (const thread of listed) {
     const first = thread.comments;
     const comments = [...first.nodes];
     if (first.pageInfo.hasNextPage) {
-      comments.push(...await every<Node>('ThreadComments', THREAD_COMMENTS, { id: thread.id },
-                                         (data) => data.node.comments, first.pageInfo.endCursor));
+      comments.push(
+        ...(await every<Node>(
+          'ThreadComments',
+          THREAD_COMMENTS,
+          { id: thread.id },
+          (data) => data.node.comments,
+          first.pageInfo.endCursor,
+        )),
+      );
     }
     if (!comments.length || !github.own(comments[0]!)) continue;
     const seen: Shown[] = [];
     for (const node of comments) seen.push(await shown(node, access));
-    found.push({ id: thread.id, path: clean(thread.path), line: thread.line, resolved: thread.isResolved, comments: seen });
+    found.push({
+      id: thread.id,
+      path: clean(thread.path),
+      line: thread.line,
+      resolved: thread.isResolved,
+      comments: seen,
+    });
   }
   return found;
 }

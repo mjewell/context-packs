@@ -25,13 +25,25 @@ interface Part {
   readonly is_error?: boolean;
 }
 
-const args = parse({
-  prog: 'transcript.ts', help: '',
-  options: [{ flag: '--file', dest: 'file', metavar: 'FILE', required: true, help: "claude-code-action's "
-    + 'claude-execution-output.json' }],
-}, process.argv.slice(2));
-const messages: { type?: string; parent_tool_use_id?: string; message: { content: (Part | string)[] } }[] = (
-  JSON.parse(fs.readFileSync(String(args.file), 'utf8')));
+const args = parse(
+  {
+    prog: 'transcript.ts',
+    help: '',
+    options: [
+      {
+        flag: '--file',
+        dest: 'file',
+        metavar: 'FILE',
+        required: true,
+        help: "claude-code-action's " + 'claude-execution-output.json',
+      },
+    ],
+  },
+  process.argv.slice(2),
+);
+const messages: { type?: string; parent_tool_use_id?: string; message: { content: (Part | string)[] } }[] = JSON.parse(
+  fs.readFileSync(String(args.file), 'utf8'),
+);
 for (const message of messages) {
   if (message.type !== 'assistant' && message.type !== 'user') continue;
   const indent = message.parent_tool_use_id ? '  [subagent] ' : '';

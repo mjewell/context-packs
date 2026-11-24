@@ -11,7 +11,7 @@
 import fs from 'node:fs';
 
 import { parse } from '../src/argparse.ts';
-import { Stop, fail } from '../src/stop.ts';
+import { fail, Stop } from '../src/stop.ts';
 import * as findingComment from './finding_comment.ts';
 import * as github from './github.ts';
 import * as summary from './summary.ts';
@@ -61,12 +61,16 @@ function reply(head: string, resolved: boolean, commentary: string | undefined):
 /** Why the PR no longer matches what was reviewed, or null when it does. */
 function stale(report: summary.Report, pr: github.PullRequest): string | null {
   if (pr.headRefOid !== report.head) {
-    return `the PR moved on to ${pr.headRefOid} since this review of ${report.head}, so it posts nothing. `
-      + 'The run for the newer commit will.';
+    return (
+      `the PR moved on to ${pr.headRefOid} since this review of ${report.head}, so it posts nothing. ` +
+      'The run for the newer commit will.'
+    );
   }
   if (pr.baseRefName !== report.base_ref) {
-    return `the PR moved from ${report.base_ref} to ${pr.baseRefName} since this review, so it posts `
-      + 'nothing. The run for the new base will.';
+    return (
+      `the PR moved from ${report.base_ref} to ${pr.baseRefName} since this review, so it posts ` +
+      'nothing. The run for the new base will.'
+    );
   }
   return null;
 }
@@ -75,13 +79,20 @@ function stale(report: summary.Report, pr: github.PullRequest): string | null {
  * Every write the review makes: the new threads, the replies by thread id, and the summary's body with the id of the
  * summary it replaces, or null when it adds one. It stops on anything that would fail partway through posting.
  */
-function planned(repo: string, number: number, report: summary.Report, paired: Paired, pr: github.PullRequest,
-                 threads: ReadonlyMap<string, trust.Thread>): [NewThread[], Map<string, string>, [string, string | null]] {
+function planned(
+  repo: string,
+  number: number,
+  report: summary.Report,
+  paired: Paired,
+  pr: github.PullRequest,
+  threads: ReadonlyMap<string, trust.Thread>,
+): [NewThread[], Map<string, string>, [string, string | null]] {
   const { head, findings } = report;
   const pairs = new Map(paired.pairs.map((pair) => [pair.finding, pair.thread]));
   const commentary = new Map(paired.commentary.map((item) => [item.finding, item.text]));
   for (const thread of pairs.values()) {
-    if (!threads.has(thread)) fail(`pack-review: the pairs name ${thread}, which isn't one of pack-review's threads on this PR.`);
+    if (!threads.has(thread))
+      fail(`pack-review: the pairs name ${thread}, which isn't one of pack-review's threads on this PR.`);
   }
   const added: NewThread[] = [];
   const replies = new Map<string, string>();
@@ -90,7 +101,12 @@ function planned(repo: string, number: number, report: summary.Report, paired: P
     const thread = pairs.get(n);
     if (thread === undefined) {
       if (anchor !== null) {
-        added.push({ path: anchor.path, line: anchor.line, side: 'RIGHT', body: findingComment.body(finding, head, anchor) });
+        added.push({
+          path: anchor.path,
+          line: anchor.line,
+          side: 'RIGHT',
+          body: findingComment.body(finding, head, anchor),
+        });
       }
       return;
     }
@@ -101,10 +117,15 @@ function planned(repo: string, number: number, report: summary.Report, paired: P
   });
   const body = summary.body(repo, number, {
     ...report,
-    findings: findings.map((finding, n) => ({ ...finding, thread: pairs.get(n) ?? null, commentary: commentary.get(n) ?? null })),
+    findings: findings.map((finding, n) => ({
+      ...finding,
+      thread: pairs.get(n) ?? null,
+      commentary: commentary.get(n) ?? null,
+    })),
   });
   const length = [...body].length;
-  if (length > summary.LIMIT) fail(`pack-review: the summary is ${length} characters, and GitHub allows ${summary.LIMIT} in a comment.`);
+  if (length > summary.LIMIT)
+    fail(`pack-review: the summary is ${length} characters, and GitHub allows ${summary.LIMIT} in a comment.`);
   const summaries = pr.comments.filter(github.own).map((comment) => comment.id);
   if (summaries.length > 1) {
     fail(`pack-review: the PR has more than one pack-review summary (${summaries.join(', ')}). Delete all but one.`);
@@ -113,14 +134,30 @@ function planned(repo: string, number: number, report: summary.Report, paired: P
 }
 
 async function main(): Promise<void> {
-  const args = parse({
-    prog: 'post.ts', help: '',
-    options: [
-      { flag: '--pr', dest: 'pr', metavar: 'PR', required: true, help: 'the PR number' },
-      { flag: '--report', dest: 'report', metavar: 'REPORT', required: true, help: "the find job's report, from report.ts" },
-      { flag: '--paired', dest: 'paired', metavar: 'PAIRED', required: true, help: "the pairing job's pairs and commentary" },
-    ],
-  }, process.argv.slice(2));
+  const args = parse(
+    {
+      prog: 'post.ts',
+      help: '',
+      options: [
+        { flag: '--pr', dest: 'pr', metavar: 'PR', required: true, help: 'the PR number' },
+        {
+          flag: '--report',
+          dest: 'report',
+          metavar: 'REPORT',
+          required: true,
+          help: "the find job's report, from report.ts",
+        },
+        {
+          flag: '--paired',
+          dest: 'paired',
+          metavar: 'PAIRED',
+          required: true,
+          help: "the pairing job's pairs and commentary",
+        },
+      ],
+    },
+    process.argv.slice(2),
+  );
   const number = Number(args.pr);
   const report: summary.Report = JSON.parse(fs.readFileSync(String(args.report), 'utf8'));
   const paired: Paired = JSON.parse(fs.readFileSync(String(args.paired), 'utf8'));
@@ -131,10 +168,23 @@ async function main(): Promise<void> {
     return;
   }
   const threads = new Map((await trust.threads(number)).map((thread) => [thread.id, thread]));
-  const [added, replies, [body, existing]] = planned(process.env.GITHUB_REPOSITORY!, number, report, paired, pr, threads);
+  const [added, replies, [body, existing]] = planned(
+    process.env.GITHUB_REPOSITORY!,
+    number,
+    report,
+    paired,
+    pr,
+    threads,
+  );
   if (added.length) {
-    await github.graphql('AddReview', ADD_REVIEW, { input: {
-      pullRequestId: pr.id, commitOID: report.head, event: 'COMMENT', threads: added } });
+    await github.graphql('AddReview', ADD_REVIEW, {
+      input: {
+        pullRequestId: pr.id,
+        commitOID: report.head,
+        event: 'COMMENT',
+        threads: added,
+      },
+    });
   }
   for (const [thread, text] of replies) {
     // A reply joins a review only while that review is pending, so each one is posted on its own.
@@ -147,8 +197,10 @@ async function main(): Promise<void> {
   }
   if (existing) await github.graphql('UpdateComment', UPDATE_COMMENT, { input: { id: existing, body } });
   else await github.graphql('AddComment', ADD_COMMENT, { input: { subjectId: pr.id, body } });
-  process.stdout.write(`pack-review: opened ${added.length} threads, replied in ${replies.size}, and posted the summary of `
-                       + `${report.findings.length} findings.\n`);
+  process.stdout.write(
+    `pack-review: opened ${added.length} threads, replied in ${replies.size}, and posted the summary of ` +
+      `${report.findings.length} findings.\n`,
+  );
 }
 
 try {
