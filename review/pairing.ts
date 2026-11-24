@@ -94,7 +94,7 @@ interface Pair {
   readonly thread: string;
 }
 
-function load(file: string): any {
+function load<T>(file: string): T {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 
@@ -149,12 +149,10 @@ function threadLines(comments: readonly Shown[]): string {
 }
 
 function commentPrompt(args: Values): void {
-  const report = load(String(args.report));
+  const report = load<{ head: string; findings: Finding[] }>(String(args.report));
   const findings: Finding[] = report.findings;
-  const threads = new Map<string, Thread>(
-    (load(String(args.threads)) as Thread[]).map((thread) => [thread.id, thread]),
-  );
-  const pairs: Pair[] = load(String(args.paired)).pairs;
+  const threads = new Map<string, Thread>(load<Thread[]>(String(args.threads)).map((thread) => [thread.id, thread]));
+  const pairs = load<{ pairs: Pair[] }>(String(args.paired)).pairs;
   output('needed', pairs.length ? 'true' : 'false');
   if (!pairs.length) return;
   output(
@@ -176,7 +174,7 @@ function commentPrompt(args: Values): void {
 /** What an agent's structured output holds, or null when the file isn't JSON. */
 function answered(file: string): unknown {
   try {
-    return load(file);
+    return load<unknown>(file);
   } catch {
     return null;
   }
@@ -189,7 +187,7 @@ function listIn(answer: unknown, key: string): unknown[] | null {
 }
 
 function commentCheck(args: Values): void {
-  const pairing = load(String(args.paired));
+  const pairing = load<{ pairs: Pair[] }>(String(args.paired));
   const paired = new Set((pairing.pairs as Pair[]).map((pair) => pair.finding));
   const commentary: { finding: number; text: string }[] = [];
   if (args.commentary !== null) {
@@ -210,8 +208,8 @@ function commentCheck(args: Values): void {
 }
 
 function pairPrompt(args: Values): void {
-  const findings: Finding[] = load(String(args.report)).findings;
-  const threads = openedWith(load(String(args.threads)));
+  const findings = load<{ findings: Finding[] }>(String(args.report)).findings;
+  const threads = openedWith(load<Thread[]>(String(args.threads)));
   const needed = !!(findings.length && threads.size);
   output('needed', needed ? 'true' : 'false');
   if (!needed) return;
@@ -228,8 +226,8 @@ function pairPrompt(args: Values): void {
 }
 
 function pairCheck(args: Values): void {
-  const findings: Finding[] = load(String(args.report)).findings;
-  const threads = new Set((load(String(args.threads)) as Thread[]).map((thread) => thread.id));
+  const findings = load<{ findings: Finding[] }>(String(args.report)).findings;
+  const threads = new Set(load<Thread[]>(String(args.threads)).map((thread) => thread.id));
   let pairs: Pair[] = [];
   if (args.pairs !== null) {
     const listed = listIn(answered(String(args.pairs)), 'pairs');

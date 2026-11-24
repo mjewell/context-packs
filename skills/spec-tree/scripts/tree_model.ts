@@ -46,6 +46,7 @@ function node(text: string, depth: number, file: string): Node {
 /** text's lines, as Python's str.splitlines gives them. */
 function splitlines(text: string): string[] {
   if (!text) return [];
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: the line breaks str.splitlines splits at include these.
   const lines = text.split(/\r\n|[\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029]/);
   if (lines.at(-1) === '') lines.pop();
   return lines;

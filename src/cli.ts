@@ -64,7 +64,7 @@ function check(file: string, found: Region, written: string, out: string, repo: 
     .sort();
   fail(
     `context-packs: ${file}: the context-packs block is stale` +
-      (stale.length ? ', as are these generated files:\n\n' + stale.map((p) => `  ${p}\n`).join('') : '.\n') +
+      (stale.length ? `, as are these generated files:\n\n${stale.map((p) => `  ${p}\n`).join('')}` : '.\n') +
       '\nRun `npx context-packs` and commit the result.',
   );
 }

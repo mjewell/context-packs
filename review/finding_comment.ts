@@ -44,7 +44,7 @@ export function quoted(text: string): string {
 
 /** The agent's items, escaped, as a list under a title. */
 function listed(title: string, items: readonly string[]): string {
-  return `${title}:\n\n` + items.map((item) => `- ${escaped(item)}`).join('\n');
+  return `${title}:\n\n${items.map((item) => `- ${escaped(item)}`).join('\n')}`;
 }
 
 /**
@@ -65,14 +65,14 @@ export function body(finding: Finding, head: string, anchor: { readonly path: st
     (spot) => !spot.follows && !(spot.path === anchor.path && spot.line === anchor.line),
   );
   if (others.length)
-    parts.push('Also found at ' + others.map((spot) => `\`${escaped(spot.path)}:${spot.line}\``).join(', ') + '.');
+    parts.push(`Also found at ${others.map((spot) => `\`${escaped(spot.path)}:${spot.line}\``).join(', ')}.`);
   if (finding.deliberate.length) parts.push(listed('Signs it may be deliberate', finding.deliberate as string[]));
   if (finding.exemplars.length) {
     parts.push(
       listed(
         'How the code does it now',
         (finding.exemplars as Exemplar[]).map(
-          (exemplar) => `${exemplar.way}: ` + exemplar.examples.map((example) => `\`${example}\``).join(', '),
+          (exemplar) => `${exemplar.way}: ${exemplar.examples.map((example) => `\`${example}\``).join(', ')}`,
         ),
       ),
     );

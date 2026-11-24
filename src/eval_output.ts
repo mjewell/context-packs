@@ -19,12 +19,12 @@ function shown(file: string, copy: string, repo: string): string {
 }
 
 function plural(count: number, noun: string): string {
-  return `${count} ${noun}` + (count !== 1 ? 's' : '');
+  return `${count} ${noun}${count !== 1 ? 's' : ''}`;
 }
 
 /** On a terminal, how many runs have finished, on a line the next one overwrites; null clears it. */
 export function status(done: number | null, total: number | null): void {
-  if (process.stdout.isTTY) process.stdout.write('\r\x1b[K' + (done !== null ? `[${done}/${total}]` : ''));
+  if (process.stdout.isTTY) process.stdout.write(`\r\x1b[K${done !== null ? `[${done}/${total}]` : ''}`);
 }
 
 /** What the packs' sessions run in, as the first line says it. */

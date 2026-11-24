@@ -38,7 +38,7 @@ interface State {
 }
 
 function counted(count: number, noun: string): string {
-  return `${count} ${noun}` + (count !== 1 ? 's' : '');
+  return `${count} ${noun}${count !== 1 ? 's' : ''}`;
 }
 
 function print(text: string, end = '\n'): void {

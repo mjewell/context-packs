@@ -1,6 +1,7 @@
 /** String operations that keep the Python version's results, where JavaScript's differ. */
 
 // Every line boundary str.splitlines splits at, \r\n counted as one.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: the line breaks str.splitlines splits at include these.
 const BREAKS = /\r\n|[\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029]/;
 
 /** text's lines, as str.splitlines gives them: without their breaks, and no empty line after a final break. */

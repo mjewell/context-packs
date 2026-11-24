@@ -67,15 +67,18 @@ function usage(message: string): never {
   process.exit(2);
 }
 
+/** The arguments after the command, or a usage error. */
+function read(rest: readonly string[]) {
+  try {
+    return parseArgs({ args: [...rest], allowPositionals: true, options: { out: { type: 'string', short: 'o' } } });
+  } catch (error) {
+    return usage((error as Error).message);
+  }
+}
+
 function main(argv: readonly string[]): void {
   const [command, ...rest] = argv;
-  let parsed;
-  try {
-    parsed = parseArgs({ args: [...rest], allowPositionals: true, options: { out: { type: 'string', short: 'o' } } });
-  } catch (error) {
-    usage((error as Error).message);
-  }
-  const { positionals, values } = parsed;
+  const { positionals, values } = read(rest);
   const expected: Record<string, number> = { check: 0, stats: 0, 'links-to': 1, render: 1 };
   if (command === undefined) usage('the following arguments are required: command');
   if (!(command in expected)) usage(`argument command: invalid choice: '${command}'`);

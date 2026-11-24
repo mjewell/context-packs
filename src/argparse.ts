@@ -226,7 +226,10 @@ function readArgs(
     if (!spec.nargs) values[spec.dest] = positionals[next++];
     else if (spec.nargs === '?')
       values[spec.dest] = positionals[next] !== undefined ? positionals[next++] : (spec.default ?? null);
-    else values[spec.dest] = positionals.slice(next, (next = positionals.length));
+    else {
+      values[spec.dest] = positionals.slice(next);
+      next = positionals.length;
+    }
   }
   unknown.push(...positionals.slice(next));
   if (unknown.length) throw new UsageError(topUsage, topProg, `unrecognized arguments: ${unknown.join(' ')}`);

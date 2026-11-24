@@ -55,16 +55,16 @@ export interface Thread {
 }
 
 /** Every item of a list from after on, reading each page in turn. field finds the list in an answer. */
-async function every<T>(
+async function every<T, D>(
   operation: string,
   query: string,
   variables: Record<string, unknown>,
-  field: (data: any) => Page<T>,
+  field: (data: D) => Page<T>,
   after: string | null = null,
 ): Promise<T[]> {
   const items: T[] = [];
   for (;;) {
-    const page = field(await github.graphql(operation, query, { ...variables, after }));
+    const page = field(await github.graphql<D>(operation, query, { ...variables, after }));
     items.push(...page.nodes);
     if (!page.pageInfo.hasNextPage) return items;
     after = page.pageInfo.endCursor;
@@ -90,8 +90,10 @@ class Access {
   async writes(login: string): Promise<boolean> {
     if (!this.#known.has(login)) {
       try {
-        const answer = await github.rest(`/repos/${this.owner}/${this.name}/collaborators/${quoted(login)}/permission`);
-        this.#known.set(login, WRITERS.has(answer.role_name));
+        const answer = await github.rest<{ role_name?: string }>(
+          `/repos/${this.owner}/${this.name}/collaborators/${quoted(login)}/permission`,
+        );
+        this.#known.set(login, WRITERS.has(answer.role_name ?? ''));
       } catch (error) {
         // GitHub answers 404 for someone who isn't a collaborator. Any other refusal stops the run.
         if (!(error instanceof github.GitHubError) || error.code !== 404) throw error;
@@ -128,19 +130,19 @@ export async function threads(number: number): Promise<Thread[]> {
   const [owner, name] = github.repository();
   const access = new Access(owner, name);
   const found: Thread[] = [];
-  const listed = await every<{
-    id: string;
-    path: string;
-    line: number | null;
-    isResolved: boolean;
-    comments: Page<Node>;
-  }>('Threads', THREADS, { owner, name, number }, (data) => data.repository.pullRequest.reviewThreads);
+  type Listed = { id: string; path: string; line: number | null; isResolved: boolean; comments: Page<Node> };
+  const listed = await every<Listed, { repository: { pullRequest: { reviewThreads: Page<Listed> } } }>(
+    'Threads',
+    THREADS,
+    { owner, name, number },
+    (data) => data.repository.pullRequest.reviewThreads,
+  );
   for (const thread of listed) {
     const first = thread.comments;
     const comments = [...first.nodes];
     if (first.pageInfo.hasNextPage) {
       comments.push(
-        ...(await every<Node>(
+        ...(await every<Node, { node: { comments: Page<Node> } }>(
           'ThreadComments',
           THREAD_COMMENTS,
           { id: thread.id },

@@ -101,7 +101,7 @@ function broken(value: unknown, schema: Schema, where: string | null): string[] 
   if (kind === 'array') {
     const array = value as unknown[];
     if (array.length < (schema.minItems ?? 0)) found.push(`${named} needs at least ${schema.minItems}`);
-    array.forEach((item, n) => found.push(...broken(item, schema.items ?? {}, `${named}[${n}]`)));
+    for (const [n, item] of array.entries()) found.push(...broken(item, schema.items ?? {}, `${named}[${n}]`));
   }
   return found;
 }

@@ -47,7 +47,7 @@ export function repository(): [string, string] {
 }
 
 /** GitHub's answer: to a POST of body, or to a GET when body is undefined. */
-async function send(url: string, body: unknown, what: string): Promise<any> {
+async function send(url: string, body: unknown, what: string): Promise<unknown> {
   const response = await fetch(url, {
     method: body === undefined ? 'GET' : 'POST',
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -61,7 +61,10 @@ async function send(url: string, body: unknown, what: string): Promise<any> {
   let answer = await response.text();
   try {
     const found = JSON.parse(answer);
-    answer = [found.message ?? '', ...(found.errors ?? []).map((e: any) => e.message ?? JSON.stringify(e))].join('; ');
+    answer = [
+      found.message ?? '',
+      ...(found.errors ?? []).map((e: { message?: string }) => e.message ?? JSON.stringify(e)),
+    ].join('; ');
   } catch {
     // Not JSON: GitHub's text says why.
   }
@@ -69,20 +72,28 @@ async function send(url: string, body: unknown, what: string): Promise<any> {
 }
 
 /** The data GitHub answers the operation with. */
-export async function graphql(operation: string, query: string, variables: Record<string, unknown>): Promise<any> {
+/** The data GitHub answers the operation with, in the shape T its query asks for. */
+export async function graphql<T = unknown>(
+  operation: string,
+  query: string,
+  variables: Record<string, unknown>,
+): Promise<T> {
   const url = process.env.GITHUB_GRAPHQL_URL || 'https://api.github.com/graphql';
-  const answer = await send(url, { operationName: operation, query, variables }, operation);
+  const answer = (await send(url, { operationName: operation, query, variables }, operation)) as {
+    data: T;
+    errors?: { message: string }[];
+  };
   if (answer.errors?.length) {
     throw new GitHubError(
-      `GitHub refused ${operation}: ` + answer.errors.map((e: { message: string }) => e.message).join('; '),
+      `GitHub refused ${operation}: ${answer.errors.map((e: { message: string }) => e.message).join('; ')}`,
     );
   }
   return answer.data;
 }
 
 /** What GitHub's REST API answers a GET of path with. */
-export async function rest(path: string): Promise<any> {
-  return send((process.env.GITHUB_API_URL || 'https://api.github.com') + path, undefined, path);
+export async function rest<T = unknown>(path: string): Promise<T> {
+  return (await send((process.env.GITHUB_API_URL || 'https://api.github.com') + path, undefined, path)) as T;
 }
 
 /** A list's items, refusing one with another page, since a review that silently missed some would be wrong. */
@@ -96,7 +107,9 @@ function nodes<T>(connection: Connection<T>, listing: string): T[] {
 /** The PR's id, head, base branch and comments, checked to fit on one page. */
 export async function pullRequest(number: number): Promise<PullRequest> {
   const [owner, name] = repository();
-  const data = await graphql('PullRequest', PULL_REQUEST, { owner, name, number });
+  const data = await graphql<{
+    repository: { pullRequest: Omit<PullRequest, 'comments'> & { comments: Connection<Comment> } };
+  }>('PullRequest', PULL_REQUEST, { owner, name, number });
   const pr = data.repository.pullRequest;
   return { ...pr, comments: nodes(pr.comments, 'comments') };
 }

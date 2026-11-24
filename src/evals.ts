@@ -124,7 +124,7 @@ function pointed(imported: imports.Import, repo: string): string {
   const front = tree.FRONT.exec(imported.text)!;
   const fields = front[1]!.split('\n').filter((line) => !line.startsWith('from: '));
   const origin = normpath(pjoin(repo, imported.origin));
-  return '---\n' + [`from: ${origin}`, ...fields].join('\n') + '\n---\n' + imported.text.slice(front[0].length);
+  return `---\n${[`from: ${origin}`, ...fields].join('\n')}\n---\n${imported.text.slice(front[0].length)}`;
 }
 
 /** Make the copy a git repo with no history, so it syncs and its sessions run as they would in a repo. */
@@ -389,13 +389,13 @@ export async function run(root: tree.Node, repoPath: string, args: Args): Promis
     errored = outcomes.filter((o) => o === 'errored').length;
     if (args.json) {
       process.stdout.write(
-        output.document(
+        `${output.document(
           found.map(
             (item, index) => [item, results[index]!, verdicts.get(index)!, copies.get(item.pack)!, repo] as const,
           ),
           args.model,
           args.runs,
-        ) + '\n',
+        )}\n`,
       );
     } else {
       output.status(null, null);

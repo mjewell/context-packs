@@ -50,7 +50,7 @@ const PARTS = new RegExp(`(${LINK_SOURCE.replace(/\((?!\?)/g, '(?:')}|\`[^\`]*\`
 export class Stop extends Error {}
 
 /** text with &, <, >, " and ' escaped, as Python's html.escape escapes them. */
-function escape(text: string): string {
+function escapeHtml(text: string): string {
   return text
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -63,10 +63,10 @@ const NAMED: Readonly<Record<string, string>> = { amp: '&', lt: '<', gt: '>', qu
 
 /**
  * text with its character references decoded, as a browser decodes an attribute: numeric ones, and the five names
- * escape() writes. Any other named reference stops the render, since it could spell out a scheme, such as
+ * escapeHtml() writes. Any other named reference stops the render, since it could spell out a scheme, such as
  * javascript&colon;, that the link check has to see.
  */
-function unescape(text: string, what: string): string {
+function unescapeHtml(text: string, what: string): string {
   return text.replace(/&(#[0-9]+|#[xX][0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]*);?/g, (match, ref: string) => {
     if (ref.startsWith('#')) {
       const code = ref[1] === 'x' || ref[1] === 'X' ? parseInt(ref.slice(2), 16) : parseInt(ref.slice(1), 10);
@@ -80,6 +80,7 @@ function unescape(text: string, what: string): string {
 
 /** Python's repr of a string, for an error that shows a URL as it is. */
 function repr(text: string): string {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: repr writes each control character as an escape.
   const escaped = text.replace(/\\/g, '\\\\').replace(/[\x00-\x1f\x7f]/g, (c) => {
     const special: Record<string, string> = { '\n': '\\n', '\r': '\\r', '\t': '\\t' };
     return special[c] ?? `\\x${c.charCodeAt(0).toString(16).padStart(2, '0')}`;
@@ -96,9 +97,9 @@ function inline(text: string, ids: ReadonlySet<string>): string {
       const m = LINK_WHOLE.exec(part);
       if (m) return link(m[1]!, codeSpans(m[2] ?? m[1]!), ids);
       if (part.startsWith('`') && part.endsWith('`') && part.length > 1)
-        return `<code>${escape(part.slice(1, -1))}</code>`;
+        return `<code>${escapeHtml(part.slice(1, -1))}</code>`;
       // Quotes too, since a link's URL lands in an href.
-      return escape(part)
+      return escapeHtml(part)
         .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
         .replace(
           /\[([^\]]+)\]\(([^)\s]+)\)/g,
@@ -113,14 +114,16 @@ function codeSpans(text: string): string {
   return text
     .split(/(`[^`]*`)/)
     .map((p) =>
-      p.startsWith('`') && p.endsWith('`') && p.length > 1 ? `<code>${escape(p.slice(1, -1))}</code>` : escape(p),
+      p.startsWith('`') && p.endsWith('`') && p.length > 1
+        ? `<code>${escapeHtml(p.slice(1, -1))}</code>`
+        : escapeHtml(p),
     )
     .join('');
 }
 
 /** A Markdown link's URL, already escaped, once checkLink allows it. */
 function href(url: string): string {
-  checkLink(unescape(url, 'a link'), 'a link');
+  checkLink(unescapeHtml(url, 'a link'), 'a link');
   return url;
 }
 
@@ -156,9 +159,9 @@ function renderText(n: Node, ids: ReadonlySet<string>): string {
 function renderDiagrams(n: Node): string {
   return n.diagrams
     .map((d) => {
-      if (d.lang === 'mermaid') return `<pre class="mermaid" data-pending="1">${escape(d.source)}</pre>`;
+      if (d.lang === 'mermaid') return `<pre class="mermaid" data-pending="1">${escapeHtml(d.source)}</pre>`;
       if (d.lang === 'd2') return `<div class="d2">${d2Svg(d.source, n)}</div>`;
-      return `<pre class="block"><code>${escape(d.source)}</code></pre>`;
+      return `<pre class="block"><code>${escapeHtml(d.source)}</code></pre>`;
     })
     .join('');
 }
@@ -174,14 +177,14 @@ function d2Svg(source: string, n: Node): string {
   // xlink:href, is held to the rule a Markdown link follows.
   const what = `a link in the D2 diagram under "${under}"`;
   for (const [, , value] of result.stdout.matchAll(/\bhref\s*=\s*(["'])(.*?)\1/g))
-    checkLink(unescape(value!, what), what);
+    checkLink(unescapeHtml(value!, what), what);
   return result.stdout.replace(/^<\?xml[^>]*\?>/, '');
 }
 
 /** The node's text as the page shows it, as plain text: its label, then its rendered text without the markup. */
 function shownText(n: Node, ids: ReadonlySet<string>): string {
   const [label, rest] = labelOf(strip(n.text));
-  const shown = unescape(inline(rest, ids).replace(/<[^>]+>/g, ''), 'a node');
+  const shown = unescapeHtml(inline(rest, ids).replace(/<[^>]+>/g, ''), 'a node');
   return label ? `${label}: ${shown}` : shown;
 }
 
@@ -190,8 +193,8 @@ function renderNode(n: Node, ids: ReadonlySet<string>): string {
   // the comment editor and sidebar show a person.
   const idAttr =
     (n.id ? ` id="${n.id}"` : '') +
-    ` data-src="${escape(strip(n.text))}"` +
-    ` data-text="${escape(shownText(n, ids))}"`;
+    ` data-src="${escapeHtml(strip(n.text))}"` +
+    ` data-text="${escapeHtml(shownText(n, ids))}"`;
   const text = renderText(n, ids);
   if (!n.children.length && !n.diagrams.length) return `<li class="leaf row" tabindex="-1"${idAttr}>${text}</li>`;
   // Every node below, not just the children: the size rules keep a node's children to about 7, so that count would
@@ -210,11 +213,11 @@ function renderNode(n: Node, ids: ReadonlySet<string>): string {
 export function page(root: Root, file: string): string {
   const ids = collectIds(root, new Set());
   const values: Record<string, string> = {
-    title: escape(root.title),
+    title: escapeHtml(root.title),
     intro: inline(root.intro.join(' '), ids),
     root_diagrams: renderDiagrams(root),
     tree: root.children.map((c) => renderNode(c, ids)).join(''),
-    file: escape(file),
+    file: escapeHtml(file),
     script: SCRIPT.replace('__MERMAID__', JSON.stringify(MERMAID)),
     comments_css: COMMENTS_CSS,
     comments_script: COMMENTS_SCRIPT,

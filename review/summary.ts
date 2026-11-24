@@ -52,7 +52,7 @@ export function body(repo: string, number: number, report: Report): string {
     `pack-review checked \`${report.head.slice(0, 7)}\` against this repo's context packs and found ` +
     `${counted(findings) || 'nothing'}.`;
   if (findings.length) {
-    text += '\n\n' + findings.map((finding, n) => listed(finding, report.anchors[n] ?? null)).join('\n');
+    text += `\n\n${findings.map((finding, n) => listed(finding, report.anchors[n] ?? null)).join('\n')}`;
     text += `\n\nTo go through them, run \`/pack-review ${repo}#${number}\`.`;
   }
   // Backticks and < only occur inside JSON strings, where ` and < mean the same. So nothing can close the
@@ -61,6 +61,6 @@ export function body(repo: string, number: number, report: Report): string {
     .replaceAll('`', '\\u0060')
     .replaceAll('<', '\\u003c');
   return github.signed(
-    `${text}\n\n<details><summary>Findings for pack-review</summary>\n\n\`\`\`json\n${data}\n` + '```\n\n</details>',
+    `${text}\n\n<details><summary>Findings for pack-review</summary>\n\n\`\`\`json\n${data}\n\`\`\`\n\n</details>`,
   );
 }

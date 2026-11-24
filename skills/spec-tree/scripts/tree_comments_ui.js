@@ -101,7 +101,7 @@ function note(c, { withPath = false } = {}) {
 
 function render() {
   const placed = placeComments(load(), paths);
-  boxes.forEach((box, i) => box.replaceChildren(...placed.byRow[i].map((c) => note(c))));
+  for (const [i, box] of boxes.entries()) box.replaceChildren(...placed.byRow[i].map((c) => note(c)));
   addButtons.forEach((button, i) => {
     button.textContent = placed.byRow[i].length ? 'Edit comment' : '+ Comment';
   });

@@ -6,13 +6,13 @@ async function draw(scope) {
     mermaid = mermaid || (await import(__MERMAID__)).default;
     const dark = matchMedia('(prefers-color-scheme: dark)').matches;
     mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'neutral' });
-    pending.forEach((p) => p.removeAttribute('data-pending'));
+    for (const p of pending) p.removeAttribute('data-pending');
     await mermaid.run({ nodes: pending });
   } catch (e) {
     console.error('mermaid', e);
   }
 }
-document.querySelectorAll('details').forEach((d) => d.addEventListener('toggle', () => d.open && draw(d)));
+for (const d of document.querySelectorAll('details')) d.addEventListener('toggle', () => d.open && draw(d));
 draw(document.querySelector('main'));
 
 // Rows are each branch's <summary> and each leaf <li>. One row at a time has tabindex 0 (a roving tabindex).
@@ -69,7 +69,7 @@ function jump(id, from) {
   const target = open(id);
   if (!target) return;
   back.push({ row: from, opened: target.opened });
-  history.replaceState(null, '', '#' + id);
+  history.replaceState(null, '', `#${id}`);
   focusRow(target.row, { keepBack: true });
   target.row.scrollIntoView({ block: 'center' });
   flash(target.row);
@@ -126,7 +126,7 @@ document.addEventListener('click', (e) => {
     const id = a.getAttribute('href').slice(1);
     const from = a.closest('.row') || current;
     if (a.classList.contains('jump')) return jump(id, from);
-    history.replaceState(null, '', '#' + id);
+    history.replaceState(null, '', `#${id}`);
     return focusRow(from);
   }
   const b = e.target.closest('button[data-act]');
