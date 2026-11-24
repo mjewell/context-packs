@@ -13,8 +13,7 @@ import { instructions, region } from '../src/blocks.ts';
 import { runAsScript } from '../src/main.ts';
 import { exists } from '../src/paths.ts';
 import { dumps } from '../src/pyjson.ts';
-import { format, quote, repr } from '../src/pystr.ts';
-import { ROOT } from '../src/root.ts';
+import { quote, repr } from '../src/pystr.ts';
 import { Stop } from '../src/stop.ts';
 import { units as tableUnits } from '../src/tables.ts';
 import { Change, commit, git, Refused } from './change.ts';
@@ -22,12 +21,12 @@ import * as ciSummary from './ci_summary.ts';
 import { type Cited, evidenceErrors } from './evidence.ts';
 import { GitHubError } from './github.ts';
 import { aKind, kindText } from './kinds.ts';
+import { prompt } from './prompts.ts';
 import { type Finding, findingsIn, Rejected } from './report.ts';
 import { counted, newRun, publish, Run } from './run.ts';
 import { errors, findingsSchema, groupsSchema, type Schema } from './schema.ts';
 import { snapshot } from './snapshot.ts';
 
-const PROMPTS = path.join(ROOT, 'review', 'prompts');
 // The kinds of finding, in the order the findings schema lists them.
 const KINDS = findingsSchema().properties!.findings!.items!.properties!.kind!.enum as string[];
 
@@ -45,11 +44,6 @@ function uncommitted(rules: readonly string[]): string[] {
       .map((entry) => entry.slice(3)),
   );
   return rules.filter((rule) => changed.has(rule));
-}
-
-/** A prompt file filled in as str.format fills it. */
-function prompt(name: string, values: Readonly<Record<string, string>>): string {
-  return format(fs.readFileSync(path.join(PROMPTS, name), 'utf8'), values);
 }
 
 /** Refuses unless the checkout is head, since the review reads the rules and the code there. step is what to rerun. */
