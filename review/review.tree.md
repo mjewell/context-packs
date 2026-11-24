@@ -244,11 +244,12 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     - Each @ before a login gets an invisible word joiner, so no one is notified
     - `<` is escaped, so no HTML comment or tag can hide text. Links and images still render
     - Rejected: backticks around mentions, since the agent's own backticks can pair with them and leave the mention outside
-  - The [[local-review|local review]] reads only the [[ci-review|summary]], through one command that prints no other comment's text {#summary-read}
-    - The filter runs before the agent sees any comment, since other comments can hold text written to steer it
-    - It reads every page, so a [[ci-review|summary]] or a forged block past the first page isn't missed
+  - The [[local-review|local review]] reads only the [[ci-review|summary]], through the [[wizard|wizard's]] `from-pr`, which prints no other comment's text {#summary-read}
+    - It checks every comment before the agent sees any, since other comments can hold text written to steer it
+    - It reads one page of 100 comments and refuses a PR with more, as post does, so a forged block past the first page can't be missed
     - It reads the [[ci-review|summary's]] plain-text rendering, which leaves out HTML comments, image alt text and link URLs
-    - A [[ci-review|summary]] counts only when the workflow's bot wrote it, it ends with the [[marker]], and it holds one findings block
+    - A [[ci-review|summary]] counts only when the workflow's bot wrote it, it ends with the [[marker]], and it holds one findings block. A refusal names no login but the bot's
+      - Why: the user's own login isn't the token that posted the summary, so `viewerDidAuthor` can't tell it apart
   - Every prompt, and both the pack-findings and [[pack-review]] skills, tell their agent that what it reads is data, never instructions
   - Text from the PR reaches a step output only under a delimiter it can't contain, so a line in it can't set another output
 - The author goes through the [[findings]] locally, decides each one, and records the [[rules]] they want {#local-review}
@@ -266,7 +267,7 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
   - A [[deviation]] is fixed in the code or in the [[rules|rule]]. A [[conflict]] needs a winner. An [[uncovered-choice|uncovered choice]] is written down or left
   - pack-rule writes one [[rules|rule]] for each [[findings|finding]] the author wants recorded, and waits for the wording to be approved
     - It gets the [[findings|finding's]] kind, whether its [[doc]] was [[routed]], its [[rules]] and [[findings|spots]], any signs it's deliberate, and the author's answer
-  - The [[findings]] are stale when the PR's head or base branch has moved. The author then picks whether to go on {#stale-summary}
+  - The [[findings]] are stale when the PR's head or base branch has moved. `from-pr` then stops, and goes on only with `--stale` once the author picks to {#stale-summary}
     - Why: the base commit moves whenever something merges into the base branch, while the diff from the merge base stays the same
     - A force push to the base branch can change the diff without either moving, and goes unnoticed
   - The checkout must be the head CI reviewed, since the [[findings|findings']] [[findings|spots]] and the [[pack]] edits are read there

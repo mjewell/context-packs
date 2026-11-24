@@ -130,7 +130,7 @@ async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   // The review's wizard has its own steps and arguments, so `review` hands everything after it on.
   if (argv[0] === 'review') {
-    wizard(argv.slice(1));
+    await wizard(argv.slice(1));
     return;
   }
   try {

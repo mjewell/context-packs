@@ -2,7 +2,7 @@
 
 // Ends every comment pack-review writes, so its own comments can be told from others the same token wrote.
 export const MARKER = '<!-- pack-review -->';
-const PAGE = 100;
+export const PAGE = 100;
 
 const PULL_REQUEST = `
 query PullRequest($owner: String!, $name: String!, $number: Int!) {
@@ -37,7 +37,7 @@ export interface PullRequest {
   readonly comments: Comment[];
 }
 
-interface Connection<T> {
+export interface Connection<T> {
   readonly pageInfo: { readonly hasNextPage: boolean; readonly endCursor?: string };
   readonly nodes: T[];
 }
@@ -47,12 +47,12 @@ export function repository(): [string, string] {
 }
 
 /** GitHub's answer: to a POST of body, or to a GET when body is undefined. */
-async function send(url: string, body: unknown, what: string): Promise<unknown> {
+async function send(url: string, body: unknown, what: string, token = process.env.GITHUB_TOKEN): Promise<unknown> {
   const response = await fetch(url, {
     method: body === undefined ? 'GET' : 'POST',
     body: body === undefined ? undefined : JSON.stringify(body),
     headers: {
-      Authorization: `bearer ${process.env.GITHUB_TOKEN}`,
+      Authorization: `bearer ${token}`,
       'Content-Type': 'application/json',
       Accept: 'application/vnd.github+json',
     },
@@ -71,15 +71,18 @@ async function send(url: string, body: unknown, what: string): Promise<unknown> 
   throw new GitHubError(`GitHub refused ${what} with HTTP ${response.status}: ${answer}`, response.status);
 }
 
-/** The data GitHub answers the operation with. */
-/** The data GitHub answers the operation with, in the shape T its query asks for. */
+/**
+ * The data GitHub answers the operation with, in the shape T its query asks for. The token is the one GitHub Actions
+ * set, unless a local run gives the user's.
+ */
 export async function graphql<T = unknown>(
   operation: string,
   query: string,
   variables: Record<string, unknown>,
+  token = process.env.GITHUB_TOKEN,
 ): Promise<T> {
   const url = process.env.GITHUB_GRAPHQL_URL || 'https://api.github.com/graphql';
-  const answer = (await send(url, { operationName: operation, query, variables }, operation)) as {
+  const answer = (await send(url, { operationName: operation, query, variables }, operation, token)) as {
     data: T;
     errors?: { message: string }[];
   };
@@ -97,7 +100,7 @@ export async function rest<T = unknown>(path: string): Promise<T> {
 }
 
 /** A list's items, refusing one with another page, since a review that silently missed some would be wrong. */
-function nodes<T>(connection: Connection<T>, listing: string): T[] {
+export function nodes<T>(connection: Connection<T>, listing: string): T[] {
   if (connection.pageInfo.hasNextPage) {
     throw new GitHubError(`The PR has more than ${PAGE} ${listing}, and pack-review reads only one page of them.`);
   }

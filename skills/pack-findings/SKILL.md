@@ -18,11 +18,7 @@ Done when:
 
 This checks the change only against what the repo's packs and instruction file say. Bugs, and whether the change does what it set out to do, are for other reviews. Deciding what to do about each finding is for `pack-review`.
 
-Each finding is one of three kinds:
-
-- **Deviation**: the change deviates from a written rule. The change may be wrong, the rule may lack an exception, or the convention may have moved on. The diff can't tell which, so the user decides. Each deviation also says whether the rule's doc was routed, meaning its `when` matches the work.
-- **Conflict**: two rules point opposite ways at the same spot.
-- **Uncovered choice**: the change makes a kind of decision that will come up again, another way would be reasonable, and no rule covers it.
+Each finding is a deviation from a written rule, a conflict between two rules, or an uncovered choice that no rule settles.
 
 ## The CLI
 
