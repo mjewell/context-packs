@@ -146,7 +146,7 @@ Objective breakage fails CI. Sizes only warn until they're far off, and judgment
 | Each node links its terms | Judgment | Review agent |
 | Structural commits change no claims | Judgment | Review agent |
 
-One CLI, `scripts/trees.py` in this skill's folder, provides these checks plus the lookups agents need instead of guessing: `check` (the CI checks above), `stats` (sizes per node), `links-to <id>` (inbound links) and `render` (the page).
+One CLI, `scripts/trees.ts` in this skill's folder, provides these checks plus the lookups agents need instead of guessing: `check` (the CI checks above), `stats` (sizes per node), `links-to <id>` (inbound links) and `render` (the page).
 
 ## Example
 

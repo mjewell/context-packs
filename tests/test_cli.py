@@ -3,12 +3,11 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 import unittest
 
-ROOT = Path(__file__).resolve().parents[1]
-CLI = ROOT / 'src' / 'cli.py'
+from scripts import command
+
 
 START = '<!-- context-packs:start -->\n'
 # The end marker with its hash masked, as SyncCase.agents() reads it.
@@ -123,7 +122,7 @@ class SyncCase(unittest.TestCase):
         return next(line[len('ref: '):] for line in text.split('\n') if line.startswith('ref: '))
 
     def sync(self, *args, cwd=None):
-        return subprocess.run([sys.executable, str(CLI), *args], cwd=cwd or self.repo,
+        return subprocess.run([*command('src/cli'), *args], cwd=cwd or self.repo,
                               text=True, capture_output=True, timeout=30, env=self.env)
 
     def add(self, *args, id='house-rules'):
@@ -532,7 +531,7 @@ class SiblingPackTests(SyncCase):
         self.assertFalse(self.gen.exists())
 
     def test_scp_style_origin_is_a_git_url(self):
-        result = subprocess.run([sys.executable, str(CLI), 'add', 'acme', 'git@example.invalid:acme/rules.git'],
+        result = subprocess.run([*command('src/cli'), 'add', 'acme', 'git@example.invalid:acme/rules.git'],
                                 cwd=self.repo, text=True, capture_output=True, timeout=30,
                                 env={**self.env, 'GIT_SSH_COMMAND': 'false'})
 

@@ -16,13 +16,13 @@ Read [spec.md](spec.md) in full before writing or restructuring a tree. It sets 
 
 ## Commands
 
-The scripts are in this skill's `scripts/` folder. Run them from inside the repo, with Python 3.9 or later:
+The scripts are in this skill's `scripts/` folder. Run them from inside the repo, with Node 22.18 or later, which runs the `.ts` files directly:
 
 ```bash
-python3 <skill folder>/scripts/trees.py check                 # every tree in the repo against the spec
-python3 <skill folder>/scripts/trees.py stats                 # sizes per view, to decide where to nest
-python3 <skill folder>/scripts/trees.py links-to <id>         # the nodes that link to an ID
-python3 <skill folder>/scripts/trees.py render <id>.tree.md   # writes <id>.tree.html
+node <skill folder>/scripts/trees.ts check                 # every tree in the repo against the spec
+node <skill folder>/scripts/trees.ts stats                 # sizes per view, to decide where to nest
+node <skill folder>/scripts/trees.ts links-to <id>         # the nodes that link to an ID
+node <skill folder>/scripts/trees.ts render <id>.tree.md   # writes <id>.tree.html
 ```
 
 `render` needs the `d2` CLI when a tree has a D2 diagram, and stops with an error naming it when it's missing. The page it writes isn't committed: the repo's `.gitignore` needs `**/*.tree.html`, so add that line when it's missing.

@@ -1,11 +1,12 @@
 import os
 from pathlib import Path
 import subprocess
-import sys
 import tempfile
 import unittest
 
 from fake_github import FakeGitHub, comment
+from scripts import command
+
 
 REVIEW = Path(__file__).resolve().parents[1] / 'review'
 SCHEMA = REVIEW.parent / 'skills' / 'pack-findings' / 'findings.schema.json'
@@ -31,7 +32,7 @@ class ReviewCase(unittest.TestCase):
                     'GITHUB_API_URL': self.github.url, 'GITHUB_GRAPHQL_URL': f'{self.github.url}/graphql'}
 
     def script(self, name, *args):
-        return subprocess.run([sys.executable, str(REVIEW / f'{name}.py'), *map(str, args)], cwd=self.root,
+        return subprocess.run([*command(f'review/{name}'), *map(str, args)], cwd=self.root,
                               env=self.env, capture_output=True, text=True)
 
     def sent(self, operation):

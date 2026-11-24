@@ -1,4 +1,7 @@
 __pycache__/
 node_modules/
-# The page skills/spec-tree/scripts/trees.py render writes beside each spec tree.
+# The page skills/spec-tree/scripts/trees.ts render writes beside each spec tree.
 **/*.tree.html
+
+# What tsc writes for the npm package, from src/.
+dist/

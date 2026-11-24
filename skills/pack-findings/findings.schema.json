@@ -1,9 +1,7 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "findings"
-  ],
+  "required": ["findings"],
   "properties": {
     "findings": {
       "type": "array",
@@ -11,22 +9,10 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "kind",
-          "headline",
-          "rules",
-          "spots",
-          "deliberate",
-          "exemplars",
-          "take"
-        ],
+        "required": ["kind", "headline", "rules", "spots", "deliberate", "exemplars", "take"],
         "properties": {
           "kind": {
-            "enum": [
-              "deviation",
-              "conflict",
-              "uncovered choice"
-            ]
+            "enum": ["deviation", "conflict", "uncovered choice"]
           },
           "headline": {
             "type": "string",
@@ -38,11 +24,7 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "file",
-                "quote",
-                "routed"
-              ],
+              "required": ["file", "quote", "routed"],
               "properties": {
                 "file": {
                   "type": "string",
@@ -65,11 +47,7 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "path",
-                "line",
-                "follows"
-              ],
+              "required": ["path", "line", "follows"],
               "properties": {
                 "path": {
                   "type": "string"
@@ -98,10 +76,7 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "way",
-                "examples"
-              ],
+              "required": ["way", "examples"],
               "properties": {
                 "way": {
                   "type": "string"

@@ -120,9 +120,8 @@ Edit only files I own. Plugins, synced skills, and installed dependencies belong
 
 ## Project
 
-- The CLI and the `review/` action use only the Python standard library and `git`, and run on macOS's system `python3` (3.9).
-- The npm package's bin only hands its arguments to the Python CLI, so the logic stays in Python.
-- The skills in `skills/` are for anyone using the tool, so they rely on nothing from any one person's packs.
-- Run the tests with `python3 -m unittest discover tests`.
+- The CLI in `src/` and the review in `review/` are TypeScript, run by Node 22.18 or later, with no dependencies at runtime but `git`. Node runs the `.ts` files directly, so write only TypeScript it can strip, and name the `.ts` file in each import. `tsc` compiles `dist/` for the npm package, since Node won't run TypeScript from `node_modules`.
+- The skills in `skills/` are for anyone using the tool, so they rely on nothing from any one person's packs. A skill's scripts import nothing outside its folder, since an installed skill holds only that folder: they use Node's standard library, and copy what they need from `src/`. `npm run lint` fails on an import that breaks this.
+- Run `npm install` once, then `npm run typecheck`, `npm run lint` and the tests, with `python3 -m unittest discover tests`. The tests are still Python, moving to `node:test` next, and `tests/scripts.py` runs each script with `node`. `npm run format` fixes what Biome can, which is code, JSON and CSS, never Markdown.
 - `GLOSSARY.md` holds the terms for the packs and the review. Use them in code, docs and skills. When a name settles, add or update its entry there.
-- This repo's own pack docs are in `context-packs/project/`, and its shared rules come from agent-config through the import pack `context-packs/core/`. After adding a doc or changing its `when:` line, run `node bin/context-packs.js` and commit the result.
+- This repo's own pack docs are in `context-packs/project/`, and its shared rules come from agent-config through the import pack `context-packs/core/`. After adding a doc or changing its `when:` line, run `node src/cli.ts` and commit the result.

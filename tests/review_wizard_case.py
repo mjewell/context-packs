@@ -3,13 +3,13 @@ as an agent would."""
 import hashlib
 import json
 import os
+from pathlib import Path
 import re
 import subprocess
-import sys
-from pathlib import Path
 import tempfile
 
 from git_case import REVIEW, GitCase
+from scripts import command
 
 ROOT = REVIEW.parent
 
@@ -50,7 +50,7 @@ class WizardCase(GitCase):
         self.run_dir = None
 
     def wizard(self, *args, input=''):
-        return subprocess.run([sys.executable, str(REVIEW / 'wizard.py'), *args], cwd=self.repo, env=self.env,
+        return subprocess.run([*command('review/wizard'), *args], cwd=self.repo, env=self.env,
                               input=input, capture_output=True, text=True)
 
     def init(self):

@@ -1,10 +1,11 @@
 import shutil
 import subprocess
-import sys
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+
+from scripts import command
 
 REPO = Path(__file__).resolve().parent.parent
 TOOLS = REPO / 'skills' / 'spec-tree' / 'scripts'
@@ -48,12 +49,12 @@ class TreeCase(unittest.TestCase):
         file.write_text(textwrap.dedent(text).lstrip(), encoding='utf-8')
 
     def trees(self, *args):
-        return subprocess.run([sys.executable, str(TOOLS / 'trees.py'), *args], cwd=self.root, capture_output=True,
+        return subprocess.run([*command('skills/spec-tree/scripts/trees'), *args], cwd=self.root, capture_output=True,
                               text=True)
 
 
 class CheckTests(TreeCase):
-    """`trees.py check` reads every tree in the repo, and fails on what the spec says CI fails on."""
+    """`trees.ts check` reads every tree in the repo, and fails on what the spec says CI fails on."""
 
     def test_passes_a_tree_that_follows_the_rules(self):
         self.write('review.tree.md', SMALL)
@@ -141,7 +142,7 @@ class CheckTests(TreeCase):
         self.assertEqual(self.trees('check').stdout, '')
 
 class SizeTests(TreeCase):
-    """`trees.py check` warns when a size passes its target, and fails at 1.5 times it."""
+    """`trees.ts check` warns when a size passes its target, and fails at 1.5 times it."""
 
     def test_warns_on_node_text_over_40_words(self):
         self.write('sizes.tree.md', tree(f'- {words(41)}'))
@@ -198,7 +199,7 @@ class SizeTests(TreeCase):
 
 
 class StatsTests(TreeCase):
-    """`trees.py stats` prints each view's size, child count and subtree size."""
+    """`trees.ts stats` prints each view's size, child count and subtree size."""
 
     def test_prints_sizes_for_each_view(self):
         self.write('review.tree.md', SMALL)
@@ -209,8 +210,29 @@ class StatsTests(TreeCase):
                                                            '  Finders check the diff: view 12, 1 child, subtree 12\n'))
 
 
+class UsageTests(TreeCase):
+    """A command given the wrong arguments says what it takes, and lists every command."""
+
+    def test_says_what_a_command_takes_and_exits_2(self):
+        for args, says in ((('render',), 'render takes <id>.tree.md [-o out.html]'),
+                           (('links-to', 'a', 'b'), 'links-to takes <id>'),
+                           (('stats', '-o', 'x'), 'stats takes no arguments'),
+                           (('publish',), "there's no command publish"),
+                           ((), 'name a command')):
+            with self.subTest(args=args):
+                run = self.trees(*args)
+
+                self.assertEqual(run.returncode, 2, run.stderr)
+                self.assertEqual(run.stderr, f'trees.ts: {says}.\n\n'
+                                             'Usage:\n'
+                                             '  trees.ts check\n'
+                                             '  trees.ts stats\n'
+                                             '  trees.ts links-to <id>\n'
+                                             '  trees.ts render <id>.tree.md [-o out.html]\n')
+
+
 class LinksToTests(TreeCase):
-    """`trees.py links-to <id>` lists the nodes that link to an ID, in every tree."""
+    """`trees.ts links-to <id>` lists the nodes that link to an ID, in every tree."""
 
     def test_lists_each_node_that_links_to_the_id(self):
         self.write('review.tree.md', SMALL)
@@ -234,7 +256,7 @@ class LinksToTests(TreeCase):
 
         run = self.trees('links-to', 'findres')
 
-        self.assertEqual((run.returncode, run.stderr), (1, 'trees.py: no node has the ID findres\n'))
+        self.assertEqual((run.returncode, run.stderr), (1, 'trees.ts: no node has the ID findres\n'))
 
     def test_lists_a_link_with_display_text(self):
         self.write('review.tree.md', SMALL.replace('see [[finders]]', 'by the [[finders|finders]]'))
@@ -246,7 +268,7 @@ class LinksToTests(TreeCase):
 
 
 class RenderTests(TreeCase):
-    """`trees.py render` writes a tree's page beside its file."""
+    """`trees.ts render` writes a tree's page beside its file."""
 
     def test_writes_the_page_beside_the_tree_file(self):
         self.write('review.tree.md', SMALL)
@@ -346,7 +368,7 @@ class RenderTests(TreeCase):
 
 @unittest.skipUnless(shutil.which('d2'), 'renders D2 diagrams through the d2 CLI')
 class D2RenderTests(TreeCase):
-    """`trees.py render` holds a D2 diagram's links to the rule Markdown links follow."""
+    """`trees.ts render` holds a D2 diagram's links to the rule Markdown links follow."""
 
     def diagram(self, source):
         self.write('review.tree.md', f'''
@@ -382,7 +404,7 @@ class RepoTreesTests(unittest.TestCase):
     """This repo's own trees follow the spec's rules, so the test suite checks them until a CI workflow does."""
 
     def test_this_repos_trees_have_no_failures(self):
-        run = subprocess.run([sys.executable, str(TOOLS / 'trees.py'), 'check'], cwd=REPO, capture_output=True,
+        run = subprocess.run([*command('skills/spec-tree/scripts/trees'), 'check'], cwd=REPO, capture_output=True,
                              text=True)
 
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
