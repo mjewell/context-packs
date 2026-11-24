@@ -99,11 +99,8 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
           - Rejected: a real commit, undone after. It runs the commit hooks, and undoing it loses which changes were staged
       - While answers are missing, `next` names each finder that hasn't answered, with its prompt, so one that stopped can be started again
       - Once every answer is in, `next` numbers the finders' findings and names the merging agent. Once its groups are in, `next` prints the [[findings]] and says who gets them: the skill that ran pack-findings, or else the user
-<<<<<<< HEAD
-      - Once the run is done, `finding <n>` prints one [[findings|finding]], with what its kind means and what the user decides about it
-=======
         - When no finder found anything, `next` builds empty [[findings]] and prints them, since a merge would have nothing to group
->>>>>>> claude/review-prompts-organization-ozgua0
+      - Once the run is done, `finding <n>` prints one [[findings|finding]], with what its kind means and what the user decides about it
       - The run's state is which files its folder holds. The wizard works it out on each step instead of storing it, and refuses a step whose checks fail
         - A file whose existence is part of the state, such as an accepted answer or a phase's file, is written beside its name and then renamed, so a write cut short changes no state
         - Once the [[findings]] are built, `submit-groups` refuses any groups, so a done run never changes. `next` still prints its findings
