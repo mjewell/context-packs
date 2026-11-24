@@ -20,7 +20,7 @@ query SummaryComments($owner: String!, $name: String!, $number: Int!) {
   }
 }`;
 
-interface Comment {
+interface SummaryComment {
   readonly author: { readonly login: string } | null;
   readonly body: string;
   readonly bodyText: string;
@@ -74,20 +74,20 @@ export async function read(
 ): Promise<{ readonly head: string; readonly baseRef: string; readonly report: Report }> {
   const found = await github.graphql<{
     repository: {
-      pullRequest: { headRefOid: string; baseRefName: string; comments: github.Connection<Comment> };
+      pullRequest: { headRefOid: string; baseRefName: string; comments: github.Connection<SummaryComment> };
     };
   }>('SummaryComments', SUMMARY_COMMENTS, { ...target }, token());
   const pull = found.repository.pullRequest;
   const comments = github.nodes(pull.comments, 'comments');
-  const blocks = (comment: Comment) => comment.body.split(`<summary>${TITLE}</summary>`).length - 1;
+  const blocks = (comment: SummaryComment) => comment.body.split(`<summary>${TITLE}</summary>`).length - 1;
   const withBlocks = comments.filter((comment) => blocks(comment));
   if (!withBlocks.length) {
     throw new Refused(
       "The PR has no summary from pack-review, so CI hasn't reviewed it. Find the findings here with pack-findings.",
     );
   }
-  const byBot = (comment: Comment) => comment.author?.login === bot;
-  const marked = (comment: Comment) => comment.body.trimEnd().endsWith(github.MARKER);
+  const byBot = (comment: SummaryComment) => comment.author?.login === bot;
+  const marked = (comment: SummaryComment) => comment.body.trimEnd().endsWith(github.MARKER);
   const [summary] = withBlocks;
   if (withBlocks.length > 1 || !byBot(summary!) || !marked(summary!) || blocks(summary!) !== 1) {
     const lines = withBlocks.map(
