@@ -5,7 +5,7 @@ import { describe, test } from 'node:test';
 
 import { exits, includes } from './expect.ts';
 import { spot } from './review_case.ts';
-import { deviation, SubmitCase } from './review_wizard_case.ts';
+import { deviation, MergeCase, SubmitCase } from './review_wizard_case.ts';
 
 interface Source {
   readonly id: string;
@@ -80,17 +80,6 @@ describe('next', () => {
     includes(result.stderr, "Not taken: the merge has started, so the finders' answers can't change.");
   });
 });
-
-/** Every finder in: units 0 and 1 with one deviation each, unit 2 with none, and the uncovered finder with one. */
-class MergeCase extends SubmitCase {
-  async allIn(): Promise<void> {
-    await this.submitUnit(0, 1, [deviation('A')]);
-    await this.submitUnit(1, 2, [deviation('B')]);
-    await this.submitUnit(2, 1, []);
-    assert.equal((await this.submit(3, [{ ...deviation('D'), kind: 'uncovered choice', rules: [] }])).status, 0);
-    assert.equal((await this.step('next')).status, 0);
-  }
-}
 
 /**
  * Once every finder is in, one subagent groups their findings, and the wizard builds the findings from its groups, as
@@ -228,7 +217,9 @@ describe('the merge', () => {
       'If another skill, such as pack-review, ran pack-findings, show none of the findings: hand that skill this ' +
         `command, \`${c.command('next')}\`, which prints them for it. Otherwise, show the user how many there are of ` +
         'each kind, then each finding in full, grouped by kind, and say that running pack-review in this session ' +
-        'goes through them without finding them again.\nHere they are:\n',
+        'goes through them without finding them again.\n' +
+        `To go through them one at a time, run \`${c.command('finding', '1')}\`, then the same with 2, and so on.\n` +
+        'Here they are:\n',
     );
   });
 });

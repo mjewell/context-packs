@@ -94,7 +94,8 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
       ```
       - `init` checks that the checkout is the head and the change touches a file, and lists [[rules|rule]] files with uncommitted changes. Then it names one [[finders|finder]] for each [[unit]] and the [[uncovered-finder|uncovered finder]], each with a one-line prompt
       - While answers are missing, `next` names each finder that hasn't answered, with its prompt, so one that stopped can be started again
-      - Once every answer is in, `next` numbers the finders' findings and names the merging agent. Once its groups are in, `next` prints the [[findings]], and says to hand them back to a skill that ran pack-findings, or else show them to the user
+      - Once every answer is in, `next` numbers the finders' findings and names the merging agent. Once its groups are in, `next` prints the [[findings]] and says who gets them: the skill that ran pack-findings, or else the user
+      - Once the run is done, `finding <n>` prints one [[findings|finding]], with what its kind means and what the user decides about it
       - The run's state is which files its folder holds. The wizard works it out on each step instead of storing it, and refuses a step whose checks fail
     - A finder's brief is the wizard's prompt for its kind, with the commands that read its docs and the change, and its answer's schema {#brief}
       - `doc` prints one of the unit's docs and marks it served. `submit` takes a unit's answer only once every doc in it was served, and only in the schema's shape
