@@ -4,7 +4,7 @@ import path from 'node:path';
 import { describe, test } from 'node:test';
 
 import { exits, includes } from './expect.ts';
-import { HEAD, ReviewCase } from './review_case.ts';
+import { HEAD, ReviewCase, spot } from './review_case.ts';
 
 const BASE = 'b'.repeat(40);
 const NUMBERS = { file: 'AGENTS.md', quote: 'Game numbers live in content.', routed: true };
@@ -20,10 +20,6 @@ function finding(id: string, { rules = [] as unknown[], spots = [] as unknown[],
     exemplars: [],
     take: `Finder take ${id}.`,
   };
-}
-
-function spot(file: string, line: number, follows = false) {
-  return { path: file, line, follows };
 }
 
 /**

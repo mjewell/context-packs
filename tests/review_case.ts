@@ -11,6 +11,11 @@ export const SCHEMA = path.join(ROOT, 'skills', 'pack-findings', 'findings.schem
 export const MARKER = '<!-- pack-review -->';
 export const HEAD = 'h'.repeat(40);
 
+/** A spot a finding names, which deviates from the rule unless follows. */
+export function spot(file: string, line: number, follows = false) {
+  return { path: file, line, follows };
+}
+
 /** A comment pack-review posted earlier. */
 export function own(body: string, id = 'IC_1') {
   return comment(`🤖 ${body}\n\n${MARKER}`, { mine: true, id });

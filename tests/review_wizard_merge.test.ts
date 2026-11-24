@@ -4,6 +4,7 @@ import path from 'node:path';
 import { describe, test } from 'node:test';
 
 import { exits, includes } from './expect.ts';
+import { spot } from './review_case.ts';
 import { deviation, SubmitCase } from './review_wizard_case.ts';
 
 interface Source {
@@ -234,10 +235,6 @@ function found({
     exemplars: [...exemplars],
     take: 'A finder take.',
   };
-}
-
-function spot(file: string, line: number, follows = false) {
-  return { path: file, line, follows };
 }
 
 function group(

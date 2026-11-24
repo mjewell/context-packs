@@ -5,7 +5,7 @@ import { describe, test } from 'node:test';
 
 import { excludes, exits, includes } from './expect.ts';
 import { comment, connection, ok, pullRequest } from './fake_github.ts';
-import { HEAD, MARKER, own, ReviewCase, reviewThread } from './review_case.ts';
+import { HEAD, MARKER, own, ReviewCase, reviewThread, spot } from './review_case.ts';
 import type { Result } from './scripts.ts';
 
 const BASE = 'b'.repeat(40);
@@ -15,10 +15,6 @@ function finding(
   { headline = 'A game number in sim code', take = 'Move it to content.', spots = [] as readonly unknown[] } = {},
 ) {
   return { kind, headline, rules: [], spots: [...spots], deliberate: [], exemplars: [], take };
-}
-
-function spot(file: string, line: number, follows = false) {
-  return { path: file, line, follows };
 }
 
 /** The findings in a summary's JSON block, and the block's text. */
