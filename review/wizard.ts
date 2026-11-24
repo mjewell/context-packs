@@ -19,6 +19,7 @@ import { ROOT } from '../src/root.ts';
 import { Stop } from '../src/stop.ts';
 import { units as tableUnits } from '../src/tables.ts';
 import { Change, commit, git, Refused } from './change.ts';
+import { type Cited, evidenceErrors } from './evidence.ts';
 import { type Finding, findingsIn, Rejected } from './report.ts';
 import { errors, findingsSchema, groupsSchema, type Schema } from './schema.ts';
 
@@ -362,7 +363,14 @@ function submit(args: Values): void {
     }
   }
   const text = answer('answer', run.answer(`unit-${finder}.json`), command, findingsSchema());
-  const findings: unknown[] = JSON.parse(text).findings;
+  const findings: Cited[] = JSON.parse(text).findings;
+  const missing = evidenceErrors(findings, run.state.head, run.state.root);
+  if (missing.length) {
+    throw new Refused(
+      `Not taken: your answer names evidence that isn't there:\n${missing.map((line) => `  ${line}\n`).join('')}` +
+        `Fix it, then submit it again with \`${command}\`.`,
+    );
+  }
   fs.mkdirSync(path.dirname(run.accepted(finder)), { recursive: true });
   fs.writeFileSync(run.accepted(finder), text, 'utf8');
   const name = finder === run.uncovered ? "the uncovered finder's answer" : `unit ${finder}`;

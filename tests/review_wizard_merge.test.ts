@@ -317,11 +317,11 @@ describe("the merge's groups", () => {
   test('builds a finding from every finding its group names', async (t) => {
     const c = await GroupCase.make(t);
     await c.answered({
-      unit0: [found({ rules: [NUMBERS], spots: [spot('src/sim.ts', 42)], deliberate: ['Commit abc says so.'] })],
+      unit0: [found({ rules: [NUMBERS], spots: [spot('src/app.py', 1)], deliberate: ['Commit abc says so.'] })],
       unit2: [
         found({
           rules: [SIM, NUMBERS],
-          spots: [spot('src/sim.ts', 42), spot('src/rng.ts', 9)],
+          spots: [spot('src/app.py', 1), spot('tests/test_app.py', 1)],
           deliberate: ['Commit abc says so.', 'A comment at the spot.'],
         }),
       ],
@@ -335,7 +335,7 @@ describe("the merge's groups", () => {
         headline: 'A game number in sim code',
         take: 'Move it to content.',
         rules: [NUMBERS, SIM],
-        spots: [spot('src/sim.ts', 42), spot('src/rng.ts', 9)],
+        spots: [spot('src/app.py', 1), spot('tests/test_app.py', 1)],
         deliberate: ['Commit abc says so.', 'A comment at the spot.'],
         exemplars: [],
       },
@@ -345,22 +345,22 @@ describe("the merge's groups", () => {
   test('counts a spot as deviating when any finding says it deviates', async (t) => {
     const c = await GroupCase.make(t);
     await c.answered({
-      unit0: [found({ rules: [NUMBERS], spots: [spot('src/sim.ts', 42)] })],
-      unit1: [found({ rules: [SIM], spots: [spot('src/sim.ts', 42, true)] })],
+      unit0: [found({ rules: [NUMBERS], spots: [spot('src/app.py', 1)] })],
+      unit1: [found({ rules: [SIM], spots: [spot('src/app.py', 1, true)] })],
     });
 
     const [finding] = await c.built([group(['0:0', '1:0'], { kind: 'conflict' })]);
 
     assert.equal(finding.kind, 'conflict');
-    assert.deepEqual(finding.spots, [spot('src/sim.ts', 42)]);
+    assert.deepEqual(finding.spots, [spot('src/app.py', 1)]);
   });
 
   test('keeps an uncovered choices exemplars in the finding that holds it', async (t) => {
     const c = await GroupCase.make(t);
     const ways = [{ way: 'Loaded at startup', examples: ['src/load.ts:8'] }];
     await c.answered({
-      unit0: [found({ rules: [NUMBERS], spots: [spot('src/load.ts', 3)] })],
-      uncovered: [found({ kind: 'uncovered choice', spots: [spot('src/load.ts', 3)], exemplars: ways })],
+      unit0: [found({ rules: [NUMBERS], spots: [spot('AGENTS.md', 3)] })],
+      uncovered: [found({ kind: 'uncovered choice', spots: [spot('AGENTS.md', 3)], exemplars: ways })],
     });
 
     const [finding] = await c.built([group(['0:0', '3:0'])]);

@@ -103,6 +103,9 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     - A finder's brief is the skill's prompt for its kind, with the commands that read its docs and the change, and its answer's schema {#brief}
       - `doc` prints one of the unit's docs and marks it served. `submit` takes a unit's answer only once every doc in it was served, and only in the schema's shape
         - Why: the wizard keeps its own record of what it printed, so the check needs no transcript, see [[doc-names]]
+      - `submit` also refuses an answer whose spot names no line of its file at the head, or whose [[rules|rule]] names no file in the checkout, and says which finding and field
+        - A spot may be outside the diff, since the report decides which spot a thread can open on
+        - Rejected: checking that each quote is in its file. No run has misquoted a rule, and a finder that reformats one would be refused
       - `files`, `diff` and `log` read the change from the merge base, through fixed git commands, see [[change-commands]]. `diff` takes only a path the change touches
       - A refusal says what's missing and the command to run next. Once the [[merge]] starts, no finder's answer can change
     - The merging agent reads the numbered findings through `sources`, and `submit-groups` builds the [[findings]] from its groups, see [[merge]]
