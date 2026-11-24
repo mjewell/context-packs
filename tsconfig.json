@@ -13,9 +13,12 @@
     "verbatimModuleSyntax": true,
     "rewriteRelativeImportExtensions": true,
     "types": ["node"],
+    // So the tests can import the spec-tree page's comment logic, a .mjs module, with the types TypeScript infers
+    // from it.
+    "allowJs": true,
     "rootDir": ".",
     "outDir": "dist",
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "review/**/*.ts", "skills/spec-tree/scripts/**/*.ts"]
+  "include": ["src/**/*.ts", "review/**/*.ts", "skills/spec-tree/scripts/**/*.ts", "tests/**/*.ts"]
 }

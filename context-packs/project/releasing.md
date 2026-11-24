@@ -9,7 +9,7 @@ when: Releasing a new version to npm
 
 ```bash
 npm ci && npm run typecheck && npm run lint
-python3 -m unittest discover tests
+npm test
 git checkout -b release-<version>
 npm version patch --no-git-tag-version   # minor for a breaking change
 # set "version" in .claude-plugin/plugin.json to match
