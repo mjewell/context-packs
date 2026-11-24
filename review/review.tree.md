@@ -89,16 +89,26 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
       finders: waiting on finders
       merge: waiting on the merge
       done: done
-      finders -> merge: "every answer is in"
+      finders -> merge: "every answer is in, with findings"
+      finders -> done: "every answer is in, with none"
       merge -> done: "the groups are in"
       ```
-      - `init` checks that the checkout is the head and the change touches a file, and lists [[rules|rule]] files with uncommitted changes. Then it names one [[finders|finder]] for each [[unit]] and the [[uncovered-finder|uncovered finder]], each with a one-line prompt
+      - `init` checks that the checkout is the head and the change touches a file. With `--head`, it lists [[rules|rule]] files with uncommitted changes. Then it names one [[finders|finder]] for each [[unit]] and the [[uncovered-finder|uncovered finder]], each with a one-line prompt
+        - With `--uncommitted`, `init` reviews a commit it makes from the working files on top of `HEAD`, built in an index of its own, so the branch, the index and the files don't change. Untracked files are in it, ignored ones aren't
+          - Finders still read rules and code from the checkout, so an edit during the review can reach them, as it can in a review of a commit
+          - Rejected: a real commit, undone after. It runs the commit hooks, and undoing it loses which changes were staged
       - While answers are missing, `next` names each finder that hasn't answered, with its prompt, so one that stopped can be started again
-      - Once every answer is in, `next` numbers the finders' findings and names the merging agent. Once its groups are in, `next` prints the [[findings]], and says to hand them back to a skill that ran pack-findings, or else show them to the user
+      - Once every answer is in, `next` numbers the finders' findings and names the merging agent. Once its groups are in, `next` prints the [[findings]] and says who gets them: the skill that ran pack-findings, or else the user
+        - When no finder found anything, `next` builds empty [[findings]] and prints them, since a merge would have nothing to group
       - The run's state is which files its folder holds. The wizard works it out on each step instead of storing it, and refuses a step whose checks fail
+        - A file whose existence is part of the state, such as an accepted answer or a phase's file, is written beside its name and then renamed, so a write cut short changes no state
+        - Once the [[findings]] are built, `submit-groups` refuses any groups, so a done run never changes. `next` still prints its findings
     - A finder's brief is the wizard's prompt for its kind, with the commands that read its docs and the change, and its answer's schema {#brief}
       - `doc` prints one of the unit's docs and marks it served. `submit` takes a unit's answer only once every doc in it was served, and only in the schema's shape
         - Why: the wizard keeps its own record of what it printed, so the check needs no transcript, see [[doc-names]]
+      - `submit` also refuses an answer whose spot names no line of its file at the head, or whose [[rules|rule]] names no file in the checkout, and says which finding and field
+        - A spot may be outside the diff, since the report decides which spot a thread can open on
+        - Rejected: checking that each quote is in its file. No run has misquoted a rule, and a finder that reformats one would be refused
       - `files`, `diff` and `log` read the change from the merge base, through fixed git commands, see [[change-commands]]. `diff` takes only a path the change touches
       - A refusal says what's missing and the command to run next. Once the [[merge]] starts, no finder's answer can change
     - The merging agent reads the numbered findings through `sources`, and `submit-groups` builds the [[findings]] from its groups, see [[merge]]

@@ -1,7 +1,7 @@
 ---
 name: pack-review
-description: Review a PR or branch against a repo's context packs, and go through each finding with the user. Findings cover where the change deviates from a written rule, whether that rule's `when` reached the work, and the choices it makes that no rule covers.
-argument-hint: "[PR number or owner/repo#number, branch, or commit range]"
+description: Review a PR, branch or uncommitted changes against a repo's context packs, and go through each finding with the user. Findings cover where the change deviates from a written rule, whether that rule's `when` reached the work, and the choices it makes that no rule covers.
+argument-hint: "[PR number or owner/repo#number, branch, commit range, or uncommitted changes]"
 disable-model-invocation: true
 ---
 

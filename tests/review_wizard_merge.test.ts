@@ -64,20 +64,36 @@ describe('next', () => {
 
   test('keeps the finders answers once the merge has started', async (t) => {
     const c = await SubmitCase.make(t);
-    for (const [unit, docs] of [
-      [0, 1],
-      [1, 2],
-      [2, 1],
-    ] as const) {
-      await c.submitUnit(unit, docs, []);
-    }
+    await c.submitUnit(0, 1, [deviation('A')]);
+    await c.submitUnit(1, 2, []);
+    await c.submitUnit(2, 1, []);
     await c.submit(3, []);
     await c.step('next');
 
     const result = await c.submit(1, []);
 
     exits(result, 1);
-    includes(result.stderr, "Not taken: the merge has started, so the finders' answers can't change.");
+    includes(result.stderr, "Not taken: every finder is in, so the finders' answers can't change.");
+  });
+
+  test('finishes with no findings and no merge when every finder found none', async (t) => {
+    const c = await SubmitCase.make(t);
+    await c.submitUnit(0, 1, []);
+    await c.submitUnit(1, 2, []);
+    await c.submitUnit(2, 1, []);
+    await c.submit(3, []);
+
+    const first = await c.step('next');
+    const again = await c.step('next');
+
+    exits(first, 0);
+    const file = path.join(c.runDir, 'findings.json');
+    assert.ok(first.stdout.startsWith(`Done: 0 findings, in ${file}.\n`), first.stdout);
+    assert.ok(first.stdout.endsWith('Here they are:\n[]\n'), first.stdout);
+    assert.equal(again.stdout, first.stdout);
+    const report = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.deepEqual(report, { base: c.base, head: c.head, findings: [] });
+    exits(await c.submit(1, []), 1);
   });
 });
 
@@ -231,6 +247,29 @@ describe('the merge', () => {
         'goes through them without finding them again.\nHere they are:\n',
     );
   });
+
+  test('refuses groups once the findings are built and keeps them', async (t) => {
+    const c = await MergeCase.make(t);
+    await c.allIn();
+    exits(await c.submitGroups([{ ids: ['0:0', '1:0', '3:0'], kind: 'deviation', headline: 'First', take: 'T' }]), 0);
+    const file = path.join(c.runDir, 'findings.json');
+    const before = fs.readFileSync(file, 'utf8');
+
+    for (const groups of [
+      [{ ids: ['0:0', '1:0', '3:0'], kind: 'deviation', headline: 'First', take: 'T' }],
+      [{ ids: ['0:0', '1:0', '3:0'], kind: 'deviation', headline: 'Second', take: 'T' }],
+      [{ ids: ['0:0'], kind: 'deviation', headline: 'Third', take: 'T' }],
+    ]) {
+      const result = await c.submitGroups(groups);
+
+      exits(result, 1);
+      assert.equal(
+        result.stderr,
+        "Not taken: the findings are already built, so the groups can't change. Tell whoever started you, and stop.\n",
+      );
+      assert.equal(fs.readFileSync(file, 'utf8'), before);
+    }
+  });
 });
 
 const NUMBERS = { file: 'AGENTS.md', quote: 'Game numbers live in content.', routed: true };
@@ -297,11 +336,11 @@ describe("the merge's groups", () => {
   test('builds a finding from every finding its group names', async (t) => {
     const c = await GroupCase.make(t);
     await c.answered({
-      unit0: [found({ rules: [NUMBERS], spots: [spot('src/sim.ts', 42)], deliberate: ['Commit abc says so.'] })],
+      unit0: [found({ rules: [NUMBERS], spots: [spot('src/app.py', 1)], deliberate: ['Commit abc says so.'] })],
       unit2: [
         found({
           rules: [SIM, NUMBERS],
-          spots: [spot('src/sim.ts', 42), spot('src/rng.ts', 9)],
+          spots: [spot('src/app.py', 1), spot('tests/test_app.py', 1)],
           deliberate: ['Commit abc says so.', 'A comment at the spot.'],
         }),
       ],
@@ -315,7 +354,7 @@ describe("the merge's groups", () => {
         headline: 'A game number in sim code',
         take: 'Move it to content.',
         rules: [NUMBERS, SIM],
-        spots: [spot('src/sim.ts', 42), spot('src/rng.ts', 9)],
+        spots: [spot('src/app.py', 1), spot('tests/test_app.py', 1)],
         deliberate: ['Commit abc says so.', 'A comment at the spot.'],
         exemplars: [],
       },
@@ -325,22 +364,22 @@ describe("the merge's groups", () => {
   test('counts a spot as deviating when any finding says it deviates', async (t) => {
     const c = await GroupCase.make(t);
     await c.answered({
-      unit0: [found({ rules: [NUMBERS], spots: [spot('src/sim.ts', 42)] })],
-      unit1: [found({ rules: [SIM], spots: [spot('src/sim.ts', 42, true)] })],
+      unit0: [found({ rules: [NUMBERS], spots: [spot('src/app.py', 1)] })],
+      unit1: [found({ rules: [SIM], spots: [spot('src/app.py', 1, true)] })],
     });
 
     const [finding] = await c.built([group(['0:0', '1:0'], { kind: 'conflict' })]);
 
     assert.equal(finding.kind, 'conflict');
-    assert.deepEqual(finding.spots, [spot('src/sim.ts', 42)]);
+    assert.deepEqual(finding.spots, [spot('src/app.py', 1)]);
   });
 
   test('keeps an uncovered choices exemplars in the finding that holds it', async (t) => {
     const c = await GroupCase.make(t);
     const ways = [{ way: 'Loaded at startup', examples: ['src/load.ts:8'] }];
     await c.answered({
-      unit0: [found({ rules: [NUMBERS], spots: [spot('src/load.ts', 3)] })],
-      uncovered: [found({ kind: 'uncovered choice', spots: [spot('src/load.ts', 3)], exemplars: ways })],
+      unit0: [found({ rules: [NUMBERS], spots: [spot('AGENTS.md', 3)] })],
+      uncovered: [found({ kind: 'uncovered choice', spots: [spot('AGENTS.md', 3)], exemplars: ways })],
     });
 
     const [finding] = await c.built([group(['0:0', '3:0'])]);
