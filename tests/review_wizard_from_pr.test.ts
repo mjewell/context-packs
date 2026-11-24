@@ -217,6 +217,24 @@ describe('findings from a CI review', () => {
     assert.equal(result.stderr, 'The PR has more than 100 comments, and pack-review reads only one page of them.\n');
   });
 
+  // The summary was written by the review commit the workflow pins, which can differ from the version reading it.
+  test('refuses a summary whose findings dont fit the findings this version reads', async (t) => {
+    const c = await FromPrCase.make(t);
+    const { headline: _, ...headless } = c.report.findings[0] as Record<string, unknown>;
+    const findings = [headless, { ...(c.report.findings[1] as object), commentary: 3 }];
+    c.comments([summaryComment({ ...c.report, findings })]);
+    const result = await c.fromPr();
+
+    exits(result, 1);
+    assert.equal(
+      result.stderr,
+      "Stop, and show the user this: pack-review's summary on the PR doesn't fit the findings this version of the " +
+        'review reads, so CI may have run another version:\n' +
+        '  findings[0] needs headline\n' +
+        '  findings[1].commentary should be a string or null\n',
+    );
+  });
+
   test('refuses a PR with no summary from pack-review', async (t) => {
     const c = await FromPrCase.make(t);
     c.comments([{ author: { login: 'alice' }, body: 'Looks good', bodyText: 'Looks good' }]);

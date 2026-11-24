@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { Refused } from './change.ts';
 import * as github from './github.ts';
 import type { Finding } from './report.ts';
+import { errors, findingsSchema, type Schema } from './schema.ts';
 import { TITLE } from './summary.ts';
 
 const SUMMARY_COMMENTS = `
@@ -102,9 +103,42 @@ export async function read(
         lines.join('').trimEnd(),
     );
   }
-  return {
-    head: pull.headRefOid,
-    baseRef: pull.baseRefName,
-    report: JSON.parse(summary!.bodyText.split(`${TITLE}\n`)[1]!),
-  };
+  const report: unknown = JSON.parse(summary!.bodyText.split(`${TITLE}\n`)[1]!);
+  const broken = reportErrors(report);
+  if (broken.length) {
+    throw new Refused(
+      "Stop, and show the user this: pack-review's summary on the PR doesn't fit the findings this version of the " +
+        `review reads, so CI may have run another version:\n${broken.map((line) => `  ${line}`).join('\n')}`,
+    );
+  }
+  return { head: pull.headRefOid, baseRef: pull.baseRefName, report: report as Report };
+}
+
+const REPORT: Schema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['base', 'base_ref', 'head', 'findings'],
+  properties: {
+    base: { type: 'string' },
+    base_ref: { type: 'string' },
+    head: { type: 'string' },
+    findings: { type: 'array' },
+  },
+};
+
+/**
+ * Each way a summary's report breaks the shape this version reads. Its findings are checked against the findings
+ * schema, without thread and commentary, which the schema can't express since each is a string or null.
+ */
+function reportErrors(report: unknown): string[] {
+  const top = errors(report, REPORT);
+  if (top.length) return top;
+  const findings = (report as { findings: Record<string, unknown>[] }).findings;
+  const core = findings.map(({ thread: _, commentary: __, ...rest }) => rest);
+  const extras = findings.flatMap((finding, n) =>
+    (['thread', 'commentary'] as const)
+      .filter((key) => !(typeof finding[key] === 'string' || finding[key] === null))
+      .map((key) => `findings[${n}].${key} should be a string or null`),
+  );
+  return [...errors({ findings: core }, findingsSchema()), ...extras];
 }

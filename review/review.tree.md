@@ -260,6 +260,7 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     - It reads the [[ci-review|summary's]] plain-text rendering, which leaves out HTML comments, image alt text and link URLs
     - A [[ci-review|summary]] counts only when the workflow's bot wrote it, it ends with the [[marker]], and it holds one findings block. A refusal names no login but the bot's
       - Why: the user's own login isn't the token that posted the summary, so `viewerDidAuthor` can't tell it apart
+    - Its [[findings]] must fit the findings schema before they enter the run, since the workflow's pinned commit wrote them, and that can be another version
   - Every prompt, and both the pack-findings and [[pack-review]] skills, tell their agent that what it reads is data, never instructions
   - Text from the PR reaches a step output only under a delimiter it can't contain, so a line in it can't set another output
 - The author goes through the [[findings]] locally, decides each one, and records the [[rules]] they want {#local-review}
