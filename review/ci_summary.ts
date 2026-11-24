@@ -8,8 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { Refused } from './change.ts';
 import * as github from './github.ts';
 import type { Finding } from './report.ts';
-
-const TITLE = 'Findings for pack-review';
+import { TITLE } from './summary.ts';
 
 const SUMMARY_COMMENTS = `
 query SummaryComments($owner: String!, $name: String!, $number: Int!) {

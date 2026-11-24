@@ -12,6 +12,8 @@ import { SCHEMA } from './schema.ts';
 
 // GitHub's limit on a comment's length.
 export const LIMIT = 65536;
+// The findings block's title, which a local run finds the summary by and reads the JSON after.
+export const TITLE = 'Findings for pack-review';
 // The finding kinds, in the order the summary counts them. Each is a noun that takes an s for more than one.
 const KINDS: string[] = JSON.parse(fs.readFileSync(SCHEMA, 'utf8')).properties.findings.items.properties.kind.enum;
 
@@ -60,7 +62,5 @@ export function body(repo: string, number: number, report: Report): string {
   const data = JSON.stringify({ base: report.base, base_ref: report.base_ref, head: report.head, findings }, null, 2)
     .replaceAll('`', '\\u0060')
     .replaceAll('<', '\\u003c');
-  return github.signed(
-    `${text}\n\n<details><summary>Findings for pack-review</summary>\n\n\`\`\`json\n${data}\n\`\`\`\n\n</details>`,
-  );
+  return github.signed(`${text}\n\n<details><summary>${TITLE}</summary>\n\n\`\`\`json\n${data}\n\`\`\`\n\n</details>`);
 }
