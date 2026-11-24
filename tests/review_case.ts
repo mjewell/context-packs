@@ -9,7 +9,6 @@ import { tempDir } from './temp.ts';
 export const REVIEW = path.join(ROOT, 'review');
 export const SCHEMA = path.join(ROOT, 'skills', 'pack-findings', 'findings.schema.json');
 export const MARKER = '<!-- pack-review -->';
-export { BASE, HEAD } from './fake_github.ts';
 
 /** A spot a finding names, which deviates from the rule unless follows. */
 export function spot(file: string, line: number, follows = false) {

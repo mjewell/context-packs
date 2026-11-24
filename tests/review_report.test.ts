@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, test } from 'node:test';
-
 import { exits, includes } from './expect.ts';
-import { BASE, HEAD, ReviewCase, spot } from './review_case.ts';
+import { BASE, HEAD } from './fake_github.ts';
+import { ReviewCase, spot } from './review_case.ts';
 
 const NUMBERS = { file: 'AGENTS.md', quote: 'Game numbers live in content.', routed: true };
 

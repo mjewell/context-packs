@@ -4,8 +4,8 @@ import path from 'node:path';
 import { describe, test } from 'node:test';
 
 import { excludes, exits, includes } from './expect.ts';
-import { comment, connection, ok, pullRequest } from './fake_github.ts';
-import { BASE, HEAD, MARKER, own, ReviewCase, reviewThread, spot } from './review_case.ts';
+import { BASE, comment, connection, HEAD, ok, pullRequest } from './fake_github.ts';
+import { MARKER, own, ReviewCase, reviewThread, spot } from './review_case.ts';
 import type { Result } from './scripts.ts';
 
 function finding(

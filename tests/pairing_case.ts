@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { BASE, HEAD, ReviewCase } from './review_case.ts';
+import { BASE, HEAD } from './fake_github.ts';
+import { ReviewCase } from './review_case.ts';
 
 /** A finding at one spot, as the review's report holds it. */
 export function finding(headline: string, { file = 'src/sim.ts', line = 42, kind = 'deviation' } = {}) {
