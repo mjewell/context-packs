@@ -6,7 +6,7 @@ argument-hint: "[PR number or owner/repo#number, branch, or commit range] [check
 # their calls from asking. It ends with that turn, so the orchestrator's later calls ask, unless the session allows the
 # command at startup, as a headless run does. The checkout CLI isn't granted, since its path is known only once the
 # skill loads: CI allows it at startup.
-allowed-tools: Bash(npx context-packs@0.11.0 review:*)
+allowed-tools: Bash(npx context-packs@0.12.0 review:*)
 ---
 
 # Pack findings
@@ -33,7 +33,7 @@ A PR named as `owner/repo#number` is in that repo: from a folder above the repos
 
 ## The CLI
 
-Every command below runs the CLI as `npx context-packs@0.11.0`, the version this skill was written for. When you were asked for the `checkout` CLI, run it from the checkout this skill was loaded from instead: `node <repo>/src/cli.ts`, where `<repo>` is this skill's base directory without its last two parts, `/skills/pack-findings`. Write that path out in full, with no `..` and no shell variable. CI asks for the `checkout` CLI, so a CI review runs the code of the commit its workflow pinned.
+Every command below runs the CLI as `npx context-packs@0.12.0`, the version this skill was written for. When you were asked for the `checkout` CLI, run it from the checkout this skill was loaded from instead: `node <repo>/src/cli.ts`, where `<repo>` is this skill's base directory without its last two parts, `/skills/pack-findings`. Write that path out in full, with no `..` and no shell variable. CI asks for the `checkout` CLI, so a CI review runs the code of the commit its workflow pinned.
 
 ## 1. Pin the diff
 
@@ -46,7 +46,7 @@ The review reads the packs and the existing code from the checkout, so a change 
 The wizard runs the review: it lists the finders, gives each one its brief, checks every answer, and builds the findings from the merge. A CI review runs the same steps, so a local review and a CI review check the same way. Start it with this command, with the base and head from step 1 and the CLI from [The CLI](#the-cli) in both places, as one Bash call written out in full, with no shell variables:
 
 ```bash
-npx context-packs@0.11.0 review init --base <base> --head <head> --command "npx context-packs@0.11.0 review"
+npx context-packs@0.12.0 review init --base <base> --head <head> --command "npx context-packs@0.12.0 review"
 ```
 
 Then do what each output says. Start every subagent it names in the foreground, all in one message when it names several, each with exactly the prompt it gives. A headless session ends when your turn does, and a subagent in the background ends with it. Don't read the docs, the diff or the finders' answers yourself: each subagent reads what its brief names, and the wizard checks what it hands back. When a subagent reports back, run the `next` command the wizard gave you. If a command is refused, do what its message says.

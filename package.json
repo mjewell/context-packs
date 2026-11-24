@@ -1,6 +1,6 @@
 {
   "name": "context-packs",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Sync your agent docs into AGENTS.md as an index that points the agent at the right doc for each task",
   "license": "MIT",
   "type": "module",
