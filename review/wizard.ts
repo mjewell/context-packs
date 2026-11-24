@@ -22,8 +22,7 @@ import { Change, commit, git, Refused } from './change.ts';
 import { type Finding, findingsIn, Rejected } from './report.ts';
 import { errors, findingsSchema, groupsSchema, type Schema } from './schema.ts';
 
-// The prompts and the schema live with the pack-findings skill, since an installed skill holds only its own folder.
-const PROMPTS = path.join(ROOT, 'skills', 'pack-findings');
+const PROMPTS = path.join(ROOT, 'review', 'prompts');
 const STATE = 'state.json';
 // The kinds of finding, in the order the findings schema lists them.
 const KINDS = findingsSchema().properties!.findings!.items!.properties!.kind!.enum as string[];

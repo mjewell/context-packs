@@ -50,8 +50,8 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     - An [[uncovered-choice|uncovered choice]] joins a [[deviation]] about the same choice at the same [[findings|spots]], since a [[rules|rule]] covers it after all
   - A [[local-review|local review]] and a [[ci-review|CI review]] give their agents the same three prompt files, so both check the same way, with answers in the findings schema {#shared-prompts}
     - The [[wizard]] fills each one with the commands that read the [[doc|docs]] and the change, and how to hand in an answer, in a [[local-review|local review]] and in CI alike
-    - The prompts, one each for a [[unit|unit's]] [[finders|finder]], the [[uncovered-finder|uncovered finder]] and the [[merge]], live with the schema in the pack-findings skill's folder, since an installed skill holds only its own folder
-      - Why: with the schema in `review/`, a local agent fetched it from a GitHub URL the user never pinned
+    - The prompts, one each for a [[unit|unit's]] [[finders|finder]], the [[uncovered-finder|uncovered finder]] and the [[merge]], live with the schema beside the [[wizard]], which alone reads them. The pack-findings skill links to neither
+      - Why: when the skill linked to the schema outside its own folder, a local agent fetched it from a GitHub URL the user never pinned
   - The wizard runs every review, local or CI: a state machine that agents step through {#wizard}
     ```d2
     shape: sequence_diagram

@@ -9,8 +9,8 @@ import path from 'node:path';
 
 import { ROOT } from '../src/root.ts';
 
-// The schema lives with the pack-findings skill, so a local review and CI read one copy.
-export const SCHEMA = path.join(ROOT, 'skills', 'pack-findings', 'findings.schema.json');
+// The schema lives with the briefs' prompts, so a local review and CI read one copy.
+export const SCHEMA = path.join(ROOT, 'review', 'prompts', 'findings.schema.json');
 
 export interface Schema {
   readonly type?: 'object' | 'array' | 'string' | 'integer' | 'boolean';

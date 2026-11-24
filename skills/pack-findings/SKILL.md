@@ -14,7 +14,7 @@ allowed-tools: Bash(npx context-packs@0.12.0 review:*)
 Done when:
 
 - the review's wizard said it's done, after every finder it named answered and the merge built the findings from their answers;
-- every finding was handed over in the shape [findings.schema.json](findings.schema.json) sets, to whoever ran this skill, as described in [Where it runs](#where-it-runs).
+- every finding was handed over as the wizard printed it, to whoever ran this skill, as described in [Where it runs](#where-it-runs).
 
 This checks the change only against what the repo's packs and instruction file say. Bugs, and whether the change does what it set out to do, are for other reviews. Deciding what to do about each finding is for `pack-review`.
 
