@@ -148,7 +148,8 @@ class Run {
  * Every such file goes through here.
  */
 function publish(file: string, text: string): void {
-  const partial = `${file}.partial`;
+  // Each process names its own, so two steps writing one file at once, such as a doc read twice, don't share it.
+  const partial = `${file}.${process.pid}.partial`;
   fs.writeFileSync(partial, text, 'utf8');
   fs.renameSync(partial, file);
 }
@@ -191,7 +192,7 @@ function init(args: Values): void {
   const answers = path.join(temp, 'pack-review-answers', path.basename(folder));
   fs.mkdirSync(answers, { recursive: true });
   const state: State = { base: change.base, head: change.head, root, command: String(args.command), units, answers };
-  fs.writeFileSync(path.join(folder, STATE), dumps(state), 'utf8');
+  publish(path.join(folder, STATE), dumps(state));
   const run = new Run(folder);
   const lines = [
     `Reviewing ${counted(commits, 'commit')} that change ${counted(change.paths().length, 'file')}, against ` +
@@ -298,7 +299,7 @@ function doc(args: Values): void {
     throw new Refused(`Unit ${unit} has ${counted(docs.length, 'doc')}.`);
   const text = fs.readFileSync(path.join(run.state.root, docs[Number(n) - 1]!), 'utf8');
   fs.mkdirSync(run.served(unit), { recursive: true });
-  fs.writeFileSync(path.join(run.served(unit), String(Number(n))), '');
+  publish(path.join(run.served(unit), String(Number(n))), '');
   print(text, '');
 }
 
