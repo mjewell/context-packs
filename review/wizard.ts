@@ -14,18 +14,17 @@ import { instructions, region } from '../src/blocks.ts';
 import { runAsScript } from '../src/main.ts';
 import { exists } from '../src/paths.ts';
 import { dumps } from '../src/pyjson.ts';
-import { format, quote, repr } from '../src/pystr.ts';
-import { ROOT } from '../src/root.ts';
+import { quote, repr } from '../src/pystr.ts';
 import { Stop } from '../src/stop.ts';
 import { units as tableUnits } from '../src/tables.ts';
 import { Change, commit, git, Refused } from './change.ts';
 import { type Cited, evidenceErrors } from './evidence.ts';
 import { aKind, kindText } from './kinds.ts';
+import { prompt } from './prompts.ts';
 import { type Finding, findingsIn, Rejected } from './report.ts';
 import { errors, findingsSchema, groupsSchema, type Schema } from './schema.ts';
 import { snapshot } from './snapshot.ts';
 
-const PROMPTS = path.join(ROOT, 'review', 'prompts');
 const STATE = 'state.json';
 // The kinds of finding, in the order the findings schema lists them.
 const KINDS = findingsSchema().properties!.findings!.items!.properties!.kind!.enum as string[];
@@ -164,11 +163,6 @@ function publish(file: string, text: string): void {
   const partial = `${file}.${process.pid}.partial`;
   fs.writeFileSync(partial, text, 'utf8');
   fs.renameSync(partial, file);
-}
-
-/** A prompt file filled in as str.format fills it. */
-function prompt(name: string, values: Readonly<Record<string, string>>): string {
-  return format(fs.readFileSync(path.join(PROMPTS, name), 'utf8'), values);
 }
 
 /** The head init reviews: the commit --head names, once it's checked out, or a commit made from the working files. */

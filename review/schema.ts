@@ -7,10 +7,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { ROOT } from '../src/root.ts';
+import { PROMPTS } from './prompts.ts';
 
 // The schema lives with the briefs' prompts, so a local review and CI read one copy.
-export const SCHEMA = path.join(ROOT, 'review', 'prompts', 'findings.schema.json');
+export const SCHEMA = path.join(PROMPTS, 'findings.schema.json');
 
 export interface Schema {
   readonly type?: 'object' | 'array' | 'string' | 'integer' | 'boolean';
