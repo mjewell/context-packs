@@ -18,7 +18,16 @@ import { check, linksTo, stats } from './tree_check.ts';
 import { parse } from './tree_model.ts';
 import { page, Stop } from './tree_render.ts';
 
-const USAGE = 'usage: trees.ts {check,stats,links-to,render} ...';
+// What each command takes after its name, as the usage lists it.
+const COMMANDS: Readonly<Record<string, string>> = {
+  check: '',
+  stats: '',
+  'links-to': '<id>',
+  render: '<id>.tree.md [-o out.html]',
+};
+const USAGE = `Usage:\n${Object.entries(COMMANDS)
+  .map(([name, takes]) => `  trees.ts ${`${name} ${takes}`.trim()}\n`)
+  .join('')}`;
 
 function fail(message: string): never {
   throw new Stop(message);
@@ -62,35 +71,36 @@ function render(tree: string, out: string | undefined): void {
   process.stdout.write(`${target}\n`);
 }
 
+/** Says what's wrong with the arguments, lists every command, and exits 2. */
 function usage(message: string): never {
-  process.stderr.write(`${USAGE}\ntrees.ts: error: ${message}\n`);
+  process.stderr.write(`trees.ts: ${message}.\n\n${USAGE}`);
   process.exit(2);
-}
-
-/** The arguments after the command, or a usage error. */
-function read(rest: readonly string[]) {
-  try {
-    return parseArgs({ args: [...rest], allowPositionals: true, options: { out: { type: 'string', short: 'o' } } });
-  } catch (error) {
-    return usage((error as Error).message);
-  }
 }
 
 function main(argv: readonly string[]): void {
   const [command, ...rest] = argv;
-  const { positionals, values } = read(rest);
-  const expected: Record<string, number> = { check: 0, stats: 0, 'links-to': 1, render: 1 };
-  if (command === undefined) usage('the following arguments are required: command');
-  if (!(command in expected)) usage(`argument command: invalid choice: '${command}'`);
-  if (positionals.length < expected[command]!)
-    usage(`the following arguments are required: ${command === 'render' ? 'tree' : 'id'}`);
-  if (positionals.length > expected[command]! || (values.out !== undefined && command !== 'render')) {
-    usage(`unrecognized arguments: ${rest.join(' ')}`);
+  if (command === undefined) usage('name a command');
+  const takes = COMMANDS[command];
+  if (takes === undefined) usage(`there's no command ${command}`);
+  const wrong = () => usage(`${command} takes ${takes || 'no arguments'}`);
+  let parsed: ReturnType<typeof read>;
+  try {
+    parsed = read(rest);
+  } catch {
+    return wrong();
   }
+  const { positionals, values } = parsed;
+  const count = command === 'links-to' || command === 'render' ? 1 : 0;
+  if (positionals.length !== count || (values.out !== undefined && command !== 'render')) wrong();
   if (command === 'check') runCheck();
   else if (command === 'stats') runStats();
   else if (command === 'links-to') runLinksTo(positionals[0]!);
   else render(positionals[0]!, values.out);
+}
+
+/** The arguments after the command. */
+function read(rest: readonly string[]) {
+  return parseArgs({ args: [...rest], allowPositionals: true, options: { out: { type: 'string', short: 'o' } } });
 }
 
 try {

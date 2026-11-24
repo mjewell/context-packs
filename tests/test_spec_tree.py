@@ -210,6 +210,27 @@ class StatsTests(TreeCase):
                                                            '  Finders check the diff: view 12, 1 child, subtree 12\n'))
 
 
+class UsageTests(TreeCase):
+    """A command given the wrong arguments says what it takes, and lists every command."""
+
+    def test_says_what_a_command_takes_and_exits_2(self):
+        for args, says in ((('render',), 'render takes <id>.tree.md [-o out.html]'),
+                           (('links-to', 'a', 'b'), 'links-to takes <id>'),
+                           (('stats', '-o', 'x'), 'stats takes no arguments'),
+                           (('publish',), "there's no command publish"),
+                           ((), 'name a command')):
+            with self.subTest(args=args):
+                run = self.trees(*args)
+
+                self.assertEqual(run.returncode, 2, run.stderr)
+                self.assertEqual(run.stderr, f'trees.ts: {says}.\n\n'
+                                             'Usage:\n'
+                                             '  trees.ts check\n'
+                                             '  trees.ts stats\n'
+                                             '  trees.ts links-to <id>\n'
+                                             '  trees.ts render <id>.tree.md [-o out.html]\n')
+
+
 class LinksToTests(TreeCase):
     """`trees.ts links-to <id>` lists the nodes that link to an ID, in every tree."""
 
