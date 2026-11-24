@@ -3,18 +3,15 @@
  * built in an index of its own, so the branch, the index and the working files stay as they were, and no commit hook
  * runs.
  */
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { Refused } from './change.ts';
+import { gitWithEnv } from './change.ts';
 
-/** What git printed, run with index as its index. */
+/** What git printed, trimmed, run with index as its index. */
 function git(index: string, ...args: string[]): string {
-  const run = spawnSync('git', args, { env: { ...process.env, GIT_INDEX_FILE: index }, maxBuffer: Infinity });
-  if (run.status !== 0) throw new Refused(`git said: ${String(run.stderr ?? run.error).trim()}`);
-  return run.stdout.toString('utf8').trim();
+  return gitWithEnv({ GIT_INDEX_FILE: index }, ...args).trim();
 }
 
 /**
