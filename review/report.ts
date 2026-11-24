@@ -48,8 +48,7 @@ function cleaned<T>(value: T): T {
 /** Groups the report can't be built from, with the reason. */
 export class Rejected extends Error {}
 
-function groupsIn(file: string): Group[] {
-  const text = fs.readFileSync(file, 'utf8');
+function groupsIn(text: string): Group[] {
   let output: unknown;
   try {
     output = JSON.parse(text);
@@ -108,10 +107,11 @@ function checked(groups: Group[], sources: ReadonlyMap<string, Finding>): Group[
   return groups;
 }
 
-export function findingsIn(groupsPath: string, sourcesPath: string): Finding[] {
+/** The findings that the merging agent's groups, its answer's JSON text, build from the sources in sourcesPath. */
+export function findingsIn(groupsText: string, sourcesPath: string): Finding[] {
   const listed: { id: string; finding: Finding }[] = JSON.parse(fs.readFileSync(sourcesPath, 'utf8'));
   const sources = new Map(listed.map((source) => [source.id, source.finding]));
-  return cleaned(checked(groupsIn(groupsPath), sources).map((group) => built(group, sources)));
+  return cleaned(checked(groupsIn(groupsText), sources).map((group) => built(group, sources)));
 }
 
 /** The findings a review's wizard built, cleaned like the merge's, once they're for the head that was reviewed. */

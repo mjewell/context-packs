@@ -19,10 +19,12 @@ import { Stop } from '../src/stop.ts';
 import { units as tableUnits } from '../src/tables.ts';
 import { Change, commit, git, Refused } from './change.ts';
 import * as ciSummary from './ci_summary.ts';
+import { type Cited, evidenceErrors } from './evidence.ts';
 import { aKind, kindText } from './kinds.ts';
 import { type Finding, findingsIn, Rejected } from './report.ts';
-import { counted, newRun, Run } from './run.ts';
+import { counted, newRun, publish, Run } from './run.ts';
 import { errors, findingsSchema, groupsSchema, type Schema } from './schema.ts';
+import { snapshot } from './snapshot.ts';
 
 const PROMPTS = path.join(ROOT, 'review', 'prompts');
 // The kinds of finding, in the order the findings schema lists them.
@@ -60,6 +62,18 @@ function checkedOut(head: string, step: string): void {
   }
 }
 
+/** The head init reviews: the commit --head names, once it's checked out, or a commit made from the working files. */
+function headOf(args: Values): string {
+  if (args.head && args.uncommitted) throw new Refused('Give init --head or --uncommitted, not both.');
+  if (args.uncommitted) return snapshot();
+  if (!args.head) {
+    throw new Refused('Give init --head, the commit to review, or --uncommitted, to review the working files.');
+  }
+  const head = commit(String(args.head));
+  checkedOut(head, 'init');
+  return head;
+}
+
 /** The repo's units: the instruction file, then the docs each pack's table points at. */
 function rulesOf(root: string): string[][] {
   const file = instructions(root);
@@ -79,13 +93,13 @@ function uncommittedLines(units: readonly string[][], before: string): string[] 
 }
 
 function init(args: Values): void {
-  const head = commit(String(args.head));
-  checkedOut(head, 'init');
+  const head = headOf(args);
   const root = git('rev-parse', '--show-toplevel').trim();
   const units = rulesOf(root);
   const change = new Change(String(args.base), head);
   if (!change.paths().length) {
-    throw new Refused(`The change from ${args.base} to ${args.head} touches no files, so there is nothing to review.`);
+    const to = args.uncommitted ? 'the working files' : args.head;
+    throw new Refused(`The change from ${args.base} to ${to} touches no files, so there is nothing to review.`);
   }
   const commits = git('rev-list', `${change.start}..${change.head}`).split(/\s+/).filter(Boolean).length;
   const run = newRun({ base: change.base, head: change.head, root, command: String(args.command), units });
@@ -93,7 +107,8 @@ function init(args: Values): void {
     `Reviewing ${counted(commits, 'commit')} that change ${counted(change.paths().length, 'file')}, against ` +
       `${counted(units.length, 'unit')}.`,
     '',
-    ...uncommittedLines(units, 'start the finders'),
+    // A review of the working files reads their rules as the head's already, so only a --head review lists them.
+    ...(args.uncommitted ? [] : uncommittedLines(units, 'start the finders')),
     `Start these ${run.finders().length} subagents now, in the foreground, all in one message, so they run at once ` +
       'and you wait for every answer. Give each exactly this prompt:',
     ...run.finders().map(([, label, line]) => `  ${label}: ${line}`),
@@ -195,7 +210,7 @@ function doc(args: Values): void {
     throw new Refused(`Unit ${unit} has ${counted(docs.length, 'doc')}.`);
   const text = fs.readFileSync(path.join(run.state.root, docs[Number(n) - 1]!), 'utf8');
   fs.mkdirSync(run.served(unit), { recursive: true });
-  fs.writeFileSync(path.join(run.served(unit), String(Number(n))), '');
+  publish(path.join(run.served(unit), String(Number(n))), '');
   print(text, '');
 }
 
@@ -257,7 +272,7 @@ function submit(args: Values): void {
   const finder = run.finder(String(args.finder));
   const command = run.command('submit', String(finder));
   if (run.phase() !== 'finders')
-    throw new Refused("Not taken: the merge has started, so the finders' answers can't change.");
+    throw new Refused("Not taken: every finder is in, so the finders' answers can't change.");
   if (finder !== run.uncovered) {
     const unread = run.units[finder]!.map((docPath, i): [number, string] => [i + 1, docPath]).filter(
       ([n]) => !exists(path.join(run.served(finder), String(n))),
@@ -274,9 +289,16 @@ function submit(args: Values): void {
     }
   }
   const text = answer('answer', run.answer(`unit-${finder}.json`), command, findingsSchema());
-  const findings: unknown[] = JSON.parse(text).findings;
+  const findings: Cited[] = JSON.parse(text).findings;
+  const missing = evidenceErrors(findings, run.state.head, run.state.root);
+  if (missing.length) {
+    throw new Refused(
+      `Not taken: your answer names evidence that isn't there:\n${missing.map((line) => `  ${line}\n`).join('')}` +
+        `Fix it, then submit it again with \`${command}\`.`,
+    );
+  }
   fs.mkdirSync(path.dirname(run.accepted(finder)), { recursive: true });
-  fs.writeFileSync(run.accepted(finder), text, 'utf8');
+  publish(run.accepted(finder), text);
   const name = finder === run.uncovered ? "the uncovered finder's answer" : `unit ${finder}`;
   print(
     `${name[0]!.toUpperCase()}${name.slice(1)} is in, with ${counted(findings.length, 'finding')}. Tell whoever ` +
@@ -284,27 +306,34 @@ function submit(args: Values): void {
   );
 }
 
+/** Print a done run's findings, counted by kind. */
+function printDone(run: Run): void {
+  const findings: Finding[] = JSON.parse(fs.readFileSync(run.findings, 'utf8')).findings;
+  const kinds = KINDS.filter((kind) => findings.some((found) => found.kind === kind)).map((kind) =>
+    counted(findings.filter((found) => found.kind === kind).length, kind),
+  );
+  const listed = kinds.length ? kinds.slice(0, -1).join(', ') + (kinds.length > 1 ? ' and ' : '') + kinds.at(-1) : '';
+  print(
+    [
+      `Done: ${counted(findings.length, 'finding')}${listed ? `, ${listed}` : ''}, in ${run.findings}.`,
+      'If another skill, such as pack-review, ran pack-findings, show none of the findings: hand that skill this ' +
+        `command, \`${run.command('next')}\`, which prints them for it. Otherwise, show the user how many there ` +
+        'are of each kind, then each finding in full, grouped by kind, and say that running pack-review in this ' +
+        'session goes through them without finding them again.',
+      ...(findings.length
+        ? [`To go through them one at a time, run \`${run.command('finding', '1')}\`, then the same with 2, and so on.`]
+        : []),
+      'Here they are:',
+      JSON.stringify(findings, null, 1),
+    ].join('\n'),
+  );
+}
+
 function nextStep(args: Values): void {
   const run = new Run(String(args.run));
   const phase = run.phase();
   if (phase === 'done') {
-    const findings: Finding[] = JSON.parse(fs.readFileSync(run.findings, 'utf8')).findings;
-    const kinds = KINDS.filter((kind) => findings.some((found) => found.kind === kind)).map((kind) =>
-      counted(findings.filter((found) => found.kind === kind).length, kind),
-    );
-    const listed = kinds.length ? kinds.slice(0, -1).join(', ') + (kinds.length > 1 ? ' and ' : '') + kinds.at(-1) : '';
-    print(
-      [
-        `Done: ${counted(findings.length, 'finding')}${listed ? `, ${listed}` : ''}, in ${run.findings}.`,
-        'If another skill, such as pack-review, ran pack-findings, show none of the findings: hand that skill this ' +
-          `command, \`${run.command('next')}\`, which prints them for it. Otherwise, show the user how many there ` +
-          'are of each kind, then each finding in full, grouped by kind, and say that running pack-review in this ' +
-          'session goes through them without finding them again.',
-        `To go through them one at a time, run \`${run.command('finding', '1')}\`, then the same with 2, and so on.`,
-        'Here they are:',
-        JSON.stringify(findings, null, 1),
-      ].join('\n'),
-    );
+    printDone(run);
     return;
   }
   if (phase === 'merge') {
@@ -329,7 +358,13 @@ function nextStep(args: Values): void {
     return;
   }
   const found = sources(path.dirname(run.accepted(0)));
-  fs.writeFileSync(run.sources, dumps(found), 'utf8');
+  publish(run.sources, dumps(found));
+  // With no findings there is nothing to group, so the findings are built here, as submit-groups would build them.
+  if (!found.length) {
+    publish(run.findings, dumps({ base: run.state.base, head: run.state.head, findings: [] }));
+    printDone(run);
+    return;
+  }
   print(
     `All ${finders.length} finders are in, with ${counted(found.length, 'finding')}.\n` +
       'Start one subagent in the foreground, with exactly this prompt: ' +
@@ -361,7 +396,7 @@ async function fromPr(args: Values): Promise<void> {
   const root = git('rev-parse', '--show-toplevel').trim();
   const units = rulesOf(root);
   const run = newRun({ base: report.base, head: report.head, root, command: String(args.command), units });
-  fs.writeFileSync(run.findings, dumps(report), 'utf8');
+  publish(run.findings, dumps(report));
   print(
     [
       `Loaded ${counted(report.findings.length, 'finding')} from CI's review of ${report.head.slice(0, 7)}, in ` +
@@ -409,23 +444,29 @@ function findingStep(args: Values): void {
 
 function submitGroups(args: Values): void {
   const run = new Run(String(args.run));
-  if (run.phase() === 'finders') {
+  const phase = run.phase();
+  if (phase === 'finders') {
     throw new Refused(
       `Not taken: the merge hasn't started. Run \`${run.command('next')}\` to see whose answers aren't in.`,
     );
   }
+  // A run that's done never changes: next prints its findings, so an agent that missed the first reply loses nothing.
+  if (phase === 'done') {
+    throw new Refused(
+      "Not taken: the findings are already built, so the groups can't change. Tell whoever started you, and stop.",
+    );
+  }
   const command = run.command('submit-groups');
-  const groups = path.join(run.folder, 'groups.json');
-  fs.writeFileSync(groups, answer('groups', run.answer('groups.json'), command, groupsSchema()), 'utf8');
+  const text = answer('groups', run.answer('groups.json'), command, groupsSchema());
   let findings: Finding[];
   try {
-    findings = findingsIn(groups, run.sources);
+    findings = findingsIn(text, run.sources);
   } catch (error) {
     if (!(error instanceof Rejected)) throw error;
     throw new Refused(`Not taken: ${error.message}. Fix your groups, then submit them again with \`${command}\`.`);
   }
-  const built = { base: run.state.base, head: run.state.head, findings };
-  fs.writeFileSync(run.findings, dumps(built), 'utf8');
+  publish(path.join(run.folder, 'groups.json'), text);
+  publish(run.findings, dumps({ base: run.state.base, head: run.state.head, findings }));
   print(`${counted(findings.length, 'finding')} are in ${run.findings}. Tell whoever started you, and stop.`);
 }
 
@@ -451,8 +492,12 @@ const PARSER: Parser = {
           flag: '--head',
           dest: 'head',
           metavar: 'HEAD',
-          required: true,
           help: 'the commit or branch that is reviewed, checked out',
+        },
+        {
+          flag: '--uncommitted',
+          dest: 'uncommitted',
+          help: 'review the working files, as a commit made from them on top of HEAD, instead of a head',
         },
         {
           flag: '--command',

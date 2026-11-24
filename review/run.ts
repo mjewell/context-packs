@@ -27,6 +27,18 @@ export function counted(count: number, noun: string): string {
   return `${count} ${noun}${count !== 1 ? 's' : ''}`;
 }
 
+/**
+ * Write text to file whole or not at all, by renaming a file written beside it. The run's state is which files exist,
+ * such as a finder's accepted answer or the file that starts a phase, so a write cut short must never leave one.
+ * Every such file goes through here.
+ */
+export function publish(file: string, text: string): void {
+  // Each process names its own, so two steps writing one file at once, such as a doc read twice, don't share it.
+  const partial = `${file}.${process.pid}.partial`;
+  fs.writeFileSync(partial, text, 'utf8');
+  fs.renameSync(partial, file);
+}
+
 /** A review in progress, kept in its run folder. */
 export class Run {
   readonly folder: string;
@@ -96,8 +108,8 @@ export class Run {
 
   /**
    * Which step the run is at: 'finders' until next starts the merge, 'merge' until submit-groups builds the findings,
-   * then 'done'. Each phase starts when the file that marks it is written, so this is the one place that knows which
-   * file that is.
+   * then 'done'. With no findings to merge, next builds them, and the run goes from 'finders' to 'done'. Each phase
+   * starts when the file that marks it is written, so this is the one place that knows which file that is.
    */
   phase(): 'finders' | 'merge' | 'done' {
     if (exists(this.findings)) return 'done';
@@ -131,6 +143,6 @@ export function newRun(state: Omit<State, 'answers'>): Run {
   const folder = fs.mkdtempSync(path.join(temp, 'pack-review-runs', 'pack-review-'));
   const answers = path.join(temp, 'pack-review-answers', path.basename(folder));
   fs.mkdirSync(answers, { recursive: true });
-  fs.writeFileSync(path.join(folder, STATE), dumps({ ...state, answers }), 'utf8');
+  publish(path.join(folder, STATE), dumps({ ...state, answers }));
   return new Run(folder);
 }
