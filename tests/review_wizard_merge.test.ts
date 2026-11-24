@@ -207,11 +207,29 @@ describe('the merge', () => {
     );
     const done = (await c.step('next')).stdout;
     const split = done.indexOf('\n');
-    assert.equal(
-      done.slice(0, split),
-      `Done: 2 findings, 1 deviation and 1 uncovered choice, in ${file}. Here they are:`,
+    assert.equal(done.slice(0, split), `Done: 2 findings, 1 deviation and 1 uncovered choice, in ${file}.`);
+    const listed = 'Here they are:\n';
+    assert.deepEqual(JSON.parse(done.slice(done.indexOf(listed) + listed.length)), report.findings);
+  });
+
+  // pack-review shows each finding one at a time, so the user would see each one twice if pack-findings showed them too.
+  test('next says how to hand the findings over', async (t) => {
+    const c = await MergeCase.make(t);
+    await c.allIn();
+    await c.submitGroups([
+      { ids: ['0:0', '1:0'], kind: 'deviation', headline: 'One import, two rules', take: 'T' },
+      { ids: ['3:0'], kind: 'uncovered choice', headline: 'Where config lives', take: 'U' },
+    ]);
+
+    const done = (await c.step('next')).stdout;
+
+    includes(
+      done,
+      'If another skill, such as pack-review, ran pack-findings, show none of the findings: hand that skill this ' +
+        `command, \`${c.command('next')}\`, which prints them for it. Otherwise, show the user how many there are of ` +
+        'each kind, then each finding in full, grouped by kind, and say that running pack-review in this session ' +
+        'goes through them without finding them again.\nHere they are:\n',
     );
-    assert.deepEqual(JSON.parse(done.slice(split + 1)), report.findings);
   });
 });
 

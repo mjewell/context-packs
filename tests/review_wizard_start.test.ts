@@ -40,6 +40,32 @@ describe('init', () => {
     assert.ok(fs.statSync(path.join(temp, 'pack-review-answers', path.basename(c.runDir))).isDirectory());
   });
 
+  // The review reads the rules from the checkout, so an uncommitted edit to one is judged as the head's rule.
+  test('lists the rule files with uncommitted changes', async (t) => {
+    const c = await WizardCase.make(t);
+    fs.appendFileSync(path.join(c.repo, 'docs/testing.md'), 'Mock nothing.\n');
+    fs.appendFileSync(path.join(c.repo, 'AGENTS.md'), 'Keep it short.\n');
+    fs.appendFileSync(path.join(c.repo, 'src/app.py'), 'y = 3\n');
+
+    const out = await c.init();
+
+    includes(
+      out,
+      'These rule files have uncommitted changes, which the review reads as the rules at the head. ' +
+        'Show the user this list before you start the finders:\n  AGENTS.md\n  docs/testing.md\n\n',
+    );
+    assert.ok(!out.includes('src/app.py'), out);
+  });
+
+  test('lists no rule files when none has uncommitted changes', async (t) => {
+    const c = await WizardCase.make(t);
+    fs.appendFileSync(path.join(c.repo, 'src/app.py'), 'y = 3\n');
+
+    const out = await c.init();
+
+    assert.ok(!out.includes('uncommitted'), out);
+  });
+
   test('refuses a change that touches no files', async (t) => {
     const c = await WizardCase.make(t);
     const result = await c.wizard('init', '--base', 'HEAD', '--head', 'HEAD', '--command', 'review');
@@ -56,7 +82,7 @@ describe('init', () => {
     const result = await c.wizard('init', '--base', c.base, '--head', c.head, '--command', 'review');
 
     exits(result, 1);
-    includes(result.stderr, `The checkout isn't the head, ${c.head}.`);
+    includes(result.stderr, `The checkout is ${c.base}, not the head, ${c.head}.`);
     assert.equal(result.stdout, '');
   });
 });
@@ -131,6 +157,6 @@ describe('the wizard from the npm package', () => {
     const result = await packaged(c, 'init', '--base', c.base, '--head', c.base, '--command', 'review');
 
     exits(result, 1);
-    includes(result.stderr, "The checkout isn't the head");
+    includes(result.stderr, 'The checkout is');
   });
 });

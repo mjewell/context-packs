@@ -139,6 +139,18 @@ class Run {
   }
 }
 
+/** The rule files, of those the units name, with uncommitted changes, which the review reads as the head's rules. */
+function uncommitted(rules: readonly string[]): string[] {
+  const entries = git('status', '--porcelain', '-z', '--no-renames', '--untracked-files=all', '--', ...rules);
+  const changed = new Set(
+    entries
+      .split('\0')
+      .filter(Boolean)
+      .map((entry) => entry.slice(3)),
+  );
+  return rules.filter((rule) => changed.has(rule));
+}
+
 /** A prompt file filled in as str.format fills it. */
 function prompt(name: string, values: Readonly<Record<string, string>>): string {
   return format(fs.readFileSync(path.join(PROMPTS, name), 'utf8'), values);
@@ -146,8 +158,12 @@ function prompt(name: string, values: Readonly<Record<string, string>>): string 
 
 function init(args: Values): void {
   const head = commit(String(args.head));
-  if (git('rev-parse', 'HEAD').trim() !== head) {
-    throw new Refused(`The checkout isn't the head, ${head}. Check out the head, then run init again.`);
+  const checkedOut = git('rev-parse', 'HEAD').trim();
+  if (checkedOut !== head) {
+    throw new Refused(
+      `The checkout is ${checkedOut}, not the head, ${head}. Stop, tell the user, and offer to check out the head. ` +
+        'Once it is checked out, run init again.',
+    );
   }
   const root = git('rev-parse', '--show-toplevel').trim();
   const file = instructions(root);
@@ -167,10 +183,19 @@ function init(args: Values): void {
   const state: State = { base: change.base, head: change.head, root, command: String(args.command), units, answers };
   fs.writeFileSync(path.join(folder, STATE), dumps(state), 'utf8');
   const run = new Run(folder);
+  const edited = uncommitted(units.flat());
   const lines = [
     `Reviewing ${counted(commits, 'commit')} that change ${counted(change.paths().length, 'file')}, against ` +
       `${counted(units.length, 'unit')}.`,
     '',
+    ...(edited.length
+      ? [
+          'These rule files have uncommitted changes, which the review reads as the rules at the head. Show the ' +
+            'user this list before you start the finders:',
+          ...edited.map((rule) => `  ${rule}`),
+          '',
+        ]
+      : []),
     `Start these ${run.finders().length} subagents now, in the foreground, all in one message, so they run at once ` +
       'and you wait for every answer. Give each exactly this prompt:',
     ...run.finders().map(([, label, line]) => `  ${label}: ${line}`),
@@ -371,8 +396,15 @@ function nextStep(args: Values): void {
     );
     const listed = kinds.length ? kinds.slice(0, -1).join(', ') + (kinds.length > 1 ? ' and ' : '') + kinds.at(-1) : '';
     print(
-      `Done: ${counted(findings.length, 'finding')}${listed ? `, ${listed}` : ''}, in ${run.findings}. Here they ` +
-        `are:\n${JSON.stringify(findings, null, 1)}`,
+      [
+        `Done: ${counted(findings.length, 'finding')}${listed ? `, ${listed}` : ''}, in ${run.findings}.`,
+        'If another skill, such as pack-review, ran pack-findings, show none of the findings: hand that skill this ' +
+          `command, \`${run.command('next')}\`, which prints them for it. Otherwise, show the user how many there ` +
+          'are of each kind, then each finding in full, grouped by kind, and say that running pack-review in this ' +
+          'session goes through them without finding them again.',
+        'Here they are:',
+        JSON.stringify(findings, null, 1),
+      ].join('\n'),
     );
     return;
   }

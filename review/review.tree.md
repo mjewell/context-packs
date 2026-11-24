@@ -92,11 +92,11 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
       finders -> merge: "every answer is in"
       merge -> done: "the groups are in"
       ```
-      - `init` checks that the checkout is the head and that the change touches a file, then names one [[finders|finder]] for each [[unit]] and the [[uncovered-finder|uncovered finder]], each with a one-line prompt
+      - `init` checks that the checkout is the head and the change touches a file, and lists [[rules|rule]] files with uncommitted changes. Then it names one [[finders|finder]] for each [[unit]] and the [[uncovered-finder|uncovered finder]], each with a one-line prompt
       - While answers are missing, `next` names each finder that hasn't answered, with its prompt, so one that stopped can be started again
-      - Once every answer is in, `next` numbers the finders' findings and names the merging agent. Once its groups are in, `next` prints the [[findings]]
+      - Once every answer is in, `next` numbers the finders' findings and names the merging agent. Once its groups are in, `next` prints the [[findings]], and says to hand them back to a skill that ran pack-findings, or else show them to the user
       - The run's state is which files its folder holds. The wizard works it out on each step instead of storing it, and refuses a step whose checks fail
-    - A finder's brief is the skill's prompt for its kind, with the commands that read its docs and the change, and its answer's schema {#brief}
+    - A finder's brief is the wizard's prompt for its kind, with the commands that read its docs and the change, and its answer's schema {#brief}
       - `doc` prints one of the unit's docs and marks it served. `submit` takes a unit's answer only once every doc in it was served, and only in the schema's shape
         - Why: the wizard keeps its own record of what it printed, so the check needs no transcript, see [[doc-names]]
       - `files`, `diff` and `log` read the change from the merge base, through fixed git commands, see [[change-commands]]. `diff` takes only a path the change touches
