@@ -86,8 +86,8 @@ describe('PromptTests', () => {
 
 /** Two findings, and a thread for each, the second resolved. */
 class CheckCase extends PairingCase {
-  protected override setUp(): void {
-    super.setUp();
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
     this.given([F1, F3], [opened('T_1', F1), opened('T_2', F3, [], true)]);
   }
 }
@@ -157,8 +157,8 @@ const LATER = { id: 'RC_5', author: 'alice', at: '2026-11-04T10:00:00Z', text: '
 
 /** The pairing job once the pairs are checked: F1 continues T1. The review ran again at the head. */
 class CommentCase extends PairingCase {
-  protected override setUp(): void {
-    super.setUp();
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
     this.thread([ALICE, BOB]);
     fs.writeFileSync(path.join(this.root, 'paired.json'), JSON.stringify({ pairs: [{ finding: 0, thread: 'T_1' }] }));
   }

@@ -18,7 +18,9 @@ function lexists(file: string): boolean {
 
 /** A repo with neither instruction file yet, and the path CLAUDE.md would have. */
 class InstructionCase extends SyncCase {
-  readonly claudeMd = path.join(this.repo, 'CLAUDE.md');
+  get claudeMd(): string {
+    return path.join(this.repo, 'CLAUDE.md');
+  }
 }
 
 /**
@@ -27,7 +29,7 @@ class InstructionCase extends SyncCase {
  */
 describe('InstructionFileTests', () => {
   test('claude md alone is synced and keeps its own text', async (t) => {
-    const c = new InstructionCase(t);
+    const c = await InstructionCase.make(t);
     fs.writeFileSync(c.claudeMd, `# Repo\n\n${EMPTY}\nUse named exports.\n`);
 
     const result = await c.sync();
@@ -38,7 +40,7 @@ describe('InstructionFileTests', () => {
   });
 
   test('pack added to claude md resyncs with nothing changed', async (t) => {
-    const c = new InstructionCase(t);
+    const c = await InstructionCase.make(t);
     c.share('Prefer small PRs.\n');
     fs.writeFileSync(c.claudeMd, EMPTY);
     await c.add();
@@ -51,7 +53,7 @@ describe('InstructionFileTests', () => {
   });
 
   test('claude md without a block stops and shows the lines to add', async (t) => {
-    const c = new InstructionCase(t);
+    const c = await InstructionCase.make(t);
     fs.writeFileSync(c.claudeMd, 'Old rules.\n');
 
     const result = await c.sync();
@@ -64,7 +66,7 @@ describe('InstructionFileTests', () => {
   });
 
   test('agents md is synced and claude md left alone', async (t) => {
-    const c = new InstructionCase(t);
+    const c = await InstructionCase.make(t);
     fs.writeFileSync(c.agentsMd, EMPTY);
     fs.writeFileSync(c.claudeMd, '@AGENTS.md\n');
 
@@ -76,7 +78,7 @@ describe('InstructionFileTests', () => {
   });
 
   test('existing agents md gets no claude md link', async (t) => {
-    const c = new InstructionCase(t);
+    const c = await InstructionCase.make(t);
     fs.writeFileSync(c.agentsMd, EMPTY);
 
     const result = await c.sync();
@@ -86,7 +88,7 @@ describe('InstructionFileTests', () => {
   });
 
   test('both files without a block stop and leave the choice to the repo', async (t) => {
-    const c = new InstructionCase(t);
+    const c = await InstructionCase.make(t);
     fs.writeFileSync(c.agentsMd, 'Codex rules.\n');
     fs.writeFileSync(c.claudeMd, 'Claude rules.\n');
 
@@ -100,7 +102,7 @@ describe('InstructionFileTests', () => {
   });
 
   test('claude md holding the block stays the one synced once agents md appears', async (t) => {
-    const c = new InstructionCase(t);
+    const c = await InstructionCase.make(t);
     fs.writeFileSync(c.claudeMd, EMPTY);
     fs.writeFileSync(c.agentsMd, 'Codex rules.\n');
 
@@ -112,7 +114,7 @@ describe('InstructionFileTests', () => {
   });
 
   test('block in both files stops the sync untouched', async (t) => {
-    const c = new InstructionCase(t);
+    const c = await InstructionCase.make(t);
     fs.writeFileSync(c.agentsMd, EMPTY);
     fs.writeFileSync(c.claudeMd, EMPTY);
 
@@ -126,7 +128,7 @@ describe('InstructionFileTests', () => {
   });
 
   test('agents md linked to claude md syncs claude md', async (t) => {
-    const c = new InstructionCase(t);
+    const c = await InstructionCase.make(t);
     fs.writeFileSync(c.claudeMd, EMPTY);
     fs.symlinkSync('CLAUDE.md', c.agentsMd);
 
@@ -138,7 +140,7 @@ describe('InstructionFileTests', () => {
   });
 
   test('claude md linked elsewhere stops the sync untouched', async (t) => {
-    const c = new InstructionCase(t);
+    const c = await InstructionCase.make(t);
     const target = path.join(c.source, 'old-rules.md');
     fs.symlinkSync(target, c.claudeMd);
 

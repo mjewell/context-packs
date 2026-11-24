@@ -2,16 +2,15 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { TestContext } from 'node:test';
-
+import { Case } from './case.ts';
 import { tempDir } from './temp.ts';
 
-export class GitCase {
-  readonly repo: string;
-  base: string;
+export class GitCase extends Case {
+  repo!: string;
+  base!: string;
 
-  constructor(t: TestContext) {
-    this.repo = tempDir(t, 'context-packs-git-');
+  protected override async setUp(): Promise<void> {
+    this.repo = tempDir(this.t, 'context-packs-git-');
     this.git('init', '-q', '-b', 'main');
     this.git('config', 'user.name', 'Test');
     this.git('config', 'user.email', 'test@example.com');

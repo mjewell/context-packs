@@ -21,7 +21,7 @@ class AnchorCase extends TreeCase {
 /** The page gives the comment script what it anchors a comment on: each node's source text, and the tree's file. */
 describe('CommentAnchorTests', () => {
   test('each node carries its source text without its id', async (t) => {
-    const c = new AnchorCase(t);
+    const c = await AnchorCase.make(t);
     c.write('review.tree.md', SMALL.replace('Finders check the diff', 'Finders check `the diff` & "more"'));
 
     const page = await c.render();
@@ -31,7 +31,7 @@ describe('CommentAnchorTests', () => {
   });
 
   test('each node carries the text it shows for a person to read', async (t) => {
-    const c = new AnchorCase(t);
+    const c = await AnchorCase.make(t);
     c.write(
       'review.tree.md',
       SMALL.replace(
@@ -50,7 +50,7 @@ describe('CommentAnchorTests', () => {
   });
 
   test('the page names its tree file from the repo root', async (t) => {
-    const c = new AnchorCase(t);
+    const c = await AnchorCase.make(t);
     c.write('review/review.tree.md', SMALL);
 
     const page = await c.render('review/review.tree.md');
@@ -59,7 +59,7 @@ describe('CommentAnchorTests', () => {
   });
 
   test('each page script parses', async (t) => {
-    const c = new AnchorCase(t);
+    const c = await AnchorCase.make(t);
     c.write('review.tree.md', SMALL);
     const scripts = [...(await c.render()).matchAll(/<script type="module">([\s\S]*?)<\/script>/g)].map((m) => m[1]!);
     assert.equal(scripts.length, 2);

@@ -1,19 +1,22 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, type TestContext, test } from 'node:test';
+import { describe, test } from 'node:test';
 
 import { excludes, exits, includes } from './expect.ts';
 import { block, doc, exists, git, HEADER, packed, read, SyncCase } from './sync_case.ts';
 
 /** The house-rules pack imported into a folder of the repo's own docs, context-packs/project/. */
 class ImportPackCase extends SyncCase {
-  ref: string;
+  ref = '';
   readonly id = 'project/house-rules';
-  readonly generated = path.join(this.gen, 'project', 'house-rules');
 
-  constructor(t: TestContext) {
-    super(t);
+  get generated(): string {
+    return path.join(this.gen, 'project', 'house-rules');
+  }
+
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
     this.ref = this.publish({
       'pack.md': 'Prefer small PRs.\n',
       'testing.md': doc('Writing tests', 'Test behavior.\n'),
@@ -28,7 +31,7 @@ class ImportPackCase extends SyncCase {
 
 describe('ImportTests', () => {
   test('add at a nested id writes an import pack pinned to the latest commit', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     const result = await c.importRules('--when', 'Reviewing a PR');
 
     exits(result, 0);
@@ -37,7 +40,7 @@ describe('ImportTests', () => {
   });
 
   test('import pack with a when gets a row in its parents table', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     const result = await c.importRules('--when', 'Reviewing a PR');
 
     exits(result, 0);
@@ -58,7 +61,7 @@ describe('ImportTests', () => {
   });
 
   test('import pack without a when is inlined after its parent', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     const result = await c.importRules();
 
     exits(result, 0);
@@ -79,7 +82,7 @@ describe('ImportTests', () => {
   });
 
   test('import pack without a when follows its authors', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     c.ref = c.share(doc('Working on anything', 'Prefer small PRs.\n'));
 
     const result = await c.importRules();
@@ -89,7 +92,7 @@ describe('ImportTests', () => {
   });
 
   test('import packs when replaces its authors', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     c.ref = c.share(doc('Working on anything', 'Prefer small PRs.\n'));
 
     const result = await c.importRules('--when', 'Reviewing a PR');
@@ -100,7 +103,7 @@ describe('ImportTests', () => {
   });
 
   test('when always inlines the pack even with its authors when', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     c.ref = c.share(doc('Working on anything', 'Prefer small PRs.\n'));
 
     const result = await c.importRules('--when', 'always');
@@ -114,7 +117,7 @@ describe('ImportTests', () => {
   });
 
   test('rules written in the import pack come before the imported ones', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     await c.importRules();
     fs.writeFileSync(c.importMd(c.id), `${c.front(c.ref)}Small means under 200 lines.\n`);
 
@@ -128,7 +131,7 @@ describe('ImportTests', () => {
   });
 
   test('packs nested in the imported pack render as written', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     c.ref = c.publish({ 'frontend/pack.md': doc('Editing `web/**`', 'Keep components small.\n') });
 
     const result = await c.importRules('--when', 'Reviewing a PR');
@@ -142,7 +145,7 @@ describe('ImportTests', () => {
   });
 
   test('import pack in a nested pack renders into its index', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     c.write('context-packs/project/review/pack.md', doc('Reviewing code', 'Read the tests first.\n'));
 
     const result = await c.addAs('project/review/house-rules');
@@ -161,7 +164,7 @@ describe('ImportTests', () => {
   });
 
   test('import pack moved to another folder renders there on resync', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     await c.importRules();
     c.write('context-packs/project/review/pack.md', doc('Reviewing code', 'Read the tests first.\n'));
     fs.renameSync(path.dirname(c.importMd(c.id)), path.join(c.packs, 'project', 'review', 'house-rules'));
@@ -178,7 +181,7 @@ describe('ImportTests', () => {
   });
 
   test('update moves the import packs pin and keeps the rest of it', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     await c.importRules('--when', 'Reviewing a PR');
     fs.writeFileSync(c.importMd(c.id), `${read(c.importMd(c.id))}Small means under 200 lines.\n`);
     const latest = c.share('Prefer small PRs.\nWrite tests first.\n');
@@ -195,7 +198,7 @@ describe('ImportTests', () => {
   });
 
   test('update by id moves only that import pack', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     await c.importRules();
     const latest = c.share('Prefer small PRs.\nWrite tests first.\n');
 
@@ -206,7 +209,7 @@ describe('ImportTests', () => {
   });
 
   test('resync keeps the import pack at its pin', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     await c.importRules();
     c.share('Prefer small PRs.\nWrite tests first.\n');
 
@@ -217,7 +220,7 @@ describe('ImportTests', () => {
   });
 
   test('resync with nothing to change names the import packs pin', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     await c.importRules();
 
     const result = await c.sync();
@@ -227,7 +230,7 @@ describe('ImportTests', () => {
   });
 
   test('remove deletes the import pack and its generated files', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     await c.importRules();
 
     const result = await c.sync('remove', 'project/house-rules');
@@ -241,7 +244,7 @@ describe('ImportTests', () => {
   });
 
   test('deleting the import pack by hand clears its files on resync', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     await c.importRules();
     fs.rmSync(path.dirname(c.importMd(c.id)), { recursive: true });
 
@@ -252,7 +255,7 @@ describe('ImportTests', () => {
   });
 
   test('list shows import packs by id', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     await c.importRules();
 
     const result = await c.sync('list');
@@ -262,7 +265,7 @@ describe('ImportTests', () => {
   });
 
   test('editing an imported doc stops the next sync', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     await c.importRules('--when', 'Reviewing a PR');
     fs.writeFileSync(path.join(c.generated, 'testing.md'), 'Edited here.\n');
 
@@ -277,7 +280,7 @@ describe('ImportTests', () => {
 /** What stops a sync with import packs. */
 describe('ImportRuleTests', () => {
   test('two import packs of one folder both render', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     await c.importRules();
 
     const result = await c.addAs('shared');
@@ -288,7 +291,7 @@ describe('ImportRuleTests', () => {
   });
 
   test('import pack of a folder inside another import packs stops', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     c.ref = c.publish({ 'review/pack.md': doc('Reviewing code', 'Read the tests first.\n') });
     assert.equal((await c.importRules()).status, 0);
 
@@ -300,7 +303,7 @@ describe('ImportRuleTests', () => {
   });
 
   test('import pack holding another file stops', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     await c.importRules();
     c.write(`context-packs/${c.id}/notes.md`, doc('Taking notes'));
 
@@ -312,7 +315,7 @@ describe('ImportRuleTests', () => {
   });
 
   test('add inside an import packs folder stops untouched', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     await c.importRules();
     const before = read(c.agentsMd);
     const [otherOrigin, other] = c.remote('other-rules');
@@ -327,7 +330,7 @@ describe('ImportRuleTests', () => {
   });
 
   test('fetched pack holding an import pack from git stops', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     const [otherOrigin, other] = c.remote('other-rules');
     c.publish({ 'pack.md': 'Use tabs.\n' }, other);
     c.publish({
@@ -343,7 +346,7 @@ describe('ImportRuleTests', () => {
   });
 
   test('import pack of a folder holding context packs stops untouched', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     const result = await c.sync('add', 'self', '.');
 
     exits(result, 1);
@@ -352,7 +355,7 @@ describe('ImportRuleTests', () => {
   });
 
   test('import pack of a folder inside context packs stops untouched', async (t) => {
-    const c = new ImportPackCase(t);
+    const c = await ImportPackCase.make(t);
     const result = await c.sync('add', 'loop', 'context-packs/project');
 
     exits(result, 1);
@@ -365,16 +368,21 @@ describe('ImportRuleTests', () => {
  * A pack whose common/ folder is an import pack with a path and no from. The path is a folder of that pack's repo, so a
  * pack can point at another folder of its own repo, and works the same wherever it's installed.
  */
-function pathImportCase(t: TestContext): SyncCase {
-  const c = new SyncCase(t);
-  c.publish({ 'pack.md': 'Prefer small PRs.\n', 'common/pack.md': '---\npath: common\n---\n' });
-  c.publish({ 'pack.md': 'Use tabs.\n', 'style.md': doc('Styling code', 'Indent once.\n') }, c.source, 'common');
-  return c;
+class PathImportCase extends SyncCase {
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
+    this.publish({ 'pack.md': 'Prefer small PRs.\n', 'common/pack.md': '---\npath: common\n---\n' });
+    this.publish(
+      { 'pack.md': 'Use tabs.\n', 'style.md': doc('Styling code', 'Indent once.\n') },
+      this.source,
+      'common',
+    );
+  }
 }
 
 describe('PathImportTests', () => {
   test('path import in a pack from git reads its repo at the packs ref', async (t) => {
-    const c = pathImportCase(t);
+    const c = await PathImportCase.make(t);
     const result = await c.add();
 
     exits(result, 0);
@@ -397,7 +405,7 @@ describe('PathImportTests', () => {
   });
 
   test('path import in a pack from git moves only with its pin', async (t) => {
-    const c = pathImportCase(t);
+    const c = await PathImportCase.make(t);
     await c.add();
     c.publish({ 'pack.md': 'Use spaces.\n' }, c.source, 'common');
 
@@ -411,7 +419,7 @@ describe('PathImportTests', () => {
   });
 
   test('path import reaching outside its repo stops', async (t) => {
-    const c = pathImportCase(t);
+    const c = await PathImportCase.make(t);
     c.publish({ 'common/pack.md': '---\npath: ../elsewhere\n---\n' });
 
     const result = await c.add();
@@ -422,7 +430,7 @@ describe('PathImportTests', () => {
   });
 
   test('import pack from a folder on disk in a pack from git stops', async (t) => {
-    const c = pathImportCase(t);
+    const c = await PathImportCase.make(t);
     c.publish({ 'common/pack.md': '---\nfrom: ../other-rules\npath: common\n---\n' });
 
     const result = await c.add();
@@ -433,7 +441,7 @@ describe('PathImportTests', () => {
   });
 
   test('path import of a folder holding its pack stops', async (t) => {
-    const c = pathImportCase(t);
+    const c = await PathImportCase.make(t);
     c.publish({ 'common/pack.md': '---\npath: .\n---\n' });
 
     const result = await c.add();
@@ -443,7 +451,7 @@ describe('PathImportTests', () => {
   });
 
   test('path import in a folder on disk reads its repo where it is', async (t) => {
-    const c = pathImportCase(t);
+    const c = await PathImportCase.make(t);
     const result = await c.sync('add', 'house-rules', '../house-rules', '--path', 'context');
 
     exits(result, 0);
@@ -461,8 +469,8 @@ describe('PathImportTests', () => {
 
 /** Two packs from one repo pointing at the same folder of it, such as web and api both including typescript. */
 class SharedFolderCase extends SyncCase {
-  constructor(t: TestContext) {
-    super(t);
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
     this.publish({
       'web/pack.md': 'Build UI from components.\n',
       'web/typescript/pack.md': '---\npath: context/typescript\n---\n',
@@ -479,7 +487,7 @@ class SharedFolderCase extends SyncCase {
 
 describe('SharedFolderTests', () => {
   test('folder both point at renders in each', async (t) => {
-    const c = new SharedFolderCase(t);
+    const c = await SharedFolderCase.make(t);
     await c.addPack('web');
 
     const result = await c.addPack('api');
@@ -492,7 +500,7 @@ describe('SharedFolderTests', () => {
   });
 
   test('folder both point at renders in each at its holders ref', async (t) => {
-    const c = new SharedFolderCase(t);
+    const c = await SharedFolderCase.make(t);
     await c.addPack('web');
     c.publish({ 'typescript/pack.md': doc('Editing `**/*.ts`', 'Prefer unions, never enums.\n') });
 
@@ -504,7 +512,7 @@ describe('SharedFolderTests', () => {
   });
 
   test('pack pointing at its own folder stops', async (t) => {
-    const c = new SharedFolderCase(t);
+    const c = await SharedFolderCase.make(t);
     c.publish({ 'web/self/pack.md': '---\npath: context/web\n---\n' });
 
     const result = await c.addPack('web');

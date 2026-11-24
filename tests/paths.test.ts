@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, type TestContext, test } from 'node:test';
+import { describe, test } from 'node:test';
 
 import { excludes, exits, includes } from './expect.ts';
 import { CLAUSE, doc, OUTSIDE_CLAUSE, read, SyncCase } from './sync_case.ts';
@@ -10,16 +10,17 @@ function rows(...pairs: [string, string][]): string {
 }
 
 /** A repo whose .git is gone, so the folder is in no repo. */
-function outsideCase(t: TestContext): SyncCase {
-  const c = new SyncCase(t);
-  fs.rmdirSync(path.join(c.repo, '.git'));
-  return c;
+class OutsideCase extends SyncCase {
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
+    fs.rmdirSync(path.join(this.repo, '.git'));
+  }
 }
 
 /** A folder in no git repo, such as the one above the repos: sessions start anywhere, so rows are absolute. */
 describe('OutsideRepoTests', () => {
   test('rows are absolute', async (t) => {
-    const c = outsideCase(t);
+    const c = await OutsideCase.make(t);
     c.write('context-packs/testing.md', doc('Writing tests'));
 
     const result = await c.sync();
@@ -29,7 +30,7 @@ describe('OutsideRepoTests', () => {
   });
 
   test('header says doc paths start from the docs folder then where the session started', async (t) => {
-    const c = outsideCase(t);
+    const c = await OutsideCase.make(t);
     const result = await c.sync();
 
     exits(result, 0);
@@ -38,7 +39,7 @@ describe('OutsideRepoTests', () => {
   });
 
   test('a nested packs index has absolute rows', async (t) => {
-    const c = outsideCase(t);
+    const c = await OutsideCase.make(t);
     c.write('context-packs/web/pack.md', doc('Editing `web/**`'));
     c.write('context-packs/web/forms.md', doc('Building a form'));
 
@@ -56,7 +57,7 @@ describe('OutsideRepoTests', () => {
  */
 describe('SubfolderTests', () => {
   test('rows start from the repo root', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     c.write('packages/web/context-packs/testing.md', doc('Writing tests'));
 
     const result = await c.sync('--dir', path.join(c.repo, 'packages', 'web'));
@@ -69,7 +70,7 @@ describe('SubfolderTests', () => {
   });
 
   test('header says paths start from the repo root', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     c.write('packages/web/context-packs/testing.md', doc('Writing tests'));
 
     const result = await c.sync('--dir', path.join(c.repo, 'packages', 'web'));
@@ -79,7 +80,7 @@ describe('SubfolderTests', () => {
   });
 
   test('a worktrees git file marks the repo root', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     fs.rmdirSync(path.join(c.repo, '.git'));
     c.write('.git', 'gitdir: /elsewhere/.git/worktrees/repo\n');
     c.write('packages/web/context-packs/testing.md', doc('Writing tests'));

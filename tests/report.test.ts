@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, type TestContext, test } from 'node:test';
+import { describe, test } from 'node:test';
 
 import { exits } from './expect.ts';
 import { doc, EMPTY, SyncCase } from './sync_case.ts';
@@ -10,11 +10,10 @@ import { doc, EMPTY, SyncCase } from './sync_case.ts';
 class ReportCase extends SyncCase {
   first = '';
 
-  static async make(t: TestContext): Promise<ReportCase> {
-    const c = new ReportCase(t);
-    c.first = c.share('Prefer small PRs.\n');
-    await c.sync();
-    return c;
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
+    this.first = this.share('Prefer small PRs.\n');
+    await this.sync();
   }
 }
 

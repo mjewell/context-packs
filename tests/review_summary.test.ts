@@ -37,7 +37,8 @@ interface Summarized {
 
 /** A run about to post its summary: the findings the review's wizard built, and the head lines each diff shows. */
 class SummaryCase extends ReviewCase {
-  protected override setUp(): void {
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
     Object.assign(this.github.responses, {
       PullRequest: pullRequest(),
       AddComment: ok({}),

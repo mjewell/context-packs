@@ -28,7 +28,8 @@ export const F3 = finding('A second RNG', { file: 'src/rng.ts', line: 17 });
 export class PairingCase extends ReviewCase {
   output = '';
 
-  protected override setUp(): void {
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
     this.output = path.join(this.root, 'github-output.txt');
     fs.writeFileSync(this.output, '');
     this.env.GITHUB_OUTPUT = this.output;

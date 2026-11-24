@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, type TestContext, test } from 'node:test';
+import { describe, test } from 'node:test';
 
 import { excludes, exits, includes } from './expect.ts';
 import { command, run } from './scripts.ts';
@@ -22,7 +22,7 @@ import {
 
 describe('SyncTests', () => {
   test('fresh repo gets agents md holding only the header', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     const result = await c.sync();
 
     exits(result, 0);
@@ -30,7 +30,7 @@ describe('SyncTests', () => {
   });
 
   test('fresh repo gets claude md linked to agents md', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     const result = await c.sync();
 
     exits(result, 0);
@@ -38,7 +38,7 @@ describe('SyncTests', () => {
   });
 
   test('block edited in the repo stops the sync untouched', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     c.share('Prefer small PRs.\n');
     await c.add();
     const edited = read(c.agentsMd).replace('small PRs', 'tiny PRs');
@@ -53,7 +53,7 @@ describe('SyncTests', () => {
   });
 
   test('header edited in the repo stops the sync untouched', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     await c.sync();
     const edited = read(c.agentsMd).replace('never here', 'rarely here');
     fs.writeFileSync(c.agentsMd, edited);
@@ -66,7 +66,7 @@ describe('SyncTests', () => {
   });
 
   test('agents md without a block stops and shows the lines to add', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     fs.writeFileSync(c.agentsMd, '# Repo\n');
 
     const result = await c.sync();
@@ -77,7 +77,7 @@ describe('SyncTests', () => {
   });
 
   test('dir syncs that folder instead of the current one', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     const elsewhere = path.join(c.root, 'elsewhere');
     fs.mkdirSync(elsewhere);
 
@@ -89,7 +89,7 @@ describe('SyncTests', () => {
   });
 
   test('missing dir stops the sync', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     const missing = path.join(c.repo, 'not-a-repo');
 
     const result = await c.sync('--dir', missing);
@@ -99,7 +99,7 @@ describe('SyncTests', () => {
   });
 
   test('usage errors name the tool', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     const result = await c.sync('publish');
 
     exits(result, 2);
@@ -107,7 +107,7 @@ describe('SyncTests', () => {
   });
 
   test('agents md that is a link stops the sync untouched', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     const target = path.join(c.source, 'old-rules.md');
     fs.symlinkSync(target, c.agentsMd);
 
@@ -119,7 +119,7 @@ describe('SyncTests', () => {
   });
 
   test('folder that is not a repo gets agents md and claude md', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     fs.rmSync(path.join(c.repo, '.git'), { recursive: true });
 
     const result = await c.sync();
@@ -130,7 +130,7 @@ describe('SyncTests', () => {
   });
 
   test('block repeated stops the sync untouched', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     await c.sync();
     const doubled = `${read(c.agentsMd)}\n${EMPTY}`;
     fs.writeFileSync(c.agentsMd, doubled);
@@ -143,7 +143,7 @@ describe('SyncTests', () => {
   });
 
   test('blocks from an older version stop and show the lines to use', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     const old =
       '# Repo\n\n<!-- context-packs:start header -->\n<!-- context-packs:end sha256:e3b0c44298fc -->\n\n' +
       '<!-- context-packs:start core path=docs/agents/core -->\n<!-- context-packs:end sha256:e3b0c44298fc -->\n';
@@ -160,7 +160,7 @@ describe('SyncTests', () => {
   });
 
   test('shared rules without a final newline still resync', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     c.share('Prefer small PRs.');
     await c.add();
 
@@ -171,7 +171,7 @@ describe('SyncTests', () => {
   });
 
   test('agents md with crlf line endings stops the sync untouched', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     const crlf = `# Repo\n\n${EMPTY}`.replaceAll('\n', '\r\n');
     fs.writeFileSync(c.agentsMd, crlf);
 
@@ -183,7 +183,7 @@ describe('SyncTests', () => {
   });
 
   test('pasted empty block gets filled', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     fs.writeFileSync(c.agentsMd, `# Repo\n\n${EMPTY}\nUse pnpm.\n`);
 
     const result = await c.sync();
@@ -193,7 +193,7 @@ describe('SyncTests', () => {
   });
 
   test('stray file in the generated folder stops the sync', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     await c.sync();
     const stray = c.write('context-packs/gen/acme/index.md', 'Use acme.\n');
 
@@ -205,13 +205,19 @@ describe('SyncTests', () => {
   });
 });
 
+/** A pack published to its origin, which the repo hasn't added yet. */
 class AddRemoveCase extends SyncCase {
-  readonly first = this.share('Prefer small PRs.\n');
+  first = '';
+
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
+    this.first = this.share('Prefer small PRs.\n');
+  }
 }
 
 describe('AddRemoveTests', () => {
   test('add writes an import pack pinned to its origins latest commit', async (t) => {
-    const c = new AddRemoveCase(t);
+    const c = await AddRemoveCase.make(t);
     const result = await c.add();
 
     exits(result, 0);
@@ -220,7 +226,7 @@ describe('AddRemoveTests', () => {
   });
 
   test('add with a ref pins the pack there', async (t) => {
-    const c = new AddRemoveCase(t);
+    const c = await AddRemoveCase.make(t);
     c.share('Prefer small PRs.\nWrite tests first.\n');
 
     const result = await c.add('--ref', c.first.slice(0, 7));
@@ -231,7 +237,7 @@ describe('AddRemoveTests', () => {
   });
 
   test('add with a branch as the ref stops untouched', async (t) => {
-    const c = new AddRemoveCase(t);
+    const c = await AddRemoveCase.make(t);
     const result = await c.add('--ref', 'main');
 
     exits(result, 1);
@@ -241,7 +247,7 @@ describe('AddRemoveTests', () => {
   });
 
   test('add where a folder already is stops untouched', async (t) => {
-    const c = new AddRemoveCase(t);
+    const c = await AddRemoveCase.make(t);
     await c.add();
     const before = read(c.agentsMd);
 
@@ -253,7 +259,7 @@ describe('AddRemoveTests', () => {
   });
 
   test('add at a nested id writes the import pack there', async (t) => {
-    const c = new AddRemoveCase(t);
+    const c = await AddRemoveCase.make(t);
     const result = await c.addAs('shared/house-rules');
 
     exits(result, 0);
@@ -262,7 +268,7 @@ describe('AddRemoveTests', () => {
   });
 
   test('add of an id that isnt a folder under context packs stops', async (t) => {
-    const c = new AddRemoveCase(t);
+    const c = await AddRemoveCase.make(t);
     for (const id of ['gen', '../rules', '.rules', 'a//b', '/rules']) {
       const result = await c.addAs(id);
 
@@ -273,7 +279,7 @@ describe('AddRemoveTests', () => {
   });
 
   test('add of a folder in the repo imports it by its path alone', async (t) => {
-    const c = new AddRemoveCase(t);
+    const c = await AddRemoveCase.make(t);
     c.write('team-rules/pack.md', 'Use pnpm.\n');
 
     for (const args of [['team-rules'], ['.', '--path', 'team-rules'], ['./docs/../team-rules']]) {
@@ -287,7 +293,7 @@ describe('AddRemoveTests', () => {
   });
 
   test('import pack whose path leaves the repo stops', async (t) => {
-    const c = new AddRemoveCase(t);
+    const c = await AddRemoveCase.make(t);
     c.write('context-packs/team/pack.md', '---\npath: ../team-rules\n---\n');
 
     const result = await c.sync();
@@ -299,7 +305,7 @@ describe('AddRemoveTests', () => {
   });
 
   test('import pack with a path alone and a ref stops', async (t) => {
-    const c = new AddRemoveCase(t);
+    const c = await AddRemoveCase.make(t);
     c.write('team-rules/pack.md', 'Use pnpm.\n');
     c.write('context-packs/team/pack.md', '---\npath: team-rules\nref: v1.0.0\n---\n');
 
@@ -311,7 +317,7 @@ describe('AddRemoveTests', () => {
   });
 
   test('remove drops the import pack and its generated files', async (t) => {
-    const c = new AddRemoveCase(t);
+    const c = await AddRemoveCase.make(t);
     c.publish({ 'testing.md': doc('Writing tests', 'Test behavior.\n') });
     await c.add();
 
@@ -324,7 +330,7 @@ describe('AddRemoveTests', () => {
   });
 
   test('remove of a pack not installed stops', async (t) => {
-    const c = new AddRemoveCase(t);
+    const c = await AddRemoveCase.make(t);
     await c.sync();
 
     const result = await c.sync('remove', 'acme');
@@ -334,7 +340,7 @@ describe('AddRemoveTests', () => {
   });
 
   test('remove of the repos own folder stops and keeps it', async (t) => {
-    const c = new AddRemoveCase(t);
+    const c = await AddRemoveCase.make(t);
     const design = c.write('context-packs/project/design.md', doc('Changing the design'));
     await c.sync();
 
@@ -347,16 +353,17 @@ describe('AddRemoveTests', () => {
 });
 
 /** The repo's own docs and rules, written in context-packs/ itself, and listed where they are. */
-function rootCase(t: TestContext): SyncCase {
-  const c = new SyncCase(t);
-  c.write('context-packs/project/deploy/index.md', doc('Deploying', 'Ship it.\n'));
-  c.write('context-packs/project/design.md', doc('Changing the design', 'Keep it small.\n'));
-  return c;
+class RootCase extends SyncCase {
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
+    this.write('context-packs/project/deploy/index.md', doc('Deploying', 'Ship it.\n'));
+    this.write('context-packs/project/design.md', doc('Changing the design', 'Keep it small.\n'));
+  }
 }
 
 describe('RootTests', () => {
   test('docs in context packs are listed where they are', async (t) => {
-    const c = rootCase(t);
+    const c = await RootCase.make(t);
     const result = await c.sync();
 
     exits(result, 0);
@@ -372,7 +379,7 @@ describe('RootTests', () => {
   });
 
   test('pack md in context packs is inlined before its table', async (t) => {
-    const c = rootCase(t);
+    const c = await RootCase.make(t);
     c.write('context-packs/pack.md', 'Use pnpm.\n');
 
     const result = await c.sync();
@@ -382,7 +389,7 @@ describe('RootTests', () => {
   });
 
   test('when on the pack md in context packs stops the sync', async (t) => {
-    const c = rootCase(t);
+    const c = await RootCase.make(t);
     c.write('context-packs/pack.md', doc('Working on anything', 'Use pnpm.\n'));
 
     const result = await c.sync();
@@ -393,7 +400,7 @@ describe('RootTests', () => {
   });
 
   test('editing a doc needs no resync', async (t) => {
-    const c = rootCase(t);
+    const c = await RootCase.make(t);
     await c.sync();
     const before = read(c.agentsMd);
     c.write('context-packs/project/design.md', doc('Changing the design', 'Keep it smaller.\n'));
@@ -405,7 +412,7 @@ describe('RootTests', () => {
   });
 
   test('new doc joins the table on resync', async (t) => {
-    const c = rootCase(t);
+    const c = await RootCase.make(t);
     await c.sync();
     c.write('context-packs/project/billing.md', doc('Editing billing', 'Charge once.\n'));
 
@@ -418,8 +425,8 @@ describe('RootTests', () => {
 
 /** A pack in a folder beside the synced repo, imported by its path, which syncs from its working tree. */
 class SiblingCase extends SyncCase {
-  constructor(t: TestContext) {
-    super(t);
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
     this.publish({ 'pack.md': 'Prefer small PRs.\n', 'testing.md': doc('Writing tests', 'Test behavior.\n') });
   }
 
@@ -430,7 +437,7 @@ class SiblingCase extends SyncCase {
 
 describe('SiblingPackTests', () => {
   test('sibling pack syncs its working tree and lists its docs where they are', async (t) => {
-    const c = new SiblingCase(t);
+    const c = await SiblingCase.make(t);
     fs.writeFileSync(path.join(c.source, 'context', 'pack.md'), 'Prefer tiny PRs.\n');
 
     const result = await c.addSibling();
@@ -452,7 +459,7 @@ describe('SiblingPackTests', () => {
   });
 
   test('editing a sibling doc needs no resync', async (t) => {
-    const c = new SiblingCase(t);
+    const c = await SiblingCase.make(t);
     await c.addSibling();
     const before = read(c.agentsMd);
     fs.writeFileSync(path.join(c.source, 'context', 'testing.md'), doc('Writing tests', 'Test behavior only.\n'));
@@ -464,7 +471,7 @@ describe('SiblingPackTests', () => {
   });
 
   test('missing sibling folder stops the sync', async (t) => {
-    const c = new SiblingCase(t);
+    const c = await SiblingCase.make(t);
     await c.addSibling();
     const before = read(c.agentsMd);
     fs.rmSync(c.source, { recursive: true });
@@ -477,7 +484,7 @@ describe('SiblingPackTests', () => {
   });
 
   test('sibling pack takes no ref', async (t) => {
-    const c = new SiblingCase(t);
+    const c = await SiblingCase.make(t);
     const result = await c.addSibling('--ref', 'v1.0.0');
 
     exits(result, 1);
@@ -486,7 +493,7 @@ describe('SiblingPackTests', () => {
   });
 
   test('sibling pack with a ref in its import pack stops', async (t) => {
-    const c = new SiblingCase(t);
+    const c = await SiblingCase.make(t);
     await c.addSibling();
     fs.writeFileSync(c.importMd(), '---\nfrom: ../house-rules\npath: context\nref: v1.0.0\n---\n');
 
@@ -498,7 +505,7 @@ describe('SiblingPackTests', () => {
   });
 
   test('when on a sibling pack gives it a row', async (t) => {
-    const c = new SiblingCase(t);
+    const c = await SiblingCase.make(t);
     const result = await c.addSibling('--when', 'Reviewing a PR');
 
     exits(result, 0);
@@ -506,7 +513,7 @@ describe('SiblingPackTests', () => {
   });
 
   test('absolute path is a folder on disk too', async (t) => {
-    const c = new SiblingCase(t);
+    const c = await SiblingCase.make(t);
     fs.writeFileSync(path.join(c.source, 'context', 'pack.md'), 'Prefer tiny PRs.\n');
 
     const result = await c.sync('add', 'house-rules', c.source, '--path', 'context');
@@ -518,7 +525,7 @@ describe('SiblingPackTests', () => {
   });
 
   test('scp style origin is a git url', async (t) => {
-    const c = new SiblingCase(t);
+    const c = await SiblingCase.make(t);
     const result = await run([...command('src/cli'), 'add', 'acme', 'git@example.invalid:acme/rules.git'], {
       cwd: c.repo,
       timeout: 30_000,
@@ -530,7 +537,7 @@ describe('SiblingPackTests', () => {
   });
 
   test('update leaves a sibling pack alone', async (t) => {
-    const c = new SiblingCase(t);
+    const c = await SiblingCase.make(t);
     await c.addSibling();
     const before = read(c.agentsMd);
 
@@ -541,7 +548,7 @@ describe('SiblingPackTests', () => {
   });
 
   test('update with a ref of a sibling pack stops', async (t) => {
-    const c = new SiblingCase(t);
+    const c = await SiblingCase.make(t);
     await c.addSibling();
 
     const result = await c.sync('update', 'house-rules', '--ref', 'v1.0.0');
@@ -553,7 +560,7 @@ describe('SiblingPackTests', () => {
 
 describe('PackShapeTests', () => {
   test('doc is copied and listed', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     c.publish({ 'billing.md': doc('Billing', 'Charge once.\n') });
 
     const result = await c.add();
@@ -574,7 +581,7 @@ describe('PackShapeTests', () => {
   });
 
   test('front matter key the tool doesnt know stops the sync', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     c.publish({ 'billing.md': doc('Billing', 'Charge once.\n', { owner: 'payments' }) });
 
     const result = await c.add();
@@ -591,11 +598,10 @@ describe('PackShapeTests', () => {
 class PinningCase extends SyncCase {
   pinned = '';
 
-  static async make(t: TestContext): Promise<PinningCase> {
-    const c = new PinningCase(t);
-    c.pinned = c.share('Prefer small PRs.\n');
-    await c.add();
-    return c;
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
+    this.pinned = this.share('Prefer small PRs.\n');
+    await this.add();
   }
 }
 
@@ -684,23 +690,24 @@ describe('PinningTests', () => {
 });
 
 /** A pack pinned to a tag stays there until a ref names somewhere else. */
-async function versionCase(t: TestContext): Promise<SyncCase> {
-  const c = new SyncCase(t);
-  c.share('Prefer small PRs.\n');
-  c.tag('v1.2.0');
-  await c.add('--ref', 'v1.2.0');
-  return c;
+class VersionCase extends SyncCase {
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
+    this.share('Prefer small PRs.\n');
+    this.tag('v1.2.0');
+    await this.add('--ref', 'v1.2.0');
+  }
 }
 
 describe('VersionTests', () => {
   test('add with a tag pins the pack to the tag', async (t) => {
-    const c = await versionCase(t);
+    const c = await VersionCase.make(t);
     assert.equal(c.agents(), c.rules());
     assert.equal(c.pin(), 'v1.2.0');
   });
 
   test('update leaves the tag even when a newer release exists', async (t) => {
-    const c = await versionCase(t);
+    const c = await VersionCase.make(t);
     c.share('Prefer small PRs.\nWrite tests first.\n');
     c.tag('v1.3.0');
 
@@ -718,17 +725,16 @@ class SeveralCase extends SyncCase {
   acme = '';
   acmeRef = '';
 
-  static async make(t: TestContext): Promise<SeveralCase> {
-    const c = new SeveralCase(t);
-    c.share('Prefer small PRs.\n');
-    await c.add();
-    [c.acmeOrigin, c.acme] = c.remote('acme');
-    c.acmeRef = c.publish(
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
+    this.share('Prefer small PRs.\n');
+    await this.add();
+    [this.acmeOrigin, this.acme] = this.remote('acme');
+    this.acmeRef = this.publish(
       { 'pack.md': 'Use acme.\n', 'deploy.md': doc('Deploying', 'Ship it.\n') },
-      c.acme,
+      this.acme,
       'plugins/x',
     );
-    return c;
   }
 
   addAcme(...args: string[]) {

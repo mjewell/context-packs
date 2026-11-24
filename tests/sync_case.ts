@@ -2,9 +2,9 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { TestContext } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
+import { Case } from './case.ts';
 import { command, environment, type Result, run } from './scripts.ts';
 import { tempDir } from './temp.ts';
 
@@ -69,19 +69,19 @@ export function names(folder: string): string[] {
   return fs.readdirSync(folder).sort();
 }
 
-export class SyncCase {
-  readonly root: string;
-  readonly origin: string;
-  readonly source: string;
-  readonly repo: string;
-  readonly packs: string;
-  readonly gen: string;
-  agentsMd: string;
-  readonly env: NodeJS.ProcessEnv;
+/** A repo to sync, and a pack's origin with a checkout of it, so tests control the pack's content. */
+export class SyncCase extends Case {
+  root!: string;
+  origin!: string;
+  source!: string;
+  repo!: string;
+  packs!: string;
+  gen!: string;
+  agentsMd!: string;
+  env!: NodeJS.ProcessEnv;
 
-  constructor(t: TestContext) {
-    this.root = tempDir(t, 'context-packs-test-');
-    // A pack's origin and a checkout of it, so tests control the pack's content.
+  protected override async setUp(): Promise<void> {
+    this.root = tempDir(this.t, 'context-packs-test-');
     [this.origin, this.source] = this.remote('house-rules');
     this.repo = path.join(this.root, 'repo');
     fs.mkdirSync(path.join(this.repo, '.git'), { recursive: true });

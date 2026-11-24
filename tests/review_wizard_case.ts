@@ -6,7 +6,6 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { TestContext } from 'node:test';
 
 import { GitCase, withoutGit } from './git_case.ts';
 import { command, type Result, run } from './scripts.ts';
@@ -41,27 +40,17 @@ const DOCS = {
  * it, as a command.
  */
 export class WizardCase extends GitCase {
-  readonly head: string;
-  readonly env: NodeJS.ProcessEnv;
+  head!: string;
+  env!: NodeJS.ProcessEnv;
   runDir = '';
 
-  constructor(t: TestContext) {
-    super(t);
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
     this.commit('Add the packs and the app', { 'AGENTS.md': AGENTS, ...DOCS, 'src/app.py': 'x = 1\n' });
     this.base = this.git('rev-parse', 'HEAD');
     this.head = this.commit('Change the app', { 'src/app.py': 'x = 2\n', 'tests/test_app.py': 'assert True\n' });
-    this.env = withoutGit({ TMPDIR: tempDir(t, 'context-packs-runs-') });
+    this.env = withoutGit({ TMPDIR: tempDir(this.t, 'context-packs-runs-') });
   }
-
-  /** A case of this class, set up, whose folders go when the test ends. */
-  static async make<C extends WizardCase>(this: new (t: TestContext) => C, t: TestContext): Promise<C> {
-    const c = new this(t);
-    await c.setUp();
-    return c;
-  }
-
-  /** What a subclass adds to the case before each test. */
-  protected setUp(): void | Promise<void> {}
 
   wizard(...args: string[]): Promise<Result> {
     return run([...command('review/wizard'), ...args], { cwd: this.repo, env: this.env });
@@ -89,6 +78,7 @@ export class WizardCase extends GitCase {
 /** A run init started. */
 export class StartedCase extends WizardCase {
   protected override async setUp(): Promise<void> {
+    await super.setUp();
     await this.init();
   }
 

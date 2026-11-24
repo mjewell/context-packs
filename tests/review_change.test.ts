@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, type TestContext, test } from 'node:test';
+import { describe, test } from 'node:test';
 
 import { excludes, exits, includes } from './expect.ts';
 import { GitCase, withoutGit } from './git_case.ts';
@@ -25,13 +25,13 @@ function body(diff: string): string {
  * finder reads it.
  */
 class ChangeCase extends GitCase {
-  readonly env: NodeJS.ProcessEnv;
+  env!: NodeJS.ProcessEnv;
   runDir: string | null = null;
 
-  constructor(t: TestContext) {
-    super(t);
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
     this.base = this.commit('Add the instruction file', { 'AGENTS.md': AGENTS });
-    this.env = withoutGit({ TMPDIR: tempDir(t, 'context-packs-runs-') });
+    this.env = withoutGit({ TMPDIR: tempDir(this.t, 'context-packs-runs-') });
   }
 
   /** A wizard step for the change from the base to the head, starting the run on the first. */
@@ -58,7 +58,7 @@ class ChangeCase extends GitCase {
 /** files lists what the change touches, so a finder can pick what to read and how many pages each takes. */
 describe('FilesTests', () => {
   test('lists each changed path with the lines in its diff', async (t) => {
-    const c = new ChangeCase(t);
+    const c = await ChangeCase.make(t);
     c.commit('Add two files', { 'a.txt': 'one\ntwo\nthree\n', 'docs/b.md': 'b\n' });
     c.commit('Change one', { 'a.txt': 'one\n2\nthree\n' });
 
@@ -67,7 +67,7 @@ describe('FilesTests', () => {
   });
 
   test('lists a rename as a deleted path and an added one', async (t) => {
-    const c = new ChangeCase(t);
+    const c = await ChangeCase.make(t);
     c.commit('Add', { 'old.txt': 'x\n' });
     c.base = c.git('rev-parse', 'HEAD');
     c.git('mv', 'old.txt', 'new.txt');
@@ -80,7 +80,7 @@ describe('FilesTests', () => {
 /** The report reads the head lines each diff shows, since a review comment can be left only on one of them. */
 describe('ShownTests', () => {
   test('prints the head lines each diff shows', async (t) => {
-    const c = new ChangeCase(t);
+    const c = await ChangeCase.make(t);
     c.commit('Add', { 'a.txt': TWELVE, 'gone.txt': 'x\n' });
     c.base = c.git('rev-parse', 'HEAD');
     c.commit('Change line 10 and delete a file', { 'a.txt': TWELVE.replace('l10\n', 'ten\n') }, ['gone.txt']);
@@ -100,7 +100,7 @@ describe('ShownTests', () => {
  */
 describe('DiffTests', () => {
   test('numbers each line the head has and leaves removed lines blank', async (t) => {
-    const c = new ChangeCase(t);
+    const c = await ChangeCase.make(t);
     c.commit('Add', { 'a.txt': TWELVE });
     c.base = c.git('rev-parse', 'HEAD');
     c.commit('Change line 10', { 'a.txt': TWELVE.replace('l10\n', 'ten\n') });
@@ -122,7 +122,7 @@ describe('DiffTests', () => {
   });
 
   test('numbers each hunk from its own start', async (t) => {
-    const c = new ChangeCase(t);
+    const c = await ChangeCase.make(t);
     c.commit('Add', { 'a.txt': TWELVE });
     c.base = c.git('rev-parse', 'HEAD');
     c.commit('Change both ends', { 'a.txt': `one\n${TWELVE.slice(3, -4)}twelve\n` });
@@ -145,7 +145,7 @@ describe('DiffTests', () => {
   });
 
   test('leaves the no newline marker unnumbered', async (t) => {
-    const c = new ChangeCase(t);
+    const c = await ChangeCase.make(t);
     c.commit('Add', { 'a.txt': 'one\n' });
     c.base = c.git('rev-parse', 'HEAD');
     c.commit('Drop the newline', { 'a.txt': 'one\ntwo' });
@@ -157,7 +157,7 @@ describe('DiffTests', () => {
   });
 
   test('shows only the change since the merge base', async (t) => {
-    const c = new ChangeCase(t);
+    const c = await ChangeCase.make(t);
     c.commit('Add', { 'a.txt': 'a\n', 'b.txt': 'b\n' });
     const fork = c.git('rev-parse', 'HEAD');
     c.git('checkout', '-q', '-b', 'base');
@@ -170,7 +170,7 @@ describe('DiffTests', () => {
   });
 
   test('refuses a path outside the change however it is written', async (t) => {
-    const c = new ChangeCase(t);
+    const c = await ChangeCase.make(t);
     c.commit('Add', { 'a.txt': 'a\n' });
 
     for (const file of ['/etc/passwd', '../a.txt', 'docs/../a.txt', '..', '', '-p', '--output=x']) {
@@ -182,7 +182,7 @@ describe('DiffTests', () => {
   });
 
   test('reads a path literally not as a pattern', async (t) => {
-    const c = new ChangeCase(t);
+    const c = await ChangeCase.make(t);
     c.commit('Add a file named like a pattern', { '*.txt': 'star\n', 'b.txt': 'b\n' });
 
     const diff = await c.text('diff', '*.txt');
@@ -192,7 +192,7 @@ describe('DiffTests', () => {
   });
 
   test('runs no external diff or textconv', async (t) => {
-    const c = new ChangeCase(t);
+    const c = await ChangeCase.make(t);
     const script = path.join(path.dirname(c.repo), `${path.basename(c.repo)}-driver.sh`);
     const ran = path.join(path.dirname(c.repo), `${path.basename(c.repo)}-ran`);
     fs.writeFileSync(script, `#!/bin/sh\ntouch ${ran}\necho converted\n`, { mode: 0o755 });
@@ -211,8 +211,8 @@ describe('DiffTests', () => {
 
 /** A change that adds a file of 2500 lines. */
 class PagingCase extends ChangeCase {
-  constructor(t: TestContext) {
-    super(t);
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
     this.commit('Add a long file', { 'long.txt': Array.from({ length: 2500 }, (_, n) => `${n + 1}\n`).join('') });
   }
 }
@@ -220,7 +220,7 @@ class PagingCase extends ChangeCase {
 /** Long output comes in pages of 1000 lines, so one step can't fill a finder's context. */
 describe('PagingTests', () => {
   test('gives the first page and says how to get the next', async (t) => {
-    const c = new PagingCase(t);
+    const c = await PagingCase.make(t);
     const lines = (await c.text('diff', 'long.txt')).trimEnd().split('\n');
 
     assert.equal(lines.length, 1001);
@@ -229,7 +229,7 @@ describe('PagingTests', () => {
   });
 
   test('gives a later page', async (t) => {
-    const c = new PagingCase(t);
+    const c = await PagingCase.make(t);
     const lines = (await c.text('diff', 'long.txt', '3')).trimEnd().split('\n');
 
     // The diff has 2506 lines: six of header, then one per line of the file.
@@ -238,7 +238,7 @@ describe('PagingTests', () => {
   });
 
   test('refuses a page past the last and one that isnt a page', async (t) => {
-    const c = new PagingCase(t);
+    const c = await PagingCase.make(t);
     includes((await c.step('diff', 'long.txt', '4')).stderr, 'long.txt has 3 pages.');
     for (const page of ['0', 'two', '-1']) {
       const result = await c.step('diff', 'long.txt', page);
@@ -252,7 +252,7 @@ describe('PagingTests', () => {
 /** log lists the change's commits with their messages, since a message can say a choice was deliberate. */
 describe('LogTests', () => {
   test('lists the changes commits newest first and none from the base branch', async (t) => {
-    const c = new ChangeCase(t);
+    const c = await ChangeCase.make(t);
     c.commit('Add', { 'a.txt': 'a\n' });
     const fork = c.git('rev-parse', 'HEAD');
     c.git('checkout', '-q', '-b', 'base');

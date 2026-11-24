@@ -1,7 +1,7 @@
 /** A PR on a fake GitHub, and a folder for the files the review scripts read and write. */
 import path from 'node:path';
-import type { TestContext } from 'node:test';
 
+import { Case } from './case.ts';
 import { comment, connection, FakeGitHub, said } from './fake_github.ts';
 import { command, environment, type Result, ROOT, run } from './scripts.ts';
 import { tempDir } from './temp.ts';
@@ -36,31 +36,21 @@ export function reviewThread(id: string, { resolved = false, replies = [] as rea
 }
 
 /** A PR, number 7 in o/r, on a fake GitHub, and a folder for the files the review scripts read and write. */
-export class ReviewCase {
-  readonly root: string;
-  readonly github: FakeGitHub;
-  readonly env: NodeJS.ProcessEnv;
+export class ReviewCase extends Case {
+  root!: string;
+  github!: FakeGitHub;
+  env!: NodeJS.ProcessEnv;
 
-  constructor(root: string, github: FakeGitHub) {
-    this.root = root;
-    this.github = github;
+  protected override async setUp(): Promise<void> {
+    this.root = tempDir(this.t, 'context-packs-review-');
+    this.github = await FakeGitHub.start(this.t);
     this.env = environment({
       GITHUB_TOKEN: 'token-1',
       GITHUB_REPOSITORY: 'o/r',
-      GITHUB_API_URL: github.url,
-      GITHUB_GRAPHQL_URL: `${github.url}/graphql`,
+      GITHUB_API_URL: this.github.url,
+      GITHUB_GRAPHQL_URL: `${this.github.url}/graphql`,
     });
   }
-
-  /** A case of this class, set up, whose folder and fake GitHub go when the test ends. */
-  static async make<C extends ReviewCase>(this: new (root: string, github: FakeGitHub) => C, t: TestContext) {
-    const c = new this(tempDir(t, 'context-packs-review-'), await FakeGitHub.start(t));
-    await c.setUp();
-    return c;
-  }
-
-  /** What a subclass adds to the case before each test. */
-  protected setUp(): void | Promise<void> {}
 
   /** Runs review/<name>.ts in the case's folder. */
   script(name: string, ...args: (string | number)[]): Promise<Result> {

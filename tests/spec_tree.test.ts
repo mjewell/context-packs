@@ -21,7 +21,7 @@ function tree(...bullets: string[]): string {
 /** `trees.ts check` reads every tree in the repo, and fails on what the spec says CI fails on. */
 describe('CheckTests', () => {
   test('passes a tree that follows the rules', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL);
 
     const result = await c.trees('check');
@@ -30,7 +30,7 @@ describe('CheckTests', () => {
   });
 
   test('fails a link to an id no tree has', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL.replace('[[finders]]', '[[findres]]'));
 
     const result = await c.trees('check');
@@ -44,7 +44,7 @@ describe('CheckTests', () => {
   });
 
   test('fails a link with display text to an id no tree has', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL.replace('see [[finders]]', 'by the [[findres|finders]]'));
 
     const result = await c.trees('check');
@@ -58,7 +58,7 @@ describe('CheckTests', () => {
   });
 
   test('resolves a link into another tree', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL.replace('[[finders]]', '[[packs]]'));
     c.write(
       'docs/packs.tree.md',
@@ -75,7 +75,7 @@ describe('CheckTests', () => {
   });
 
   test('fails an id two nodes use', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL);
     c.write(
       'docs/packs.tree.md',
@@ -98,7 +98,7 @@ describe('CheckTests', () => {
   });
 
   test('fails a node with more than one id', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL.replace('{#finders}', '{#finders #finder}'));
 
     const result = await c.trees('check');
@@ -112,7 +112,7 @@ describe('CheckTests', () => {
   });
 
   test('fails a label written any other way', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     for (const text of [
       'Rejected, since it was slow',
       'why: it was slow',
@@ -129,7 +129,7 @@ describe('CheckTests', () => {
   });
 
   test('passes a node that only starts with a word like a label', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write(
       'review.tree.md',
       SMALL.replace(
@@ -145,7 +145,7 @@ describe('CheckTests', () => {
 /** `trees.ts check` warns when a size passes its target, and fails at 1.5 times it. */
 describe('SizeTests', () => {
   test('warns on node text over 40 words', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('sizes.tree.md', tree(`- ${words(41)}`));
 
     const result = await c.trees('check');
@@ -161,7 +161,7 @@ describe('SizeTests', () => {
   });
 
   test('counts a links display text but not its slug', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('sizes.tree.md', tree(`- ${words(39)} [[sizes|w39 w40]] [[sizes]]`));
 
     const result = await c.trees('check');
@@ -177,7 +177,7 @@ describe('SizeTests', () => {
   });
 
   test('fails node text over 60 words', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('sizes.tree.md', tree(`- ${words(61)}`));
 
     const result = await c.trees('check');
@@ -187,7 +187,7 @@ describe('SizeTests', () => {
   });
 
   test('warns on more than 7 children', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('sizes.tree.md', tree(...Array.from({ length: 8 }, (_, i) => `- child ${i}`)));
 
     assert.equal(
@@ -197,7 +197,7 @@ describe('SizeTests', () => {
   });
 
   test('warns on a view over 150 words', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('sizes.tree.md', tree(...Array.from({ length: 4 }, (_, i) => `- ${words(38, 38 * i)}`)));
 
     assert.equal(
@@ -207,7 +207,7 @@ describe('SizeTests', () => {
   });
 
   test('fails a view over 225 words', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('sizes.tree.md', tree(...Array.from({ length: 6 }, (_, i) => `- ${words(38, 38 * i)}`)));
 
     const result = await c.trees('check');
@@ -219,7 +219,7 @@ describe('SizeTests', () => {
   });
 
   test('warns on a nested subtree of 60 words or fewer', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write(
       'sizes.tree.md',
       tree('- parent node here', '  - child node', '    - grandchild node', `- ${words(38)}`, `- ${words(38, 38)}`),
@@ -235,7 +235,7 @@ describe('SizeTests', () => {
 /** `trees.ts stats` prints each view's size, child count and subtree size. */
 describe('StatsTests', () => {
   test('prints sizes for each view', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL);
 
     const result = await c.trees('stats');
@@ -250,7 +250,7 @@ describe('StatsTests', () => {
 /** A command given the wrong arguments says what it takes, and lists every command. */
 describe('UsageTests', () => {
   test('says what a command takes and exits 2', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     for (const [args, says] of [
       [['render'], 'render takes <id>.tree.md [-o out.html]'],
       [['links-to', 'a', 'b'], 'links-to takes <id>'],
@@ -277,7 +277,7 @@ describe('UsageTests', () => {
 /** `trees.ts links-to <id>` lists the nodes that link to an ID, in every tree. */
 describe('LinksToTests', () => {
   test('lists each node that links to the id', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL);
     c.write(
       'docs/packs.tree.md',
@@ -305,7 +305,7 @@ describe('LinksToTests', () => {
   });
 
   test('fails on an id no node has', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL);
 
     const result = await c.trees('links-to', 'findres');
@@ -314,7 +314,7 @@ describe('LinksToTests', () => {
   });
 
   test('lists a link with display text', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL.replace('see [[finders]]', 'by the [[finders|finders]]'));
 
     const result = await c.trees('links-to', 'finders');
@@ -329,7 +329,7 @@ describe('LinksToTests', () => {
 /** `trees.ts render` writes a tree's page beside its file. */
 describe('RenderTests', () => {
   test('writes the page beside the tree file', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL);
 
     const result = await c.trees('render', 'review.tree.md');
@@ -339,7 +339,7 @@ describe('RenderTests', () => {
   });
 
   test('renders a code span in a links display text', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL.replace('see [[finders]]', 'when its [[finders|`when` <x>]] matches'));
 
     const result = await c.trees('render', 'review.tree.md');
@@ -352,7 +352,7 @@ describe('RenderTests', () => {
   });
 
   test('leaves a link inside a code span as code', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL.replace('see [[finders]]', 'written `[[finders|x]]`'));
 
     const result = await c.trees('render', 'review.tree.md');
@@ -362,7 +362,7 @@ describe('RenderTests', () => {
   });
 
   test('renders a links display text escaped', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL.replace('see [[finders]]', 'by [[finders|the <finders>]] and [[nope|x]]'));
 
     const result = await c.trees('render', 'review.tree.md');
@@ -376,7 +376,7 @@ describe('RenderTests', () => {
   });
 
   test('counts every node below a branch', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write(
       'review.tree.md',
       tree('- Branch with two children and one grandchild', '  - Child', '    - Grandchild', '  - Child'),
@@ -391,7 +391,7 @@ describe('RenderTests', () => {
   });
 
   test('refuses a tree that doesnt read as a tree', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL.replace('{#finders}', '{#finders #finder}'));
 
     const result = await c.trees('render', 'review.tree.md');
@@ -402,7 +402,7 @@ describe('RenderTests', () => {
   });
 
   test('escapes a quote in a links url', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL.replace('see [[finders]]', 'see [docs](https://e.com/a"onclick=x)'));
 
     const result = await c.trees('render', 'review.tree.md');
@@ -412,7 +412,7 @@ describe('RenderTests', () => {
   });
 
   test('renders relative anchor http and mailto links', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     const links = '[a](docs/review.md) [b](#finders) [c](HTTPS://e.com) [d](mailto:me@e.com)';
     c.write('review.tree.md', SMALL.replace('see [[finders]]', `see ${links}`));
 
@@ -427,7 +427,7 @@ describe('RenderTests', () => {
   });
 
   test('refuses a link to a url scheme that can run script', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     c.write('review.tree.md', SMALL.replace('see [[finders]]', 'see [docs](javascript:alert(1))'));
 
     const result = await c.trees('render', 'review.tree.md');
@@ -438,7 +438,7 @@ describe('RenderTests', () => {
   });
 
   test('refuses a link that starts with a control character', async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     // Browsers drop a URL's leading control characters, so this one would still run as javascript:.
     c.write('review.tree.md', SMALL.replace('see [[finders]]', 'see [docs](\x01javascript:alert(1))'));
 
@@ -475,7 +475,7 @@ const D2 = { skip: HAS_D2 ? false : 'renders D2 diagrams through the d2 CLI' };
 
 describe('D2RenderTests', () => {
   test('renders a diagram with an https link', D2, async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     diagram(c, 'x.link: "https://e.com/docs"');
 
     const result = await c.trees('render', 'review.tree.md');
@@ -485,7 +485,7 @@ describe('D2RenderTests', () => {
   });
 
   test('refuses a diagram link to a url scheme that can run script', D2, async (t) => {
-    const c = new TreeCase(t);
+    const c = await TreeCase.make(t);
     diagram(c, 'x.link: "javascript:alert(1)"');
 
     const result = await c.trees('render', 'review.tree.md');

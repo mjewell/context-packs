@@ -22,7 +22,8 @@ interface Thread {
 
 /** PR 7 in o/r on the fake GitHub, with alice, who can write, and mallory, who can only read. */
 class TrustCase extends ReviewCase {
-  protected override setUp(): void {
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
     Object.assign(this.github.rest, {
       '/repos/o/r/collaborators/alice/permission': role('write'),
       '/repos/o/r/collaborators/mallory/permission': role('read'),

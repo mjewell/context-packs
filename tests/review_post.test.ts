@@ -16,7 +16,8 @@ interface Input {
 
 /** The post job: the find job's report, the pairing job's pairs and commentary, and the PR on the fake GitHub. */
 class PostCase extends ReviewCase {
-  protected override setUp(): void {
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
     Object.assign(this.github.responses, {
       PullRequest: pullRequest(),
       Threads: ok({ repository: { pullRequest: { reviewThreads: connection([]) } } }),

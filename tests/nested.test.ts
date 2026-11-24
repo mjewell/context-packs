@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, type TestContext, test } from 'node:test';
+import { describe, test } from 'node:test';
 
 import { exits, includes } from './expect.ts';
 import { block, doc, exists, names, packed, read, SyncCase } from './sync_case.ts';
@@ -16,24 +16,27 @@ function files(folder: string): string[] {
 
 /** A case with the folder its pack is synced into. */
 class SyncedCase extends SyncCase {
-  synced = path.join(this.gen, 'house-rules');
+  get synced(): string {
+    return path.join(this.gen, 'house-rules');
+  }
 }
 
-function folderCase(t: TestContext): SyncedCase {
-  const c = new SyncedCase(t);
-  c.publish({
-    'pack.md': 'Prefer small PRs.\n',
-    'typescript/react.md': doc('Writing React components', 'Use function components.\n'),
-    'typescript/types.md': doc('Declaring types', 'Prefer unions.\n'),
-    'typescript/example.tsx': 'export const x = 1;\n',
-  });
-  return c;
+class FolderCase extends SyncedCase {
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
+    this.publish({
+      'pack.md': 'Prefer small PRs.\n',
+      'typescript/react.md': doc('Writing React components', 'Use function components.\n'),
+      'typescript/types.md': doc('Declaring types', 'Prefer unions.\n'),
+      'typescript/example.tsx': 'export const x = 1;\n',
+    });
+  }
 }
 
 /** A folder without a pack.md, which only groups files: its docs join the nearest pack's table. */
 describe('FolderTests', () => {
   test('folder docs join the packs table', async (t) => {
-    const c = folderCase(t);
+    const c = await FolderCase.make(t);
     const result = await c.add();
 
     exits(result, 0);
@@ -52,7 +55,7 @@ describe('FolderTests', () => {
   });
 
   test('every file in the folder is copied', async (t) => {
-    const c = folderCase(t);
+    const c = await FolderCase.make(t);
     const result = await c.add();
 
     exits(result, 0);
@@ -61,22 +64,23 @@ describe('FolderTests', () => {
   });
 });
 
-function nestedCase(t: TestContext): SyncedCase {
-  const c = new SyncedCase(t);
-  c.publish({
-    'pack.md': 'Prefer small PRs.\n',
-    'testing.md': doc('Writing tests', 'Test behavior.\n'),
-    'frontend/pack.md': doc('Editing `web/**`', 'Keep components small.\n'),
-    'frontend/react.md': doc('Writing React components', 'Use function components.\n'),
-    'frontend/css/layout.md': doc('Laying out pages', 'Use grid.\n'),
-  });
-  return c;
+class NestedCase extends SyncedCase {
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
+    this.publish({
+      'pack.md': 'Prefer small PRs.\n',
+      'testing.md': doc('Writing tests', 'Test behavior.\n'),
+      'frontend/pack.md': doc('Editing `web/**`', 'Keep components small.\n'),
+      'frontend/react.md': doc('Writing React components', 'Use function components.\n'),
+      'frontend/css/layout.md': doc('Laying out pages', 'Use grid.\n'),
+    });
+  }
 }
 
 /** A folder with a pack.md inside the installed pack, which gets a row pointing at a generated index. */
 describe('NestedPackTests', () => {
   test('nested pack gets a row in its parents table', async (t) => {
-    const c = nestedCase(t);
+    const c = await NestedCase.make(t);
     const result = await c.add();
 
     exits(result, 0);
@@ -95,7 +99,7 @@ describe('NestedPackTests', () => {
   });
 
   test('nested pack whose when is always is inlined after its parent between markers', async (t) => {
-    const c = nestedCase(t);
+    const c = await NestedCase.make(t);
     c.publish({ 'frontend/pack.md': doc('always', 'Keep components small.\n') });
 
     const result = await c.add();
@@ -116,7 +120,7 @@ describe('NestedPackTests', () => {
   });
 
   test('nested packs index holds its rules and table without front matter', async (t) => {
-    const c = nestedCase(t);
+    const c = await NestedCase.make(t);
     const result = await c.add();
 
     exits(result, 0);
@@ -129,7 +133,7 @@ describe('NestedPackTests', () => {
   });
 
   test('nested packs files are copied without its pack md', async (t) => {
-    const c = nestedCase(t);
+    const c = await NestedCase.make(t);
     const result = await c.add();
 
     exits(result, 0);
@@ -137,7 +141,7 @@ describe('NestedPackTests', () => {
   });
 
   test('generated index edited in the repo stops the sync', async (t) => {
-    const c = nestedCase(t);
+    const c = await NestedCase.make(t);
     await c.add();
     const index = path.join(c.synced, 'frontend.md');
     fs.writeFileSync(index, 'Edited here.\n');
@@ -150,7 +154,7 @@ describe('NestedPackTests', () => {
   });
 
   test('nested pack without a when line stops the sync', async (t) => {
-    const c = nestedCase(t);
+    const c = await NestedCase.make(t);
     c.publish({ 'backend/pack.md': 'Use Rails.\n' });
 
     const result = await c.add();
@@ -161,7 +165,7 @@ describe('NestedPackTests', () => {
   });
 
   test('doc without a when line stops the sync', async (t) => {
-    const c = nestedCase(t);
+    const c = await NestedCase.make(t);
     c.publish({ 'frontend/css/grid.md': 'Use grid.\n' });
 
     const result = await c.add();
@@ -172,7 +176,7 @@ describe('NestedPackTests', () => {
   });
 
   test('doc whose when is always stops the sync', async (t) => {
-    const c = nestedCase(t);
+    const c = await NestedCase.make(t);
     c.publish({ 'testing.md': doc('always', 'Test behavior.\n') });
 
     const result = await c.add();
@@ -184,7 +188,7 @@ describe('NestedPackTests', () => {
   });
 
   test('tier on a doc stops the sync', async (t) => {
-    const c = nestedCase(t);
+    const c = await NestedCase.make(t);
     c.publish({ 'testing.md': doc('Writing tests', '', { tier: 'required' }) });
 
     const result = await c.add();
@@ -195,7 +199,7 @@ describe('NestedPackTests', () => {
   });
 
   test('stray file in the synced folder stops the sync', async (t) => {
-    const c = nestedCase(t);
+    const c = await NestedCase.make(t);
     await c.add();
     fs.writeFileSync(path.join(c.synced, '.DS_Store'), '');
 
@@ -207,7 +211,7 @@ describe('NestedPackTests', () => {
   });
 
   test('nested pack beside a doc of the same name stops the sync', async (t) => {
-    const c = nestedCase(t);
+    const c = await NestedCase.make(t);
     c.publish({ 'frontend.md': doc('Editing the frontend') });
 
     const result = await c.add();
@@ -220,8 +224,8 @@ describe('NestedPackTests', () => {
 
 /** A pack and a folder inside it installed from the same origin. */
 class OverlapCase extends SyncCase {
-  constructor(t: TestContext) {
-    super(t);
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
     this.publish({
       'pack.md': 'Prefer small PRs.\n',
       'typescript/pack.md': doc('Editing `**/*.ts`', 'Prefer unions.\n'),
@@ -235,7 +239,7 @@ class OverlapCase extends SyncCase {
 
 describe('OverlapTests', () => {
   test('adding a folder inside an installed pack stops untouched', async (t) => {
-    const c = new OverlapCase(t);
+    const c = await OverlapCase.make(t);
     await c.add();
     const before = read(c.agentsMd);
 
@@ -250,7 +254,7 @@ describe('OverlapTests', () => {
   });
 
   test('adding a pack around an installed one stops untouched', async (t) => {
-    const c = new OverlapCase(t);
+    const c = await OverlapCase.make(t);
     await c.addTypescript();
     const before = read(c.agentsMd);
 
@@ -262,7 +266,7 @@ describe('OverlapTests', () => {
   });
 
   test('same folder from another origin doesnt overlap', async (t) => {
-    const c = new OverlapCase(t);
+    const c = await OverlapCase.make(t);
     const [otherOrigin, other] = c.remote('other-rules');
     c.publish({ 'typescript/pack.md': doc('Editing `**/*.ts`', 'Use strict mode.\n') }, other);
     await c.add();
@@ -275,10 +279,12 @@ describe('OverlapTests', () => {
 
 /** A folder with a pack.md installed on its own, which renders the way it would inside its parent. */
 class InstallPointCase extends SyncCase {
-  readonly synced = path.join(this.gen, 'typescript');
+  get synced(): string {
+    return path.join(this.gen, 'typescript');
+  }
 
-  constructor(t: TestContext) {
-    super(t);
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
     this.publish({
       'pack.md': 'Prefer small PRs.\n',
       'typescript/pack.md': doc('Editing `**/*.ts`', 'Prefer unions.\n'),
@@ -293,7 +299,7 @@ class InstallPointCase extends SyncCase {
 
 describe('InstallPointTests', () => {
   test('pack with a when line gets a row in the context table', async (t) => {
-    const c = new InstallPointCase(t);
+    const c = await InstallPointCase.make(t);
     const result = await c.addFolder('typescript');
 
     exits(result, 0);
@@ -307,7 +313,7 @@ describe('InstallPointTests', () => {
   });
 
   test('pack with a when line gets an index of its rules and table', async (t) => {
-    const c = new InstallPointCase(t);
+    const c = await InstallPointCase.make(t);
     const result = await c.addFolder('typescript');
 
     exits(result, 0);
@@ -319,7 +325,7 @@ describe('InstallPointTests', () => {
   });
 
   test('nested pack named pack beside a root index stops the sync', async (t) => {
-    const c = new InstallPointCase(t);
+    const c = await InstallPointCase.make(t);
     c.publish({ 'typescript/pack/pack.md': doc('Packaging') });
 
     const result = await c.addFolder('typescript');
@@ -334,10 +340,12 @@ describe('InstallPointTests', () => {
  * A nested pack in the repo's own context-packs/: its docs stay where they are, and only its index is generated.
  */
 class LocalNestedCase extends SyncCase {
-  readonly index = path.join(this.gen, 'project', 'deploy.md');
+  get index(): string {
+    return path.join(this.gen, 'project', 'deploy.md');
+  }
 
-  constructor(t: TestContext) {
-    super(t);
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
     this.write('context-packs/project/design.md', doc('Changing the design', 'Keep it small.\n'));
     this.write('context-packs/project/deploy/pack.md', doc('Deploying', 'Ship on green.\n'));
     this.write('context-packs/project/deploy/rollback.md', doc('Rolling back', 'Revert first.\n'));
@@ -346,7 +354,7 @@ class LocalNestedCase extends SyncCase {
 
 describe('LocalNestedPackTests', () => {
   test('nested packs index is generated and its docs stay where they are', async (t) => {
-    const c = new LocalNestedCase(t);
+    const c = await LocalNestedCase.make(t);
     const result = await c.sync();
 
     exits(result, 0);
@@ -367,7 +375,7 @@ describe('LocalNestedPackTests', () => {
   });
 
   test('generated index edited in the repo stops the sync', async (t) => {
-    const c = new LocalNestedCase(t);
+    const c = await LocalNestedCase.make(t);
     await c.sync();
     fs.writeFileSync(c.index, 'Edited here.\n');
 
@@ -379,7 +387,7 @@ describe('LocalNestedPackTests', () => {
   });
 
   test('editing a nested packs rules regenerates its index on resync', async (t) => {
-    const c = new LocalNestedCase(t);
+    const c = await LocalNestedCase.make(t);
     await c.sync();
     c.write('context-packs/project/deploy/pack.md', doc('Deploying', 'Ship on green, never on Friday.\n'));
 

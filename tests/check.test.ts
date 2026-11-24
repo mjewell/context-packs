@@ -9,7 +9,7 @@ import { doc, names, read, SyncCase } from './sync_case.ts';
 /** check, which exits 1 when a sync would change anything, and writes nothing. */
 describe('CheckTests', () => {
   test('synced repo passes silently', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     c.share('Prefer small PRs.\n');
     await c.add();
     const before = read(c.agentsMd);
@@ -22,7 +22,7 @@ describe('CheckTests', () => {
   });
 
   test('when changed without a resync fails naming the block', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     c.write('context-packs/testing.md', doc('Writing tests'));
     await c.sync();
     const before = read(c.agentsMd);
@@ -37,7 +37,7 @@ describe('CheckTests', () => {
   });
 
   test('ref edited without a resync fails naming the stale generated file', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     const old = c.publish({ 'pack.md': 'Prefer small PRs.\n', 'testing.md': doc('Writing tests', 'Use factories.\n') });
     await c.add();
     const fresh = c.publish({ 'testing.md': doc('Writing tests', 'Use fixtures.\n') });
@@ -52,7 +52,7 @@ describe('CheckTests', () => {
   });
 
   test('repo never synced fails creating nothing', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     const result = await c.sync('check');
 
     exits(result, 1);
@@ -61,7 +61,7 @@ describe('CheckTests', () => {
   });
 
   test('block edited in the repo fails untouched', async (t) => {
-    const c = new SyncCase(t);
+    const c = await SyncCase.make(t);
     c.share('Prefer small PRs.\n');
     await c.add();
     const edited = read(c.agentsMd).replace('small PRs', 'tiny PRs');

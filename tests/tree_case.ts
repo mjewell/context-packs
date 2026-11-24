@@ -1,8 +1,7 @@
 /** A repo for the spec-tree skill's scripts to read trees from, and a tree to put in it. */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { TestContext } from 'node:test';
-
+import { Case } from './case.ts';
 import { command, type Result, ROOT, run } from './scripts.ts';
 import { tempDir } from './temp.ts';
 
@@ -32,11 +31,11 @@ export function dedent(text: string): string {
 }
 
 /** A repo in a temporary folder, with spec trees written into it, and the trees CLI run from its root. */
-export class TreeCase {
-  readonly root: string;
+export class TreeCase extends Case {
+  root!: string;
 
-  constructor(t: TestContext) {
-    this.root = tempDir(t, 'context-packs-trees-');
+  protected override async setUp(): Promise<void> {
+    this.root = tempDir(this.t, 'context-packs-trees-');
     fs.mkdirSync(path.join(this.root, '.git'));
   }
 

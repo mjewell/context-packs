@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, type TestContext, test } from 'node:test';
+import { describe, test } from 'node:test';
 
 import { excludes, exits, includes } from './expect.ts';
 import { CLAUSE, doc, exists, read, SyncCase } from './sync_case.ts';
@@ -17,15 +17,12 @@ interface Run {
 
 /** A repo whose own docs have cases, run by `eval` against a fake claude on PATH. */
 class EvalCase extends SyncCase {
-  readonly log = path.join(this.root, 'claude.log');
-
-  static async make(t: TestContext): Promise<EvalCase> {
-    const c = new EvalCase(t);
-    await c.setUp();
-    return c;
+  get log(): string {
+    return path.join(this.root, 'claude.log');
   }
 
-  protected async setUp(): Promise<void> {
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
     const bin = path.join(this.root, 'bin');
     fs.mkdirSync(bin);
     fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\nexec '${process.execPath}' '${FAKE}' "$@"\n`, {
@@ -368,13 +365,11 @@ describe('EvalTests', () => {
  * context-packs/, the top-level pack, that's the whole repo.
  */
 class PackCase extends EvalCase {
-  static override async make(t: TestContext): Promise<PackCase> {
-    const c = new PackCase(t);
-    await c.setUp();
-    c.write('rules/pack.md', 'Prefer small PRs.\n');
-    c.write('rules/deploying.md', doc('Deploying to production'));
-    c.write('rules/.evals/deploying.md', '## Reads\n\n- Help me with deploying to production\n');
-    return c;
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
+    this.write('rules/pack.md', 'Prefer small PRs.\n');
+    this.write('rules/deploying.md', doc('Deploying to production'));
+    this.write('rules/.evals/deploying.md', '## Reads\n\n- Help me with deploying to production\n');
   }
 
   async install(): Promise<void> {
