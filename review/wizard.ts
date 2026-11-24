@@ -22,6 +22,7 @@ import { Change, commit, git, Refused } from './change.ts';
 import { type Cited, evidenceErrors } from './evidence.ts';
 import { type Finding, findingsIn, Rejected } from './report.ts';
 import { errors, findingsSchema, groupsSchema, type Schema } from './schema.ts';
+import { snapshot } from './snapshot.ts';
 
 // The prompts and the schema live with the pack-findings skill, since an installed skill holds only its own folder.
 const PROMPTS = path.join(ROOT, 'skills', 'pack-findings');
@@ -156,17 +157,29 @@ function prompt(name: string, values: Readonly<Record<string, string>>): string 
   return format(fs.readFileSync(path.join(PROMPTS, name), 'utf8'), values);
 }
 
-function init(args: Values): void {
+/** The head init reviews: the commit --head names, once it's checked out, or a commit made from the working files. */
+function headOf(args: Values): string {
+  if (args.head && args.uncommitted) throw new Refused('Give init --head or --uncommitted, not both.');
+  if (args.uncommitted) return snapshot();
+  if (!args.head) {
+    throw new Refused('Give init --head, the commit to review, or --uncommitted, to review the working files.');
+  }
   const head = commit(String(args.head));
   if (git('rev-parse', 'HEAD').trim() !== head) {
     throw new Refused(`The checkout isn't the head, ${head}. Check out the head, then run init again.`);
   }
+  return head;
+}
+
+function init(args: Values): void {
+  const head = headOf(args);
   const root = git('rev-parse', '--show-toplevel').trim();
   const file = instructions(root);
   const units = [[path.relative(root, file)], ...tableUnits(root, region(root, file).block)];
   const change = new Change(String(args.base), head);
   if (!change.paths().length) {
-    throw new Refused(`The change from ${args.base} to ${args.head} touches no files, so there is nothing to review.`);
+    const to = args.uncommitted ? 'the working files' : args.head;
+    throw new Refused(`The change from ${args.base} to ${to} touches no files, so there is nothing to review.`);
   }
   const commits = git('rev-list', `${change.start}..${change.head}`).split(/\s+/).filter(Boolean).length;
   // Agents write their answers in a folder of their own, so a run folder, which holds what the wizard checked, is
@@ -487,8 +500,12 @@ const PARSER: Parser = {
           flag: '--head',
           dest: 'head',
           metavar: 'HEAD',
-          required: true,
           help: 'the commit or branch that is reviewed, checked out',
+        },
+        {
+          flag: '--uncommitted',
+          dest: 'uncommitted',
+          help: 'review the working files, as a commit made from them on top of HEAD, instead of a head',
         },
         {
           flag: '--command',

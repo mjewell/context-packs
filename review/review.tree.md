@@ -94,6 +94,9 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
       merge -> done: "the groups are in"
       ```
       - `init` checks that the checkout is the head and that the change touches a file, then names one [[finders|finder]] for each [[unit]] and the [[uncovered-finder|uncovered finder]], each with a one-line prompt
+        - With `--uncommitted`, `init` reviews a commit it makes from the working files on top of `HEAD`, built in an index of its own, so the branch, the index and the files don't change. Untracked files are in it, ignored ones aren't
+          - Finders still read rules and code from the checkout, so an edit during the review can reach them, as it can in a review of a commit
+          - Rejected: a real commit, undone after. It runs the commit hooks, and undoing it loses which changes were staged
       - While answers are missing, `next` names each finder that hasn't answered, with its prompt, so one that stopped can be started again
       - Once every answer is in, `next` numbers the finders' findings and names the merging agent. Once its groups are in, `next` prints the [[findings]]
         - When no finder found anything, `next` builds empty [[findings]] and prints them, since a merge would have nothing to group
