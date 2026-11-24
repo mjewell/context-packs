@@ -6,9 +6,7 @@ import { describe, test } from 'node:test';
 import { excludes, exits, includes } from './expect.ts';
 import { connection, ok, pullRequest, role } from './fake_github.ts';
 import { F1, F3 } from './pairing_case.ts';
-import { HEAD, MARKER, ours, ReviewCase, reviewThread } from './review_case.ts';
-
-const BASE = 'b'.repeat(40);
+import { BASE, HEAD, MARKER, ours, ReviewCase, reviewThread } from './review_case.ts';
 
 interface Input {
   readonly [key: string]: unknown;

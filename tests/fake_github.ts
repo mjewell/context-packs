@@ -18,6 +18,10 @@ export interface Request {
   readonly path?: string;
 }
 
+/** The fake PR's head and base commits. */
+export const HEAD = 'h'.repeat(40);
+export const BASE = 'b'.repeat(40);
+
 export class FakeGitHub {
   readonly responses: Record<string, Answer | ((variables: Variables) => Answer)> = {};
   readonly rest: Record<string, Answer> = {};
@@ -100,7 +104,7 @@ export function comment(body: string, { mine = false, id = 'IC_1' } = {}) {
 export function pullRequest({
   comments = [] as readonly unknown[],
   more = false,
-  head = 'h'.repeat(40),
+  head = HEAD,
   baseRef = 'main',
 } = {}): Answer {
   return ok({

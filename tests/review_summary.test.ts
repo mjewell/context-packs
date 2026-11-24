@@ -5,10 +5,8 @@ import { describe, test } from 'node:test';
 
 import { excludes, exits, includes } from './expect.ts';
 import { comment, connection, ok, pullRequest } from './fake_github.ts';
-import { HEAD, MARKER, own, ReviewCase, reviewThread, spot } from './review_case.ts';
+import { BASE, HEAD, MARKER, own, ReviewCase, reviewThread, spot } from './review_case.ts';
 import type { Result } from './scripts.ts';
-
-const BASE = 'b'.repeat(40);
 
 function finding(
   kind = 'deviation',

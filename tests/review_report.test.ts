@@ -4,9 +4,8 @@ import path from 'node:path';
 import { describe, test } from 'node:test';
 
 import { exits, includes } from './expect.ts';
-import { HEAD, ReviewCase, spot } from './review_case.ts';
+import { BASE, HEAD, ReviewCase, spot } from './review_case.ts';
 
-const BASE = 'b'.repeat(40);
 const NUMBERS = { file: 'AGENTS.md', quote: 'Game numbers live in content.', routed: true };
 
 /** One finder's finding. */
