@@ -10,7 +10,7 @@ import path from 'node:path';
 import { gitWithEnv } from './change.ts';
 
 /** What git printed, trimmed, run with index as its index. */
-function git(index: string, ...args: string[]): string {
+function gitWithIndex(index: string, ...args: string[]): string {
   return gitWithEnv({ GIT_INDEX_FILE: index }, ...args).trim();
 }
 
@@ -22,10 +22,18 @@ export function snapshot(): string {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'pack-review-index-'));
   try {
     const index = path.join(folder, 'index');
-    git(index, 'read-tree', 'HEAD');
-    git(index, 'add', '--all');
-    const tree = git(index, 'write-tree');
-    return git(index, 'commit-tree', tree, '-p', 'HEAD', '-m', 'Uncommitted changes, as pack-review reviews them');
+    gitWithIndex(index, 'read-tree', 'HEAD');
+    gitWithIndex(index, 'add', '--all');
+    const tree = gitWithIndex(index, 'write-tree');
+    return gitWithIndex(
+      index,
+      'commit-tree',
+      tree,
+      '-p',
+      'HEAD',
+      '-m',
+      'Uncommitted changes, as pack-review reviews them',
+    );
   } finally {
     fs.rmSync(folder, { recursive: true, force: true });
   }
