@@ -10,9 +10,13 @@ import { exists } from '../src/paths.ts';
 import { dumps } from '../src/pyjson.ts';
 import { quote } from '../src/pystr.ts';
 import { Change, Refused } from './change.ts';
+import type { CiFinding } from './ci_summary.ts';
 import type { Finding, Source } from './report.ts';
 
 const STATE = 'state.json';
+
+/** A finding in a run's findings: a local run's have no thread or commentary, and from-pr's have them from CI. */
+export type RunFinding = Finding & Partial<CiFinding>;
 
 export interface State {
   readonly base: string;
@@ -33,7 +37,7 @@ export function counted(count: number, noun: string): string {
  * such as a finder's accepted answer or the file that starts a phase, so a write cut short must never leave one.
  * Every such file goes through here.
  */
-export function publish(file: string, text: string): void {
+function publish(file: string, text: string): void {
   // Each process names its own, so two steps writing one file at once, such as a doc read twice, don't share it.
   const partial = `${file}.${process.pid}.partial`;
   fs.writeFileSync(partial, text, 'utf8');
@@ -121,9 +125,39 @@ export class Run {
     );
   }
 
-  /** The review's findings, which submit-groups writes from the groups, so it marks that the run is done. */
-  get findings(): string {
+  /**
+   * The file that holds the review's findings, which finish() writes, so it marks that the run is done. Steps name it
+   * in what they print, and read the findings through findings().
+   */
+  get findingsFile(): string {
     return path.join(this.folder, 'findings.json');
+  }
+
+  /** Refuses once the findings are built, since a done run never changes. */
+  buildingFindings(): void {
+    if (this.phase() === 'done') {
+      throw new Refused(
+        "Not taken: the findings are already built, so the groups can't change. Tell whoever started you, and stop.",
+      );
+    }
+  }
+
+  /**
+   * Finish the run with its findings, and the merging agent's groups, their JSON text, when a merge built them. Each
+   * path to the findings writes them here, in one shape: a merge, a review that found nothing, and from-pr.
+   */
+  finish(findings: readonly RunFinding[], groups?: string): void {
+    this.buildingFindings();
+    if (groups !== undefined) publish(path.join(this.folder, 'groups.json'), groups);
+    publish(this.findingsFile, dumps({ base: this.state.base, head: this.state.head, findings }));
+  }
+
+  /** The review's findings, once the run is done. */
+  findings(): RunFinding[] {
+    if (this.phase() !== 'done') {
+      throw new Refused(`The review has no findings yet: run \`${this.command('next')}\` to see what it's waiting on.`);
+    }
+    return JSON.parse(fs.readFileSync(this.findingsFile, 'utf8')).findings;
   }
 
   /** The finders' findings, numbered for the merge. startMerge() writes it, so it marks that the merge has started. */
@@ -137,7 +171,7 @@ export class Run {
    * starts when the file that marks it is written, so this is the one place that knows which file that is.
    */
   phase(): 'finders' | 'merge' | 'done' {
-    if (exists(this.findings)) return 'done';
+    if (exists(this.findingsFile)) return 'done';
     return exists(this.#sourcesFile) ? 'merge' : 'finders';
   }
 

@@ -23,7 +23,7 @@ import { GitHubError } from './github.ts';
 import { aKind, kindText } from './kinds.ts';
 import { prompt } from './prompts.ts';
 import { type Finding, findingsIn, Rejected } from './report.ts';
-import { counted, newRun, publish, Run } from './run.ts';
+import { counted, newRun, Run } from './run.ts';
 import { errors, findingsSchema, groupsSchema, type Schema } from './schema.ts';
 import { snapshot } from './snapshot.ts';
 
@@ -265,14 +265,14 @@ function submit(args: Values): void {
 
 /** Print a done run's findings, counted by kind. */
 function printDone(run: Run): void {
-  const findings: Finding[] = JSON.parse(fs.readFileSync(run.findings, 'utf8')).findings;
+  const findings = run.findings();
   const kinds = KINDS.filter((kind) => findings.some((found) => found.kind === kind)).map((kind) =>
     counted(findings.filter((found) => found.kind === kind).length, kind),
   );
   const listed = kinds.length ? kinds.slice(0, -1).join(', ') + (kinds.length > 1 ? ' and ' : '') + kinds.at(-1) : '';
   print(
     [
-      `Done: ${counted(findings.length, 'finding')}${listed ? `, ${listed}` : ''}, in ${run.findings}.`,
+      `Done: ${counted(findings.length, 'finding')}${listed ? `, ${listed}` : ''}, in ${run.findingsFile}.`,
       'If another skill, such as pack-review, ran pack-findings, show none of the findings: hand that skill this ' +
         `command, \`${run.command('next')}\`, which prints them for it. Otherwise, show the user how many there ` +
         'are of each kind, then each finding in full, grouped by kind, and say that running pack-review in this ' +
@@ -316,7 +316,7 @@ function nextStep(args: Values): void {
   const found = run.startMerge();
   // With no findings there is nothing to group, so the findings are built here, as submit-groups would build them.
   if (!found.length) {
-    publish(run.findings, dumps({ base: run.state.base, head: run.state.head, findings: [] }));
+    run.finish([]);
     printDone(run);
     return;
   }
@@ -351,11 +351,11 @@ async function fromPr(args: Values): Promise<void> {
   const root = git('rev-parse', '--show-toplevel').trim();
   const units = rulesOf(root);
   const run = newRun({ base: report.base, head: report.head, root, command: String(args.command), units });
-  publish(run.findings, dumps(report));
+  run.finish(report.findings);
   print(
     [
       `Loaded ${counted(report.findings.length, 'finding')} from CI's review of ${report.head.slice(0, 7)}, in ` +
-        `${run.findings}.`,
+        `${run.findingsFile}.`,
       ...uncommittedLines(units, 'go through the findings'),
       `To go through them one at a time, run \`${run.command('finding', '1')}\`, then the same with 2, and so on.`,
       'Here they are:',
@@ -366,13 +366,8 @@ async function fromPr(args: Values): Promise<void> {
 
 function findingStep(args: Values): void {
   const run = new Run(String(args.run));
-  if (run.phase() !== 'done') {
-    throw new Refused(`The review has no findings yet: run \`${run.command('next')}\` to see what it's waiting on.`);
-  }
   // A local run's findings have no commentary, and a CI review's have it on some.
-  const findings: (Finding & Partial<ciSummary.CiFinding>)[] = JSON.parse(
-    fs.readFileSync(run.findings, 'utf8'),
-  ).findings;
+  const findings = run.findings();
   const n = String(args.n);
   if (!/^\d+$/.test(n) || Number(n) < 1 || Number(n) > findings.length) {
     throw new Refused(
@@ -406,11 +401,7 @@ function submitGroups(args: Values): void {
     );
   }
   // A run that's done never changes: next prints its findings, so an agent that missed the first reply loses nothing.
-  if (phase === 'done') {
-    throw new Refused(
-      "Not taken: the findings are already built, so the groups can't change. Tell whoever started you, and stop.",
-    );
-  }
+  run.buildingFindings();
   const command = run.command('submit-groups');
   const text = answer('groups', run.answer('groups.json'), command, groupsSchema());
   let findings: Finding[];
@@ -420,9 +411,8 @@ function submitGroups(args: Values): void {
     if (!(error instanceof Rejected)) throw error;
     throw new Refused(`Not taken: ${error.message}. Fix your groups, then submit them again with \`${command}\`.`);
   }
-  publish(path.join(run.folder, 'groups.json'), text);
-  publish(run.findings, dumps({ base: run.state.base, head: run.state.head, findings }));
-  print(`${counted(findings.length, 'finding')} are in ${run.findings}. Tell whoever started you, and stop.`);
+  run.finish(findings, text);
+  print(`${counted(findings.length, 'finding')} are in ${run.findingsFile}. Tell whoever started you, and stop.`);
 }
 
 const PARSER: Parser = {
