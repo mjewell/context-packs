@@ -19,16 +19,14 @@ import { units as tableUnits } from '../src/tables.ts';
 import { Change, commit, git, Refused } from './change.ts';
 import * as ciSummary from './ci_summary.ts';
 import { type Cited, evidenceErrors } from './evidence.ts';
+import { type Finding, KINDS } from './finding.ts';
 import { GitHubError } from './github.ts';
 import { aKind, kindText } from './kinds.ts';
 import { prompt } from './prompts.ts';
-import { type Finding, findingsIn, Rejected } from './report.ts';
+import { findingsIn, Rejected } from './report.ts';
 import { counted, newRun, Run } from './run.ts';
 import { errors, findingsSchema, groupsSchema, type Schema } from './schema.ts';
 import { snapshot } from './snapshot.ts';
-
-// The kinds of finding, in the order the findings schema lists them.
-const KINDS = findingsSchema().properties!.findings!.items!.properties!.kind!.enum as string[];
 
 function print(text: string, end = '\n'): void {
   process.stdout.write(text + end);

@@ -14,7 +14,7 @@ import { ascii, dumps } from '../src/pyjson.ts';
 import { format, repr } from '../src/pystr.ts';
 import { fail, Stop } from '../src/stop.ts';
 import { compact, line, output } from './args.ts';
-import type { Finding } from './report.ts';
+import type { Report } from './finding.ts';
 import { clean } from './sanitize.ts';
 import type { Shown, Thread } from './trust.ts';
 
@@ -149,8 +149,8 @@ function threadLines(comments: readonly Shown[]): string {
 }
 
 function commentPrompt(args: Values): void {
-  const report = load<{ head: string; findings: Finding[] }>(String(args.report));
-  const findings: Finding[] = report.findings;
+  const report = load<Report>(String(args.report));
+  const findings = report.findings;
   const threads = new Map<string, Thread>(load<Thread[]>(String(args.threads)).map((thread) => [thread.id, thread]));
   const pairs = load<{ pairs: Pair[] }>(String(args.paired)).pairs;
   output('needed', pairs.length ? 'true' : 'false');
@@ -208,7 +208,7 @@ function commentCheck(args: Values): void {
 }
 
 function pairPrompt(args: Values): void {
-  const findings = load<{ findings: Finding[] }>(String(args.report)).findings;
+  const findings = load<Report>(String(args.report)).findings;
   const threads = openedWith(load<Thread[]>(String(args.threads)));
   const needed = !!(findings.length && threads.size);
   output('needed', needed ? 'true' : 'false');
@@ -226,7 +226,7 @@ function pairPrompt(args: Values): void {
 }
 
 function pairCheck(args: Values): void {
-  const findings = load<{ findings: Finding[] }>(String(args.report)).findings;
+  const findings = load<Report>(String(args.report)).findings;
   const threads = new Set(load<Thread[]>(String(args.threads)).map((thread) => thread.id));
   let pairs: Pair[] = [];
   if (args.pairs !== null) {

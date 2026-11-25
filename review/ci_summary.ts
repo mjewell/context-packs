@@ -6,8 +6,8 @@
 import { spawnSync } from 'node:child_process';
 
 import { Refused } from './change.ts';
+import type { SummaryBlock } from './finding.ts';
 import * as github from './github.ts';
-import type { Finding } from './report.ts';
 import { errors, findingsSchema, type Schema } from './schema.ts';
 import { TITLE } from './summary.ts';
 
@@ -25,23 +25,6 @@ interface SummaryComment {
   readonly author: { readonly login: string } | null;
   readonly body: string;
   readonly bodyText: string;
-}
-
-/**
- * A finding as CI's summary carries it: thread is the review thread pack-review opened for it on an earlier run, and
- * commentary sums up what that thread's replies say about it. Either is null when there's none.
- */
-export interface CiFinding extends Finding {
-  readonly thread: string | null;
-  readonly commentary: string | null;
-}
-
-/** The report CI's summary carries, as the summary's JSON block holds it. */
-export interface Report {
-  readonly base: string;
-  readonly base_ref: string;
-  readonly head: string;
-  readonly findings: CiFinding[];
 }
 
 /** A PR as a user names it, owner/repo#number. */
@@ -72,7 +55,7 @@ function token(): string {
 export async function read(
   target: Pr,
   bot: string,
-): Promise<{ readonly head: string; readonly baseRef: string; readonly report: Report }> {
+): Promise<{ readonly head: string; readonly baseRef: string; readonly report: SummaryBlock }> {
   const found = await github.graphql<{
     repository: {
       pullRequest: { headRefOid: string; baseRefName: string; comments: github.Connection<SummaryComment> };
@@ -120,7 +103,7 @@ export async function read(
         `review reads, so CI may have run another version:\n${broken.map((line) => `  ${line}`).join('\n')}`,
     );
   }
-  return { head: pull.headRefOid, baseRef: pull.baseRefName, report: report as Report };
+  return { head: pull.headRefOid, baseRef: pull.baseRefName, report: report as SummaryBlock };
 }
 
 const REPORT: Schema = {

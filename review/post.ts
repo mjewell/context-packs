@@ -12,6 +12,7 @@ import fs from 'node:fs';
 
 import { parse } from '../src/argparse.ts';
 import { fail, Stop } from '../src/stop.ts';
+import type { Report } from './finding.ts';
 import * as findingComment from './finding_comment.ts';
 import * as github from './github.ts';
 import * as summary from './summary.ts';
@@ -59,7 +60,7 @@ function reply(head: string, resolved: boolean, commentary: string | undefined):
 }
 
 /** Why the PR no longer matches what was reviewed, or null when it does. */
-function stale(report: summary.Report, pr: github.PullRequest): string | null {
+function stale(report: Report, pr: github.PullRequest): string | null {
   if (pr.headRefOid !== report.head) {
     return (
       `the PR moved on to ${pr.headRefOid} since this review of ${report.head}, so it posts nothing. ` +
@@ -82,7 +83,7 @@ function stale(report: summary.Report, pr: github.PullRequest): string | null {
 function planned(
   repo: string,
   number: number,
-  report: summary.Report,
+  report: Report,
   paired: Paired,
   pr: github.PullRequest,
   threads: ReadonlyMap<string, trust.Thread>,
@@ -159,7 +160,7 @@ async function main(): Promise<void> {
     process.argv.slice(2),
   );
   const number = Number(args.pr);
-  const report: summary.Report = JSON.parse(fs.readFileSync(String(args.report), 'utf8'));
+  const report: Report = JSON.parse(fs.readFileSync(String(args.report), 'utf8'));
   const paired: Paired = JSON.parse(fs.readFileSync(String(args.paired), 'utf8'));
   const pr = await github.pullRequest(number);
   const why = stale(report, pr);

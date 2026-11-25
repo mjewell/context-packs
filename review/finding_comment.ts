@@ -3,8 +3,9 @@
  * found, and a later run's pairing agent reads that same text to tell whether a new finding is about the same issue.
  * The agent's text renders as Markdown, escaped so it can't notify anyone or hide text.
  */
+
+import type { Finding } from './finding.ts';
 import * as github from './github.ts';
-import type { Finding } from './report.ts';
 
 // GitHub links a mention only when a login's first character follows the @. A word joiner between them doesn't show,
 // and it breaks the mention whatever Markdown is around it. Backticks around the mention wouldn't hold, since the
@@ -14,17 +15,6 @@ const JOINER = '⁠';
 
 // Said after a rule's file only when its doc wasn't routed, since routed is the usual case.
 const UNROUTED = ", whose `when` didn't match this change";
-
-export interface Rule {
-  readonly file: string;
-  readonly quote: string;
-  readonly routed: boolean;
-}
-
-export interface Exemplar {
-  readonly way: string;
-  readonly examples: string[];
-}
 
 /**
  * The agent's text as Markdown that can't notify anyone or hide text: each @ that could start a mention has a word
@@ -55,7 +45,7 @@ export function body(finding: Finding, head: string, anchor: { readonly path: st
   // The kind is set in code like the commit, so both read as tags at the start of the comment.
   const parts = [`\`${finding.kind}\` \`${head.slice(0, 7)}\` **${escaped(finding.headline)}**`];
   parts.push(
-    ...(finding.rules as Rule[]).map(
+    ...finding.rules.map(
       (rule) => `From \`${escaped(rule.file)}\`${rule.routed ? '' : UNROUTED}:\n\n${quoted(rule.quote)}`,
     ),
   );
@@ -66,12 +56,12 @@ export function body(finding: Finding, head: string, anchor: { readonly path: st
   );
   if (others.length)
     parts.push(`Also found at ${others.map((spot) => `\`${escaped(spot.path)}:${spot.line}\``).join(', ')}.`);
-  if (finding.deliberate.length) parts.push(listed('Signs it may be deliberate', finding.deliberate as string[]));
+  if (finding.deliberate.length) parts.push(listed('Signs it may be deliberate', finding.deliberate));
   if (finding.exemplars.length) {
     parts.push(
       listed(
         'How the code does it now',
-        (finding.exemplars as Exemplar[]).map(
+        finding.exemplars.map(
           (exemplar) => `${exemplar.way}: ${exemplar.examples.map((example) => `\`${example}\``).join(', ')}`,
         ),
       ),

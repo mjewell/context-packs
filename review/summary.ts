@@ -3,29 +3,14 @@
  * JSON for the author's local run. post.ts posts it. Only the report's text reaches it, so the only text it holds from
  * the agent is what the report holds.
  */
-import fs from 'node:fs';
-
+import { type Anchor, type Finding, KINDS, type Report } from './finding.ts';
 import * as findingComment from './finding_comment.ts';
 import * as github from './github.ts';
-import type { Finding } from './report.ts';
-import { SCHEMA } from './schema.ts';
 
 // GitHub's limit on a comment's length.
 export const LIMIT = 65536;
 // The findings block's title, which a local run finds the summary by and reads the JSON after.
 export const TITLE = 'Findings for pack-review';
-// The finding kinds, in the order the summary counts them. Each is a noun that takes an s for more than one.
-const KINDS: string[] = JSON.parse(fs.readFileSync(SCHEMA, 'utf8')).properties.findings.items.properties.kind.enum;
-
-export type Anchor = { readonly path: string; readonly line: number } | null;
-
-export interface Report {
-  readonly base: string;
-  readonly base_ref: string;
-  readonly head: string;
-  readonly findings: readonly Finding[];
-  readonly anchors: readonly Anchor[];
-}
 
 function counted(findings: readonly Finding[]): string {
   return KINDS.map((kind): [string, number] => [kind, findings.filter((f) => f.kind === kind).length])
