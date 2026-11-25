@@ -51,7 +51,7 @@ function checkedOut(head: string, step: string): void {
   const checked = git('rev-parse', 'HEAD').trim();
   if (checked !== head) {
     throw new Refused(
-      `The checkout is ${checked}, not the head, ${head}. Stop, tell the user, and offer to check out the head. ` +
+      `Stop, tell the user the checkout is ${checked}, not the head, ${head}, and offer to check out the head. ` +
         `Once it is checked out, run ${step} again.`,
     );
   }
@@ -382,9 +382,9 @@ async function fromPr(args: Values): Promise<void> {
       '--stale',
     ];
     throw new Refused(
-      `CI hasn't reviewed the PR as it is now: ${changes.join(', and ')}. Stop, and ask the user whether to wait for ` +
-        'CI to review it again, to go on with these findings, or to find them again here with pack-findings. To go ' +
-        `on, run \`${again.join(' ')}\`.`,
+      'Stop, and ask the user whether to wait for CI to review the PR again, to go on with these findings, or to find ' +
+        `them again here with pack-findings. CI hasn't reviewed it as it is now: ${changes.join(', and ')}. To go on, ` +
+        `run \`${again.join(' ')}\`.`,
     );
   }
   checkedOut(report.head, 'from-pr');

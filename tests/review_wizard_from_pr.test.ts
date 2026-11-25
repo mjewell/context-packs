@@ -102,7 +102,10 @@ describe('findings from a CI review', () => {
     const result = await c.fromPr();
 
     exits(result, 1);
-    includes(result.stderr, `The checkout is ${c.base}, not the head, ${c.head}.`);
+    includes(
+      result.stderr,
+      `Stop, tell the user the checkout is ${c.base}, not the head, ${c.head}, and offer to check out the head.`,
+    );
     includes(result.stderr, 'Once it is checked out, run from-pr again.');
   });
 
@@ -140,10 +143,9 @@ describe('findings from a CI review', () => {
         ];
         assert.equal(
           result.stderr,
-          `CI hasn't reviewed the PR as it is now: ${changes.join(', and ')}. Stop, and ask the user whether to ` +
-            'wait for CI to review it again, to go on with these findings, or to find them again here with ' +
-            "pack-findings. To go on, run `review from-pr --pr 'o/r#7' --bot github-actions --command review " +
-            '--stale`.\n',
+          'Stop, and ask the user whether to wait for CI to review the PR again, to go on with these findings, or to ' +
+            `find them again here with pack-findings. CI hasn't reviewed it as it is now: ${changes.join(', and ')}. ` +
+            "To go on, run `review from-pr --pr 'o/r#7' --bot github-actions --command review --stale`.\n",
         );
       });
     }
