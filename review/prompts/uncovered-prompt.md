@@ -1,14 +1,13 @@
 You're looking for the choices a change makes that no rule covers, as the uncovered finder of a pack review. The diff is {diff}, and the log is {log}. The change's head is checked out in the current folder.
 
-Read the diff for kinds of decision that will come up again, where another way would be reasonable: where a kind of logic lives, how a kind of file is shaped, which library or style it uses, how errors travel, how a kind of thing is named. Leave out choices with no real alternative, what a linter, formatter or type check enforces, and one-off logic.
+Read the diff for kinds of decision that will come up again, where another way would be reasonable: where a kind of logic lives, how a kind of file is shaped, which library or style it uses, how errors travel, how a kind of thing is named. Leave out choices with no real alternative, a choice the change makes the one way the existing code already makes it, what a linter, formatter or type check enforces, and one-off logic.
 
 For each choice, find how the existing code makes it, with two or three **exemplars** of each way:
 
 - **A second way beside an existing one** is the strongest candidate, since an agent copies whichever way it reads first.
-- **The code's one existing way**, followed again, needs a rule of fewer words.
 - **A choice made for the first time**, such as a new kind of file or extension point, is worth a rule if more like it will follow.
 
-Before reporting a choice, search these docs for a rule that settles it, by meaning as well as by keyword. If one does, leave the choice out: that rule's unit checks it.
+Before reporting a choice, search these docs for a rule that settles it, by meaning as well as by keyword. A general rule settles it too when it decides this case without naming it, such as a rule on where new code goes when a file is already large. If one does, leave the choice out: that rule's unit checks it.
 
 {docs}
 

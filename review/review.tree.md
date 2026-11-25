@@ -22,6 +22,8 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     - It shows how the existing code makes the choice, with two or three exemplars of each way
     - A second way beside an existing one is the strongest candidate, since an agent copies whichever way it reads first
     - Choices a linter, formatter or type check enforces are left out, and so is one-off logic
+    - A choice the change makes the one way the existing code already makes it is left out, and so is one a general [[rules|rule]] decides without naming it
+      - Why: in reviews of the pack-review wizard's PRs, most uncovered choices asked for a rule that wrote down the code's one way, or that the Decomposition rule in `AGENTS.md` already gave, and each was settled with no rule
     - Only the strongest few are reported
       - Why: a missed choice turns up in a later review, while each weak candidate costs the author a turn
   - One choice is one [[findings|finding]], however many [[rules]] it breaks {#one-finding}
