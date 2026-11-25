@@ -103,7 +103,16 @@ export async function read(
         lines.join('').trimEnd(),
     );
   }
-  const report: unknown = JSON.parse(summary!.bodyText.split(`${TITLE}\n`)[1]!);
+  let report: unknown;
+  try {
+    report = JSON.parse(summary!.bodyText.split(`${TITLE}\n`)[1]!);
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    throw new Refused(
+      "Stop, and show the user this: pack-review's summary on the PR holds no JSON this version can read after its " +
+        `findings block's title: ${error.message}.`,
+    );
+  }
   const broken = reportErrors(report);
   if (broken.length) {
     throw new Refused(
@@ -122,7 +131,7 @@ const REPORT: Schema = {
     base: { type: 'string' },
     base_ref: { type: 'string' },
     head: { type: 'string' },
-    findings: { type: 'array' },
+    findings: { type: 'array', items: { type: 'object' } },
   },
 };
 
@@ -138,7 +147,7 @@ function reportErrors(report: unknown): string[] {
   const extras = findings.flatMap((finding, n) =>
     (['thread', 'commentary'] as const)
       .filter((key) => !(typeof finding[key] === 'string' || finding[key] === null))
-      .map((key) => `findings[${n}].${key} should be a string or null`),
+      .map((key) => `findings[${n}].${key} must be a string or null`),
   );
   return [...errors({ findings: core }, findingsSchema()), ...extras];
 }

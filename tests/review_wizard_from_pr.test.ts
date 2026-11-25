@@ -231,8 +231,27 @@ describe('findings from a CI review', () => {
       "Stop, and show the user this: pack-review's summary on the PR doesn't fit the findings this version of the " +
         'review reads, so CI may have run another version:\n' +
         '  findings[0] needs headline\n' +
-        '  findings[1].commentary should be a string or null\n',
+        '  findings[1].commentary must be a string or null\n',
     );
+  });
+
+  test('refuses a summary whose findings block isnt JSON', async (t) => {
+    const c = await FromPrCase.make(t);
+    const comment = summaryComment(c.report);
+    c.comments([{ ...comment, bodyText: comment.bodyText.replace(/\{[\s\S]*$/, '{ not json') }]);
+    const result = await c.fromPr();
+
+    exits(result, 1);
+    includes(result.stderr, "Stop, and show the user this: pack-review's summary on the PR holds no JSON this version");
+  });
+
+  test('refuses a summary with a finding that isnt an object', async (t) => {
+    const c = await FromPrCase.make(t);
+    c.comments([summaryComment({ ...c.report, findings: [null] })]);
+    const result = await c.fromPr();
+
+    exits(result, 1);
+    includes(result.stderr, '  findings[0] must be an object\n');
   });
 
   test('refuses a PR with no summary from pack-review', async (t) => {
