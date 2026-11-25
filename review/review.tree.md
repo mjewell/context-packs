@@ -50,7 +50,7 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     - An [[uncovered-choice|uncovered choice]] joins a [[deviation]] about the same choice at the same [[findings|spots]], since a [[rules|rule]] covers it after all
   - A [[local-review|local review]] and a [[ci-review|CI review]] give their agents the same three prompt files, so both check the same way, with answers in the findings schema {#shared-prompts}
     - The [[wizard]] fills each one with the commands that read the [[doc|docs]] and the change, and how to hand in an answer, in a [[local-review|local review]] and in CI alike
-    - The prompts, one each for a [[unit|unit's]] [[finders|finder]], the [[uncovered-finder|uncovered finder]] and the [[merge]], live with the schema beside the [[wizard]], which alone reads them. The pack-findings skill links to neither
+    - The prompts, one each for a [[unit|unit's]] [[finders|finder]], the [[uncovered-finder|uncovered finder]] and the [[merge]], live with the schema in one folder, and every module reads them through one that owns the folder. The pack-findings skill links to neither
       - Why: when the skill linked to the schema outside its own folder, a local agent fetched it from a GitHub URL the user never pinned
   - The wizard runs every review, local or CI: a state machine that agents step through {#wizard}
     ```d2
@@ -100,6 +100,7 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
       - While answers are missing, `next` names each finder that hasn't answered, with its prompt, so one that stopped can be started again
       - Once every answer is in, `next` numbers the finders' findings and names the merging agent. Once its groups are in, `next` prints the [[findings]] and says who gets them: the skill that ran pack-findings, or else the user
         - When no finder found anything, `next` builds empty [[findings]] and prints them, since a merge would have nothing to group
+      - Once the run is done, `finding <n>` prints one [[findings|finding]], with what its kind means and what the user decides about it
       - The run's state is which files its folder holds. The wizard works it out on each step instead of storing it, and refuses a step whose checks fail
         - A file whose existence is part of the state, such as an accepted answer or a phase's file, is written beside its name and then renamed, so a write cut short changes no state
         - Once the [[findings]] are built, `submit-groups` refuses any groups, so a done run never changes. `next` still prints its findings

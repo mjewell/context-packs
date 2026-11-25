@@ -127,3 +127,33 @@ export class SubmitCase extends StartedCase {
     assert.equal(result.status, 0, result.stderr);
   }
 }
+
+/** Every finder in: units 0 and 1 with one deviation each, unit 2 with none, and the uncovered finder with one. */
+export class MergeCase extends SubmitCase {
+  async allIn(): Promise<void> {
+    await this.submitUnit(0, 1, [deviation('A')]);
+    await this.submitUnit(1, 2, [deviation('B')]);
+    await this.submitUnit(2, 1, []);
+    assert.equal((await this.submit(3, [{ ...deviation('D'), kind: 'uncovered choice', rules: [] }])).status, 0);
+    assert.equal((await this.step('next')).status, 0);
+  }
+}
+
+/** A review that's done, with a finding of each kind: unit 0's deviation, unit 1's as a conflict, and the uncovered choice. */
+export class DoneCase extends MergeCase {
+  protected override async setUp(): Promise<void> {
+    await super.setUp();
+    await this.allIn();
+    const result = await this.submitGroups([
+      { ids: ['0:0'], kind: 'deviation', headline: 'Tests reach into a helper', take: 'T' },
+      { ids: ['1:0'], kind: 'conflict', headline: 'Two rules on one import', take: 'C' },
+      { ids: ['3:0'], kind: 'uncovered choice', headline: 'Where config lives', take: 'U' },
+    ]);
+    assert.equal(result.status, 0, result.stderr);
+  }
+
+  /** The findings the merge built, as the run keeps them. */
+  findings(): { kind: string; headline: string }[] {
+    return JSON.parse(fs.readFileSync(path.join(this.runDir, 'findings.json'), 'utf8')).findings;
+  }
+}

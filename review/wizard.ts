@@ -14,17 +14,17 @@ import { instructions, region } from '../src/blocks.ts';
 import { runAsScript } from '../src/main.ts';
 import { exists } from '../src/paths.ts';
 import { dumps } from '../src/pyjson.ts';
-import { format, quote, repr } from '../src/pystr.ts';
-import { ROOT } from '../src/root.ts';
+import { quote, repr } from '../src/pystr.ts';
 import { Stop } from '../src/stop.ts';
 import { units as tableUnits } from '../src/tables.ts';
 import { Change, commit, git, Refused } from './change.ts';
 import { type Cited, evidenceErrors } from './evidence.ts';
+import { aKind, kindText } from './kinds.ts';
+import { prompt } from './prompts.ts';
 import { type Finding, findingsIn, Rejected } from './report.ts';
 import { errors, findingsSchema, groupsSchema, type Schema } from './schema.ts';
 import { snapshot } from './snapshot.ts';
 
-const PROMPTS = path.join(ROOT, 'review', 'prompts');
 const STATE = 'state.json';
 // The kinds of finding, in the order the findings schema lists them.
 const KINDS = findingsSchema().properties!.findings!.items!.properties!.kind!.enum as string[];
@@ -163,11 +163,6 @@ function publish(file: string, text: string): void {
   const partial = `${file}.${process.pid}.partial`;
   fs.writeFileSync(partial, text, 'utf8');
   fs.renameSync(partial, file);
-}
-
-/** A prompt file filled in as str.format fills it. */
-function prompt(name: string, values: Readonly<Record<string, string>>): string {
-  return format(fs.readFileSync(path.join(PROMPTS, name), 'utf8'), values);
 }
 
 /** The head init reviews: the commit --head names, once it's checked out, or a commit made from the working files. */
@@ -434,6 +429,9 @@ function printDone(run: Run): void {
         `command, \`${run.command('next')}\`, which prints them for it. Otherwise, show the user how many there ` +
         'are of each kind, then each finding in full, grouped by kind, and say that running pack-review in this ' +
         'session goes through them without finding them again.',
+      ...(findings.length
+        ? [`To go through them one at a time, run \`${run.command('finding', '1')}\`, then the same with 2, and so on.`]
+        : []),
       'Here they are:',
       JSON.stringify(findings, null, 1),
     ].join('\n'),
@@ -481,6 +479,29 @@ function nextStep(args: Values): void {
       'Start one subagent in the foreground, with exactly this prompt: ' +
       `Run \`${run.command('brief', 'merge')}\` and follow what it says.\n` +
       `When it has answered, run \`${run.command('next')}\`.`,
+  );
+}
+
+function findingStep(args: Values): void {
+  const run = new Run(String(args.run));
+  if (run.phase() !== 'done') {
+    throw new Refused(`The review has no findings yet: run \`${run.command('next')}\` to see what it's waiting on.`);
+  }
+  const findings: Finding[] = JSON.parse(fs.readFileSync(run.findings, 'utf8')).findings;
+  const n = String(args.n);
+  if (!/^\d+$/.test(n) || Number(n) < 1 || Number(n) > findings.length) {
+    throw new Refused(
+      `There is no finding ${n}: the review has ${counted(findings.length, 'finding')}, numbered from 1.`,
+    );
+  }
+  const finding = findings[Number(n) - 1]!;
+  print(
+    [
+      `Finding ${Number(n)} of ${findings.length}, ${aKind(finding.kind)}.`,
+      kindText(finding.kind),
+      'Here it is:',
+      JSON.stringify(finding, null, 1),
+    ].join('\n'),
   );
 }
 
@@ -579,6 +600,10 @@ const PARSER: Parser = {
     },
     next: { help: 'print what to do now' },
     sources: { help: "print the finders' findings, numbered for the merge" },
+    finding: {
+      help: 'print one of the findings, with what its kind means and what the user decides',
+      positionals: [{ dest: 'n', help: "the finding's number, from 1" }],
+    },
     'submit-groups': { help: "check the merging agent's groups and build the findings" },
   },
 };
@@ -593,6 +618,7 @@ const STEPS: Readonly<Record<string, (args: Values) => void>> = {
   submit,
   next: nextStep,
   sources: sourcesStep,
+  finding: findingStep,
   'submit-groups': submitGroups,
 };
 
