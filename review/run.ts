@@ -10,14 +10,10 @@ import { exists } from '../src/paths.ts';
 import { dumps } from '../src/pyjson.ts';
 import { quote } from '../src/pystr.ts';
 import { Change, Refused } from './change.ts';
-import type { CiFinding } from './ci_summary.ts';
-import type { Finding } from './finding.ts';
+import type { Finding, RunFinding, RunFindings } from './finding.ts';
 import type { Source } from './report.ts';
 
 const STATE = 'state.json';
-
-/** A finding in a run's findings: a local run's have no thread or commentary, and from-pr's have them from CI. */
-export type RunFinding = Finding & Partial<CiFinding>;
 
 export interface State {
   readonly base: string;
@@ -150,15 +146,16 @@ export class Run {
   finish(findings: readonly RunFinding[], groups?: string): void {
     this.buildingFindings();
     if (groups !== undefined) publish(path.join(this.folder, 'groups.json'), groups);
-    publish(this.findingsFile, dumps({ base: this.state.base, head: this.state.head, findings }));
+    const file: RunFindings = { base: this.state.base, head: this.state.head, findings };
+    publish(this.findingsFile, dumps(file));
   }
 
   /** The review's findings, once the run is done. */
-  findings(): RunFinding[] {
+  findings(): readonly RunFinding[] {
     if (this.phase() !== 'done') {
       throw new Refused(`The review has no findings yet: run \`${this.command('next')}\` to see what it's waiting on.`);
     }
-    return JSON.parse(fs.readFileSync(this.findingsFile, 'utf8')).findings;
+    return (JSON.parse(fs.readFileSync(this.findingsFile, 'utf8')) as RunFindings).findings;
   }
 
   /** The finders' findings, numbered for the merge. startMerge() writes it, so it marks that the merge has started. */

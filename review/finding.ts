@@ -40,3 +40,42 @@ export interface Finding {
   readonly exemplars: readonly Exemplar[];
   readonly take: string;
 }
+
+/**
+ * A finding as CI's summary carries it: thread is the review thread pack-review opened for it on an earlier run, and
+ * commentary sums up what that thread's replies say about it. Either is null when there's none.
+ */
+export interface CiFinding extends Finding {
+  readonly thread: string | null;
+  readonly commentary: string | null;
+}
+
+/** A finding in a run's findings: a local run's have no thread or commentary, and from-pr's have them from CI. */
+export type RunFinding = Finding & Partial<CiFinding>;
+
+/** A run folder's findings.json, which the run's finish() writes. */
+export interface RunFindings {
+  readonly base: string;
+  readonly head: string;
+  readonly findings: readonly RunFinding[];
+}
+
+/** The line a finding's thread opens on, or null when the diff shows none of its spots. */
+export type Anchor = { readonly path: string; readonly line: number } | null;
+
+/** The review job's report.json, which report.ts writes for the pairing and post jobs. */
+export interface Report {
+  readonly base: string;
+  readonly base_ref: string;
+  readonly head: string;
+  readonly findings: readonly Finding[];
+  readonly anchors: readonly Anchor[];
+}
+
+/** The JSON in the summary comment's findings block, which the local run's from-pr reads. */
+export interface SummaryBlock {
+  readonly base: string;
+  readonly base_ref: string;
+  readonly head: string;
+  readonly findings: readonly CiFinding[];
+}

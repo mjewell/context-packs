@@ -10,7 +10,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { parse } from '../src/argparse.ts';
 import { runAsScript } from '../src/main.ts';
 import { repr } from '../src/pystr.ts';
-import type { Finding, Kind, Spot } from './finding.ts';
+import type { Finding, Kind, Report, RunFindings, Spot } from './finding.ts';
 import { clean } from './sanitize.ts';
 
 /** A finder's finding, with the id the merging agent's groups name it by. */
@@ -105,8 +105,8 @@ export function findingsIn(groupsText: string, listed: readonly Source[]): Findi
 }
 
 /** The findings a review's wizard built, cleaned like the merge's, once they're for the head that was reviewed. */
-function builtByWizard(file: string, head: string): Finding[] {
-  const found: { head: string; findings: Finding[] } = JSON.parse(fs.readFileSync(file, 'utf8'));
+function builtByWizard(file: string, head: string): readonly Finding[] {
+  const found: RunFindings = JSON.parse(fs.readFileSync(file, 'utf8'));
   if (found.head !== head) throw new Rejected(`the review's findings are for ${found.head}, not the head, ${head}`);
   return cleaned(found.findings);
 }
@@ -147,7 +147,7 @@ function main(): void {
     },
     process.argv.slice(2),
   ) as Record<string, string>;
-  let findings: Finding[];
+  let findings: readonly Finding[];
   try {
     findings = builtByWizard(args.findings!, args.head!);
   } catch (error) {
@@ -155,10 +155,10 @@ function main(): void {
     process.stderr.write(`pack-review: ${error.message}.\n`);
     process.exit(1);
   }
-  const report = {
-    base: args.base,
-    base_ref: args.base_ref,
-    head: args.head,
+  const report: Report = {
+    base: args.base!,
+    base_ref: args.base_ref!,
+    head: args.head!,
     findings,
     anchors: anchors(findings, JSON.parse(fs.readFileSync(args.shown!, 'utf8'))),
   };
