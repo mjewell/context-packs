@@ -28,6 +28,12 @@ export interface Finding {
   readonly take: string;
 }
 
+/** A finder's finding, with the id the merging agent's groups name it by. */
+export interface Source {
+  readonly id: string;
+  readonly finding: Finding;
+}
+
 interface Group {
   readonly ids: string[];
   readonly kind: string;
@@ -107,9 +113,8 @@ function checked(groups: Group[], sources: ReadonlyMap<string, Finding>): Group[
   return groups;
 }
 
-/** The findings that the merging agent's groups, its answer's JSON text, build from the sources in sourcesPath. */
-export function findingsIn(groupsText: string, sourcesPath: string): Finding[] {
-  const listed: { id: string; finding: Finding }[] = JSON.parse(fs.readFileSync(sourcesPath, 'utf8'));
+/** The findings that the merging agent's groups, its answer's JSON text, build from the finders' findings. */
+export function findingsIn(groupsText: string, listed: readonly Source[]): Finding[] {
   const sources = new Map(listed.map((source) => [source.id, source.finding]));
   return cleaned(checked(groupsIn(groupsText), sources).map((group) => built(group, sources)));
 }

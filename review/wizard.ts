@@ -23,7 +23,7 @@ import { GitHubError } from './github.ts';
 import { aKind, kindText } from './kinds.ts';
 import { prompt } from './prompts.ts';
 import { type Finding, findingsIn, Rejected } from './report.ts';
-import { counted, newRun, publish, Run } from './run.ts';
+import { counted, newRun, Run } from './run.ts';
 import { errors, findingsSchema, groupsSchema, type Schema } from './schema.ts';
 import { snapshot } from './snapshot.ts';
 
@@ -149,32 +149,8 @@ function brief(args: Values): void {
   );
 }
 
-/**
- * Every finder's findings, from the unit-<n>.json answers in folder, numbered as <finder>:<index>, so the merging
- * agent can answer with ids and a script can build each finding from the ones it names.
- */
-function sources(folder: string): { id: string; finding: Finding }[] {
-  const finder = (name: string) => Number(name.slice('unit-'.length, -'.json'.length));
-  const answers = fs
-    .readdirSync(folder)
-    .filter((name) => /^unit-.*\.json$/.test(name))
-    .sort((a, b) => finder(a) - finder(b));
-  return answers.flatMap((name) => {
-    const found: Finding[] = JSON.parse(fs.readFileSync(path.join(folder, name), 'utf8')).findings;
-    return found.map((finding, n) => ({ id: `${finder(name)}:${n}`, finding }));
-  });
-}
-
-/** The run, once every finder is in and the merge has started. */
-function merging(run: Run): Run {
-  if (run.phase() === 'finders') {
-    throw new Refused(`The merge can't start yet: run \`${run.command('next')}\` to see whose answers aren't in.`);
-  }
-  return run;
-}
-
 function mergeBrief(run: Run): void {
-  merging(run);
+  run.merging();
   print(
     prompt('merge-prompt.md', {
       sources: run.command('sources'),
@@ -190,23 +166,12 @@ function mergeBrief(run: Run): void {
 }
 
 function sourcesStep(args: Values): void {
-  print(fs.readFileSync(merging(new Run(String(args.run))).sources, 'utf8'));
+  print(dumps(new Run(String(args.run)).sources()));
 }
 
 function doc(args: Values): void {
   const run = new Run(String(args.run));
-  const unit = run.finder(String(args.unit));
-  if (unit === run.uncovered) {
-    throw new Refused('The uncovered finder has no docs to read through doc: search them in the current folder.');
-  }
-  const docs = run.units[unit]!;
-  const n = String(args.n);
-  if (!/^\d+$/.test(n) || Number(n) < 1 || Number(n) > docs.length)
-    throw new Refused(`Unit ${unit} has ${counted(docs.length, 'doc')}.`);
-  const text = fs.readFileSync(path.join(run.state.root, docs[Number(n) - 1]!), 'utf8');
-  fs.mkdirSync(run.served(unit), { recursive: true });
-  publish(path.join(run.served(unit), String(Number(n))), '');
-  print(text, '');
+  print(run.serve(run.finder(String(args.unit)), String(args.n)), '');
 }
 
 /** The page a step's argument names, from 1. */
@@ -266,12 +231,10 @@ function submit(args: Values): void {
   const run = new Run(String(args.run));
   const finder = run.finder(String(args.finder));
   const command = run.command('submit', String(finder));
-  if (run.phase() !== 'finders')
-    throw new Refused("Not taken: every finder is in, so the finders' answers can't change.");
+  // accept() refuses this too. Asking first puts it before any other refusal, since no fix would get the answer in.
+  run.takingAnswers();
   if (finder !== run.uncovered) {
-    const unread = run.units[finder]!.map((docPath, i): [number, string] => [i + 1, docPath]).filter(
-      ([n]) => !exists(path.join(run.served(finder), String(n))),
-    );
+    const unread = run.unread(finder);
     if (unread.length) {
       const listed = unread
         .map(([n, docPath]) => `${docPath} through \`${run.command('doc', String(finder), String(n))}\``)
@@ -292,8 +255,7 @@ function submit(args: Values): void {
         `Fix it, then submit it again with \`${command}\`.`,
     );
   }
-  fs.mkdirSync(path.dirname(run.accepted(finder)), { recursive: true });
-  publish(run.accepted(finder), text);
+  run.accept(finder, text);
   const name = finder === run.uncovered ? "the uncovered finder's answer" : `unit ${finder}`;
   print(
     `${name[0]!.toUpperCase()}${name.slice(1)} is in, with ${counted(findings.length, 'finding')}. Tell whoever ` +
@@ -303,14 +265,14 @@ function submit(args: Values): void {
 
 /** Print a done run's findings, counted by kind. */
 function printDone(run: Run): void {
-  const findings: Finding[] = JSON.parse(fs.readFileSync(run.findings, 'utf8')).findings;
+  const findings = run.findings();
   const kinds = KINDS.filter((kind) => findings.some((found) => found.kind === kind)).map((kind) =>
     counted(findings.filter((found) => found.kind === kind).length, kind),
   );
   const listed = kinds.length ? kinds.slice(0, -1).join(', ') + (kinds.length > 1 ? ' and ' : '') + kinds.at(-1) : '';
   print(
     [
-      `Done: ${counted(findings.length, 'finding')}${listed ? `, ${listed}` : ''}, in ${run.findings}.`,
+      `Done: ${counted(findings.length, 'finding')}${listed ? `, ${listed}` : ''}, in ${run.findingsFile}.`,
       'If another skill, such as pack-review, ran pack-findings, show none of the findings: hand that skill this ' +
         `command, \`${run.command('next')}\`, which prints them for it. Otherwise, show the user how many there ` +
         'are of each kind, then each finding in full, grouped by kind, and say that running pack-review in this ' +
@@ -339,8 +301,7 @@ function nextStep(args: Values): void {
     );
     return;
   }
-  const finders = run.finders();
-  const waiting = finders.filter(([n]) => !exists(run.accepted(n)));
+  const waiting = run.waiting();
   if (waiting.length) {
     print(
       [
@@ -352,16 +313,15 @@ function nextStep(args: Values): void {
     );
     return;
   }
-  const found = sources(path.dirname(run.accepted(0)));
-  publish(run.sources, dumps(found));
+  const found = run.startMerge();
   // With no findings there is nothing to group, so the findings are built here, as submit-groups would build them.
   if (!found.length) {
-    publish(run.findings, dumps({ base: run.state.base, head: run.state.head, findings: [] }));
+    run.finish([]);
     printDone(run);
     return;
   }
   print(
-    `All ${finders.length} finders are in, with ${counted(found.length, 'finding')}.\n` +
+    `All ${run.finders().length} finders are in, with ${counted(found.length, 'finding')}.\n` +
       'Start one subagent in the foreground, with exactly this prompt: ' +
       `Run \`${run.command('brief', 'merge')}\` and follow what it says.\n` +
       `When it has answered, run \`${run.command('next')}\`.`,
@@ -391,11 +351,11 @@ async function fromPr(args: Values): Promise<void> {
   const root = git('rev-parse', '--show-toplevel').trim();
   const units = rulesOf(root);
   const run = newRun({ base: report.base, head: report.head, root, command: String(args.command), units });
-  publish(run.findings, dumps(report));
+  run.finish(report.findings);
   print(
     [
       `Loaded ${counted(report.findings.length, 'finding')} from CI's review of ${report.head.slice(0, 7)}, in ` +
-        `${run.findings}.`,
+        `${run.findingsFile}.`,
       ...uncommittedLines(units, 'go through the findings'),
       `To go through them one at a time, run \`${run.command('finding', '1')}\`, then the same with 2, and so on.`,
       'Here they are:',
@@ -406,13 +366,8 @@ async function fromPr(args: Values): Promise<void> {
 
 function findingStep(args: Values): void {
   const run = new Run(String(args.run));
-  if (run.phase() !== 'done') {
-    throw new Refused(`The review has no findings yet: run \`${run.command('next')}\` to see what it's waiting on.`);
-  }
   // A local run's findings have no commentary, and a CI review's have it on some.
-  const findings: (Finding & Partial<ciSummary.CiFinding>)[] = JSON.parse(
-    fs.readFileSync(run.findings, 'utf8'),
-  ).findings;
+  const findings = run.findings();
   const n = String(args.n);
   if (!/^\d+$/.test(n) || Number(n) < 1 || Number(n) > findings.length) {
     throw new Refused(
@@ -446,23 +401,18 @@ function submitGroups(args: Values): void {
     );
   }
   // A run that's done never changes: next prints its findings, so an agent that missed the first reply loses nothing.
-  if (phase === 'done') {
-    throw new Refused(
-      "Not taken: the findings are already built, so the groups can't change. Tell whoever started you, and stop.",
-    );
-  }
+  run.buildingFindings();
   const command = run.command('submit-groups');
   const text = answer('groups', run.answer('groups.json'), command, groupsSchema());
   let findings: Finding[];
   try {
-    findings = findingsIn(text, run.sources);
+    findings = findingsIn(text, run.sources());
   } catch (error) {
     if (!(error instanceof Rejected)) throw error;
     throw new Refused(`Not taken: ${error.message}. Fix your groups, then submit them again with \`${command}\`.`);
   }
-  publish(path.join(run.folder, 'groups.json'), text);
-  publish(run.findings, dumps({ base: run.state.base, head: run.state.head, findings }));
-  print(`${counted(findings.length, 'finding')} are in ${run.findings}. Tell whoever started you, and stop.`);
+  run.finish(findings, text);
+  print(`${counted(findings.length, 'finding')} are in ${run.findingsFile}. Tell whoever started you, and stop.`);
 }
 
 const PARSER: Parser = {
