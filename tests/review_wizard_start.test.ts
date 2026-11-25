@@ -82,7 +82,10 @@ describe('init', () => {
     const result = await c.wizard('init', '--base', c.base, '--head', c.head, '--command', 'review');
 
     exits(result, 1);
-    includes(result.stderr, `The checkout is ${c.base}, not the head, ${c.head}.`);
+    includes(
+      result.stderr,
+      `Stop, tell the user the checkout is ${c.base}, not the head, ${c.head}, and offer to check out the head.`,
+    );
     assert.equal(result.stdout, '');
   });
 });
@@ -157,6 +160,6 @@ describe('the wizard from the npm package', () => {
     const result = await packaged(c, 'init', '--base', c.base, '--head', c.base, '--command', 'review');
 
     exits(result, 1);
-    includes(result.stderr, 'The checkout is');
+    includes(result.stderr, 'Stop, tell the user the checkout is');
   });
 });
