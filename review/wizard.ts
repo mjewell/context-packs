@@ -149,32 +149,8 @@ function brief(args: Values): void {
   );
 }
 
-/**
- * Every finder's findings, from the unit-<n>.json answers in folder, numbered as <finder>:<index>, so the merging
- * agent can answer with ids and a script can build each finding from the ones it names.
- */
-function sources(folder: string): { id: string; finding: Finding }[] {
-  const finder = (name: string) => Number(name.slice('unit-'.length, -'.json'.length));
-  const answers = fs
-    .readdirSync(folder)
-    .filter((name) => /^unit-.*\.json$/.test(name))
-    .sort((a, b) => finder(a) - finder(b));
-  return answers.flatMap((name) => {
-    const found: Finding[] = JSON.parse(fs.readFileSync(path.join(folder, name), 'utf8')).findings;
-    return found.map((finding, n) => ({ id: `${finder(name)}:${n}`, finding }));
-  });
-}
-
-/** The run, once every finder is in and the merge has started. */
-function merging(run: Run): Run {
-  if (run.phase() === 'finders') {
-    throw new Refused(`The merge can't start yet: run \`${run.command('next')}\` to see whose answers aren't in.`);
-  }
-  return run;
-}
-
 function mergeBrief(run: Run): void {
-  merging(run);
+  run.merging();
   print(
     prompt('merge-prompt.md', {
       sources: run.command('sources'),
@@ -190,7 +166,7 @@ function mergeBrief(run: Run): void {
 }
 
 function sourcesStep(args: Values): void {
-  print(fs.readFileSync(merging(new Run(String(args.run))).sources, 'utf8'));
+  print(dumps(new Run(String(args.run)).sources()));
 }
 
 function doc(args: Values): void {
@@ -337,8 +313,7 @@ function nextStep(args: Values): void {
     );
     return;
   }
-  const found = sources(path.dirname(run.accepted(0)));
-  publish(run.sources, dumps(found));
+  const found = run.startMerge();
   // With no findings there is nothing to group, so the findings are built here, as submit-groups would build them.
   if (!found.length) {
     publish(run.findings, dumps({ base: run.state.base, head: run.state.head, findings: [] }));
@@ -440,7 +415,7 @@ function submitGroups(args: Values): void {
   const text = answer('groups', run.answer('groups.json'), command, groupsSchema());
   let findings: Finding[];
   try {
-    findings = findingsIn(text, run.sources);
+    findings = findingsIn(text, run.sources());
   } catch (error) {
     if (!(error instanceof Rejected)) throw error;
     throw new Refused(`Not taken: ${error.message}. Fix your groups, then submit them again with \`${command}\`.`);

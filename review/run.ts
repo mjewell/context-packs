@@ -10,6 +10,7 @@ import { exists } from '../src/paths.ts';
 import { dumps } from '../src/pyjson.ts';
 import { quote } from '../src/pystr.ts';
 import { Change, Refused } from './change.ts';
+import type { Finding, Source } from './report.ts';
 
 const STATE = 'state.json';
 
@@ -125,8 +126,8 @@ export class Run {
     return path.join(this.folder, 'findings.json');
   }
 
-  /** The finders' findings, numbered for the merge. next writes it once every finder is in, so it marks that the merge has started. */
-  get sources(): string {
+  /** The finders' findings, numbered for the merge. startMerge() writes it, so it marks that the merge has started. */
+  get #sourcesFile(): string {
     return path.join(this.folder, 'sources.json');
   }
 
@@ -137,11 +138,11 @@ export class Run {
    */
   phase(): 'finders' | 'merge' | 'done' {
     if (exists(this.findings)) return 'done';
-    return exists(this.sources) ? 'merge' : 'finders';
+    return exists(this.#sourcesFile) ? 'merge' : 'finders';
   }
 
   /** Where submit keeps a finder's answer once it took it, so a later edit to the answer changes nothing. */
-  accepted(finder: number): string {
+  #accepted(finder: number): string {
     return path.join(this.folder, 'accepted', `unit-${finder}.json`);
   }
 
@@ -154,13 +155,39 @@ export class Run {
   /** Keep a finder's answer, its checked JSON text, while the finders' answers can still change. */
   accept(finder: number, text: string): void {
     this.takingAnswers();
-    fs.mkdirSync(path.dirname(this.accepted(finder)), { recursive: true });
-    publish(this.accepted(finder), text);
+    fs.mkdirSync(path.dirname(this.#accepted(finder)), { recursive: true });
+    publish(this.#accepted(finder), text);
   }
 
   /** The finders whose answers aren't in, as finders() lists them. */
   waiting(): [number, string, string][] {
-    return this.finders().filter(([n]) => !exists(this.accepted(n)));
+    return this.finders().filter(([n]) => !exists(this.#accepted(n)));
+  }
+
+  /**
+   * Start the merge, once every finder is in: number every finder's findings as <finder>:<index>, so the merging agent
+   * can answer with ids and a script can build each finding from the ones it names.
+   */
+  startMerge(): Source[] {
+    const found = this.finders().flatMap(([finder]) => {
+      const findings: Finding[] = JSON.parse(fs.readFileSync(this.#accepted(finder), 'utf8')).findings;
+      return findings.map((finding, n) => ({ id: `${finder}:${n}`, finding }));
+    });
+    publish(this.#sourcesFile, dumps(found));
+    return found;
+  }
+
+  /** Refuses until the merge has started. */
+  merging(): void {
+    if (this.phase() === 'finders') {
+      throw new Refused(`The merge can't start yet: run \`${this.command('next')}\` to see whose answers aren't in.`);
+    }
+  }
+
+  /** The finders' findings, as startMerge() numbered them, once the merge has started. */
+  sources(): Source[] {
+    this.merging();
+    return JSON.parse(fs.readFileSync(this.#sourcesFile, 'utf8'));
   }
 
   /** Each finder's number, its label, and the one-line prompt the orchestrator gives it. */
