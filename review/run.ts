@@ -11,7 +11,8 @@ import { dumps } from '../src/pyjson.ts';
 import { quote } from '../src/pystr.ts';
 import { Change, Refused } from './change.ts';
 import type { CiFinding } from './ci_summary.ts';
-import type { Finding, Source } from './report.ts';
+import type { Finding } from './finding.ts';
+import type { Source } from './report.ts';
 
 const STATE = 'state.json';
 

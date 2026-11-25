@@ -14,7 +14,7 @@ import { ascii, dumps } from '../src/pyjson.ts';
 import { format, repr } from '../src/pystr.ts';
 import { fail, Stop } from '../src/stop.ts';
 import { compact, line, output } from './args.ts';
-import type { Finding } from './report.ts';
+import type { Finding } from './finding.ts';
 import { clean } from './sanitize.ts';
 import type { Shown, Thread } from './trust.ts';
 

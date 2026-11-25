@@ -10,23 +10,8 @@ import { isDeepStrictEqual } from 'node:util';
 import { parse } from '../src/argparse.ts';
 import { runAsScript } from '../src/main.ts';
 import { repr } from '../src/pystr.ts';
+import type { Finding, Kind, Spot } from './finding.ts';
 import { clean } from './sanitize.ts';
-
-interface Spot {
-  readonly path: string;
-  readonly line: number;
-  readonly follows: boolean;
-}
-
-export interface Finding {
-  readonly kind: string;
-  readonly headline: string;
-  readonly rules: unknown[];
-  readonly spots: Spot[];
-  readonly deliberate: unknown[];
-  readonly exemplars: unknown[];
-  readonly take: string;
-}
 
 /** A finder's finding, with the id the merging agent's groups name it by. */
 export interface Source {
@@ -36,7 +21,7 @@ export interface Source {
 
 interface Group {
   readonly ids: string[];
-  readonly kind: string;
+  readonly kind: Kind;
   readonly headline: string;
   readonly take: string;
 }

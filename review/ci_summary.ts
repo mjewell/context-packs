@@ -6,8 +6,8 @@
 import { spawnSync } from 'node:child_process';
 
 import { Refused } from './change.ts';
+import type { Finding } from './finding.ts';
 import * as github from './github.ts';
-import type { Finding } from './report.ts';
 import { errors, findingsSchema, type Schema } from './schema.ts';
 import { TITLE } from './summary.ts';
 

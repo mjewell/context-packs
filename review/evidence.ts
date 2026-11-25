@@ -8,12 +8,10 @@ import path from 'node:path';
 
 import { splitlines } from '../src/pystr.ts';
 import { git } from './change.ts';
+import type { Finding } from './finding.ts';
 
-/** What a finding cites, as the findings schema shapes it. */
-export interface Cited {
-  readonly rules: readonly { readonly file: string }[];
-  readonly spots: readonly { readonly path: string; readonly line: number }[];
-}
+/** What a finding cites, which submit checks is there. */
+export type Cited = Pick<Finding, 'rules' | 'spots'>;
 
 /** The head's files, and how many lines one of them has, read once each. */
 class Head {
