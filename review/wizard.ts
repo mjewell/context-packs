@@ -195,18 +195,7 @@ function sourcesStep(args: Values): void {
 
 function doc(args: Values): void {
   const run = new Run(String(args.run));
-  const unit = run.finder(String(args.unit));
-  if (unit === run.uncovered) {
-    throw new Refused('The uncovered finder has no docs to read through doc: search them in the current folder.');
-  }
-  const docs = run.units[unit]!;
-  const n = String(args.n);
-  if (!/^\d+$/.test(n) || Number(n) < 1 || Number(n) > docs.length)
-    throw new Refused(`Unit ${unit} has ${counted(docs.length, 'doc')}.`);
-  const text = fs.readFileSync(path.join(run.state.root, docs[Number(n) - 1]!), 'utf8');
-  fs.mkdirSync(run.served(unit), { recursive: true });
-  publish(path.join(run.served(unit), String(Number(n))), '');
-  print(text, '');
+  print(run.serve(run.finder(String(args.unit)), String(args.n)), '');
 }
 
 /** The page a step's argument names, from 1. */
@@ -269,9 +258,7 @@ function submit(args: Values): void {
   if (run.phase() !== 'finders')
     throw new Refused("Not taken: every finder is in, so the finders' answers can't change.");
   if (finder !== run.uncovered) {
-    const unread = run.units[finder]!.map((docPath, i): [number, string] => [i + 1, docPath]).filter(
-      ([n]) => !exists(path.join(run.served(finder), String(n))),
-    );
+    const unread = run.unread(finder);
     if (unread.length) {
       const listed = unread
         .map(([n, docPath]) => `${docPath} through \`${run.command('doc', String(finder), String(n))}\``)

@@ -92,8 +92,32 @@ export class Run {
    * The folder that marks which of a unit's docs doc printed, one empty file for each, so finders running at once
    * never write the same file.
    */
-  served(unit: number): string {
+  #served(unit: number): string {
     return path.join(this.folder, 'served', `unit-${unit}`);
+  }
+
+  /**
+   * The text of a unit's doc, by its number in the unit's brief, from 1, once it's marked served. Marking it here is
+   * what lets submit check that every doc was read, so no step prints a doc without it.
+   */
+  serve(unit: number, n: string): string {
+    if (unit === this.uncovered) {
+      throw new Refused('The uncovered finder has no docs to read through doc: search them in the current folder.');
+    }
+    const docs = this.units[unit]!;
+    if (!/^\d+$/.test(n) || Number(n) < 1 || Number(n) > docs.length)
+      throw new Refused(`Unit ${unit} has ${counted(docs.length, 'doc')}.`);
+    const text = fs.readFileSync(path.join(this.state.root, docs[Number(n) - 1]!), 'utf8');
+    fs.mkdirSync(this.#served(unit), { recursive: true });
+    publish(path.join(this.#served(unit), String(Number(n))), '');
+    return text;
+  }
+
+  /** The unit's docs that doc hasn't printed yet, each with its number in the unit's brief, from 1. */
+  unread(unit: number): [number, string][] {
+    return this.units[unit]!.map((docPath, i): [number, string] => [i + 1, docPath]).filter(
+      ([n]) => !exists(path.join(this.#served(unit), String(n))),
+    );
   }
 
   /** The review's findings, which submit-groups writes from the groups, so it marks that the run is done. */
