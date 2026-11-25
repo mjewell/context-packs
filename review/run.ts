@@ -145,6 +145,24 @@ export class Run {
     return path.join(this.folder, 'accepted', `unit-${finder}.json`);
   }
 
+  /** Refuses once every finder is in, since the merge reads their answers from then on. */
+  takingAnswers(): void {
+    if (this.phase() !== 'finders')
+      throw new Refused("Not taken: every finder is in, so the finders' answers can't change.");
+  }
+
+  /** Keep a finder's answer, its checked JSON text, while the finders' answers can still change. */
+  accept(finder: number, text: string): void {
+    this.takingAnswers();
+    fs.mkdirSync(path.dirname(this.accepted(finder)), { recursive: true });
+    publish(this.accepted(finder), text);
+  }
+
+  /** The finders whose answers aren't in, as finders() lists them. */
+  waiting(): [number, string, string][] {
+    return this.finders().filter(([n]) => !exists(this.accepted(n)));
+  }
+
   /** Each finder's number, its label, and the one-line prompt the orchestrator gives it. */
   finders(): [number, string, string][] {
     const labels = [this.units[0]![0]!, ...this.units.slice(1).map((unit) => counted(unit.length, 'doc'))];

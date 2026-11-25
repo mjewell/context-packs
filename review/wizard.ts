@@ -255,8 +255,8 @@ function submit(args: Values): void {
   const run = new Run(String(args.run));
   const finder = run.finder(String(args.finder));
   const command = run.command('submit', String(finder));
-  if (run.phase() !== 'finders')
-    throw new Refused("Not taken: every finder is in, so the finders' answers can't change.");
+  // accept() refuses this too. Asking first puts it before any other refusal, since no fix would get the answer in.
+  run.takingAnswers();
   if (finder !== run.uncovered) {
     const unread = run.unread(finder);
     if (unread.length) {
@@ -279,8 +279,7 @@ function submit(args: Values): void {
         `Fix it, then submit it again with \`${command}\`.`,
     );
   }
-  fs.mkdirSync(path.dirname(run.accepted(finder)), { recursive: true });
-  publish(run.accepted(finder), text);
+  run.accept(finder, text);
   const name = finder === run.uncovered ? "the uncovered finder's answer" : `unit ${finder}`;
   print(
     `${name[0]!.toUpperCase()}${name.slice(1)} is in, with ${counted(findings.length, 'finding')}. Tell whoever ` +
@@ -326,8 +325,7 @@ function nextStep(args: Values): void {
     );
     return;
   }
-  const finders = run.finders();
-  const waiting = finders.filter(([n]) => !exists(run.accepted(n)));
+  const waiting = run.waiting();
   if (waiting.length) {
     print(
       [
@@ -348,7 +346,7 @@ function nextStep(args: Values): void {
     return;
   }
   print(
-    `All ${finders.length} finders are in, with ${counted(found.length, 'finding')}.\n` +
+    `All ${run.finders().length} finders are in, with ${counted(found.length, 'finding')}.\n` +
       'Start one subagent in the foreground, with exactly this prompt: ' +
       `Run \`${run.command('brief', 'merge')}\` and follow what it says.\n` +
       `When it has answered, run \`${run.command('next')}\`.`,
