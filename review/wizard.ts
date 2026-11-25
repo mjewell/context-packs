@@ -24,8 +24,7 @@ import { type Finding, findingsIn, Rejected } from './report.ts';
 import { errors, findingsSchema, groupsSchema, type Schema } from './schema.ts';
 import { snapshot } from './snapshot.ts';
 
-// The prompts and the schema live with the pack-findings skill, since an installed skill holds only its own folder.
-const PROMPTS = path.join(ROOT, 'skills', 'pack-findings');
+const PROMPTS = path.join(ROOT, 'review', 'prompts');
 const STATE = 'state.json';
 // The kinds of finding, in the order the findings schema lists them.
 const KINDS = findingsSchema().properties!.findings!.items!.properties!.kind!.enum as string[];
@@ -142,6 +141,18 @@ class Run {
   }
 }
 
+/** The rule files, of those the units name, with uncommitted changes, which the review reads as the head's rules. */
+function uncommitted(rules: readonly string[]): string[] {
+  const entries = git('status', '--porcelain', '-z', '--no-renames', '--untracked-files=all', '--', ...rules);
+  const changed = new Set(
+    entries
+      .split('\0')
+      .filter(Boolean)
+      .map((entry) => entry.slice(3)),
+  );
+  return rules.filter((rule) => changed.has(rule));
+}
+
 /**
  * Write text to file whole or not at all, by renaming a file written beside it. The run's state is which files exist,
  * such as a finder's accepted answer or the file that starts a phase, so a write cut short must never leave one.
@@ -167,8 +178,12 @@ function headOf(args: Values): string {
     throw new Refused('Give init --head, the commit to review, or --uncommitted, to review the working files.');
   }
   const head = commit(String(args.head));
-  if (git('rev-parse', 'HEAD').trim() !== head) {
-    throw new Refused(`The checkout isn't the head, ${head}. Check out the head, then run init again.`);
+  const checkedOut = git('rev-parse', 'HEAD').trim();
+  if (checkedOut !== head) {
+    throw new Refused(
+      `The checkout is ${checkedOut}, not the head, ${head}. Stop, tell the user, and offer to check out the head. ` +
+        'Once it is checked out, run init again.',
+    );
   }
   return head;
 }
@@ -194,10 +209,20 @@ function init(args: Values): void {
   const state: State = { base: change.base, head: change.head, root, command: String(args.command), units, answers };
   publish(path.join(folder, STATE), dumps(state));
   const run = new Run(folder);
+  // A review of the working files reads their rules as the head's already, so only a --head review lists them.
+  const edited = args.uncommitted ? [] : uncommitted(units.flat());
   const lines = [
     `Reviewing ${counted(commits, 'commit')} that change ${counted(change.paths().length, 'file')}, against ` +
       `${counted(units.length, 'unit')}.`,
     '',
+    ...(edited.length
+      ? [
+          'These rule files have uncommitted changes, which the review reads as the rules at the head. Show the ' +
+            'user this list before you start the finders:',
+          ...edited.map((rule) => `  ${rule}`),
+          '',
+        ]
+      : []),
     `Start these ${run.finders().length} subagents now, in the foreground, all in one message, so they run at once ` +
       'and you wait for every answer. Give each exactly this prompt:',
     ...run.finders().map(([, label, line]) => `  ${label}: ${line}`),
@@ -403,8 +428,15 @@ function printDone(run: Run): void {
   );
   const listed = kinds.length ? kinds.slice(0, -1).join(', ') + (kinds.length > 1 ? ' and ' : '') + kinds.at(-1) : '';
   print(
-    `Done: ${counted(findings.length, 'finding')}${listed ? `, ${listed}` : ''}, in ${run.findings}. Here they ` +
-      `are:\n${JSON.stringify(findings, null, 1)}`,
+    [
+      `Done: ${counted(findings.length, 'finding')}${listed ? `, ${listed}` : ''}, in ${run.findings}.`,
+      'If another skill, such as pack-review, ran pack-findings, show none of the findings: hand that skill this ' +
+        `command, \`${run.command('next')}\`, which prints them for it. Otherwise, show the user how many there ` +
+        'are of each kind, then each finding in full, grouped by kind, and say that running pack-review in this ' +
+        'session goes through them without finding them again.',
+      'Here they are:',
+      JSON.stringify(findings, null, 1),
+    ].join('\n'),
   );
 }
 

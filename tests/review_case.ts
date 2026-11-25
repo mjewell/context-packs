@@ -7,7 +7,7 @@ import { command, environment, type Result, ROOT, run } from './scripts.ts';
 import { tempDir } from './temp.ts';
 
 export const REVIEW = path.join(ROOT, 'review');
-export const SCHEMA = path.join(ROOT, 'skills', 'pack-findings', 'findings.schema.json');
+export const SCHEMA = path.join(ROOT, 'review', 'prompts', 'findings.schema.json');
 export const MARKER = '<!-- pack-review -->';
 
 /** A spot a finding names, which deviates from the rule unless follows. */

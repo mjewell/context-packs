@@ -48,6 +48,16 @@ class DirtyCase extends WizardCase {
 
 /** init --uncommitted reviews the working files as a commit made from them, without changing the checkout. */
 describe('init on uncommitted changes', () => {
+  // The snapshot holds the edited rules, so they are the head's rules, and there's nothing to warn about.
+  test('lists no rule files with uncommitted changes', async (t) => {
+    const c = await DirtyCase.make(t);
+    c.write('docs/testing.md', '# Testing\n\nMock nothing.\n');
+
+    const out = await c.initUncommitted();
+
+    assert.ok(!out.includes('uncommitted changes'), out);
+  });
+
   test('reviews every uncommitted change but ignored files', async (t) => {
     const c = await DirtyCase.make(t);
     await c.initUncommitted();

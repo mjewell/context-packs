@@ -50,8 +50,8 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
     - An [[uncovered-choice|uncovered choice]] joins a [[deviation]] about the same choice at the same [[findings|spots]], since a [[rules|rule]] covers it after all
   - A [[local-review|local review]] and a [[ci-review|CI review]] give their agents the same three prompt files, so both check the same way, with answers in the findings schema {#shared-prompts}
     - The [[wizard]] fills each one with the commands that read the [[doc|docs]] and the change, and how to hand in an answer, in a [[local-review|local review]] and in CI alike
-    - The prompts, one each for a [[unit|unit's]] [[finders|finder]], the [[uncovered-finder|uncovered finder]] and the [[merge]], live with the schema in the pack-findings skill's folder, since an installed skill holds only its own folder
-      - Why: with the schema in `review/`, a local agent fetched it from a GitHub URL the user never pinned
+    - The prompts, one each for a [[unit|unit's]] [[finders|finder]], the [[uncovered-finder|uncovered finder]] and the [[merge]], live with the schema beside the [[wizard]], which alone reads them. The pack-findings skill links to neither
+      - Why: when the skill linked to the schema outside its own folder, a local agent fetched it from a GitHub URL the user never pinned
   - The wizard runs every review, local or CI: a state machine that agents step through {#wizard}
     ```d2
     shape: sequence_diagram
@@ -93,17 +93,17 @@ A review checks a change against the repo's [[pack|packs]] and [[instruction-fil
       finders -> done: "every answer is in, with none"
       merge -> done: "the groups are in"
       ```
-      - `init` checks that the checkout is the head and that the change touches a file, then names one [[finders|finder]] for each [[unit]] and the [[uncovered-finder|uncovered finder]], each with a one-line prompt
+      - `init` checks that the checkout is the head and the change touches a file. With `--head`, it lists [[rules|rule]] files with uncommitted changes. Then it names one [[finders|finder]] for each [[unit]] and the [[uncovered-finder|uncovered finder]], each with a one-line prompt
         - With `--uncommitted`, `init` reviews a commit it makes from the working files on top of `HEAD`, built in an index of its own, so the branch, the index and the files don't change. Untracked files are in it, ignored ones aren't
           - Finders still read rules and code from the checkout, so an edit during the review can reach them, as it can in a review of a commit
           - Rejected: a real commit, undone after. It runs the commit hooks, and undoing it loses which changes were staged
       - While answers are missing, `next` names each finder that hasn't answered, with its prompt, so one that stopped can be started again
-      - Once every answer is in, `next` numbers the finders' findings and names the merging agent. Once its groups are in, `next` prints the [[findings]]
+      - Once every answer is in, `next` numbers the finders' findings and names the merging agent. Once its groups are in, `next` prints the [[findings]] and says who gets them: the skill that ran pack-findings, or else the user
         - When no finder found anything, `next` builds empty [[findings]] and prints them, since a merge would have nothing to group
       - The run's state is which files its folder holds. The wizard works it out on each step instead of storing it, and refuses a step whose checks fail
         - A file whose existence is part of the state, such as an accepted answer or a phase's file, is written beside its name and then renamed, so a write cut short changes no state
         - Once the [[findings]] are built, `submit-groups` refuses any groups, so a done run never changes. `next` still prints its findings
-    - A finder's brief is the skill's prompt for its kind, with the commands that read its docs and the change, and its answer's schema {#brief}
+    - A finder's brief is the wizard's prompt for its kind, with the commands that read its docs and the change, and its answer's schema {#brief}
       - `doc` prints one of the unit's docs and marks it served. `submit` takes a unit's answer only once every doc in it was served, and only in the schema's shape
         - Why: the wizard keeps its own record of what it printed, so the check needs no transcript, see [[doc-names]]
       - `submit` also refuses an answer whose spot names no line of its file at the head, or whose [[rules|rule]] names no file in the checkout, and says which finding and field
