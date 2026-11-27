@@ -20,5 +20,5 @@
     "outDir": "dist",
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "review/**/*.ts", "skills/spec-tree/scripts/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "skills/spec-tree/scripts/**/*.ts", "tests/**/*.ts"]
 }

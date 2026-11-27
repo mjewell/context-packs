@@ -24,7 +24,7 @@ export interface RunOptions {
   readonly timeout?: number;
 }
 
-/** The command that runs script, such as 'review/wizard', as a list of arguments. */
+/** The command that runs script, such as 'src/cli', as a list of arguments. */
 export function command(script: string): string[] {
   return ['node', path.join(ROOT, `${script}.ts`)];
 }

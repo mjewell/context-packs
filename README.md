@@ -84,7 +84,6 @@ Rather not type commands? [Let your agent run them](#let-your-agent-run-it).
 | Rules and docs shared across repos | [Push the pack to a git repo](#3-share-packs-across-repos), and `add` it in each repo |
 | A pack held at a tag or commit | `add … --ref <tag or commit>` |
 | CI to fail when the packs need a resync | Run `npx context-packs check`, as in [Checking in CI](docs/reference.md#checking-in-ci) |
-| Every PR reviewed against the packs, with the findings posted to it (experimental) | Call the review workflow from yours, as in [Reviewing PRs in CI](docs/reference.md#reviewing-prs-in-ci) |
 | To check an agent reads each doc when it should | Write prompts in its pack's `.evals/<doc>.md`, and run `npx context-packs eval`, as in [Testing when each doc gets read](docs/reference.md#testing-when-each-doc-gets-read) |
 | A shared pack loaded differently than its author set up | See [How packs load](docs/loading.md#choosing-when-a-pack-loads) |
 
@@ -109,14 +108,12 @@ In Claude Code, `/context-packs` invokes it directly.
 
 ## Grow your packs with your agent
 
-Four more skills help write and apply the rules themselves, and the command above installs them too:
+Two more skills help write the rules themselves, and the command above installs them too:
 
 - **`pack-rule`** writes one rule into the repo's packs, from a pattern you describe or examples you point at.
 - **`pack-backfill`** finds a decision the code makes that no rule covers yet, and writes it once you confirm it.
-- **`pack-findings`** checks a PR or branch against the repo's packs.
-- **`pack-review`** goes through those findings with you, to decide whether the change or the rule needs fixing.
 
-[Skills that grow your packs](docs/skills.md) covers how to run each one, and the `review` actions that run `pack-findings` on each PR in CI, which are experimental.
+[Skills that grow your packs](docs/skills.md) covers how to run each one. To review each PR against the packs, see [context-review](https://github.com/mjewell/context-review).
 
 ## Why not skills?
 
@@ -134,6 +131,6 @@ Already sharing rules by symlinking Claude Code's `.claude/rules/`? See [Why not
 - [Writing packs](docs/writing-packs.md): nested packs, one repo or many, pinning to tags, and trying a pack before pushing it.
 - [How packs load](docs/loading.md): what goes into every session and what waits behind a row, and how to change that for a pack you install.
 - [Reference](docs/reference.md): every command, pinning, and what the sync writes.
-- [Skills that grow your packs](docs/skills.md): how to run `pack-rule`, `pack-backfill`, `pack-findings` and `pack-review`.
+- [Skills that grow your packs](docs/skills.md): how to run `pack-rule` and `pack-backfill`.
 - [Why not symlinked rules?](docs/why.md): how `.claude/rules/` links load, and where they don't.
 - [Design](context-packs/project/design.md): the choices behind the format. To contribute, run `npm install`, then `npm run typecheck`, `npm run lint` and `npm test`.

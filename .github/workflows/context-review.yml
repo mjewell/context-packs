@@ -1,12 +1,10 @@
-name: pack-review
+name: context-review
 on:
   pull_request:
     types: [opened, reopened, ready_for_review, synchronize, edited]
 jobs:
   review:
-    # This repo's reusable workflow from the PR's own commit, unlike the reference's pinned one, so a PR that changes
-    # the review is reviewed with its change.
-    uses: ./.github/workflows/review.yml
+    uses: mjewell/context-review/.github/workflows/review.yml@a1cbc8d84ab7013d7449c54b251a60d1ac2ee3e0
     permissions:
       contents: read
       pull-requests: write
