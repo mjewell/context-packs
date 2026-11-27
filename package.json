@@ -9,8 +9,7 @@
   },
   "files": [
     "bin",
-    "dist",
-    "review/prompts"
+    "dist"
   ],
   "scripts": {
     "typecheck": "tsc",

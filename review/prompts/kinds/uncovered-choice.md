@@ -1,1 +1,0 @@
-An uncovered choice is where the change makes a kind of decision that will come up again, another way would be reasonable, and no rule covers it. Ask the user whether to write a rule for it, and which way new code should follow.

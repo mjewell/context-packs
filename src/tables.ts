@@ -15,7 +15,7 @@ const ROW = /^\| .* \| `([^`]+)` \|$/gm;
 
 /**
  * The paths the block's tables point at, then those the tables in each of those files point at, as the tables show
- * them, grouped by the table they're in. Each table is one pack's, so each group is a unit for the review to check. A
+ * them, grouped by the table they're in. Each table is one pack's, so each group is a unit for a review to check. A
  * nested pack's index holds that pack's own rules, so it starts its own table's group, not its parent's.
  */
 export function units(repo: string, block: string): string[][] {

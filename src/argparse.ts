@@ -1,6 +1,5 @@
 /**
- * Command-line arguments read the way Python's argparse read them, for the CLI and the review's scripts, which were
- * Python: options before a command are the program's, options after it are the command's, `--` ends the options, an
+ * Command-line arguments read the way Python's argparse read them, for the CLI, which was Python: options before a command are the program's, options after it are the command's, `--` ends the options, an
  * option is never matched by a shortened name, a usage error prints the usage and exits 2, and -h prints the help.
  */
 

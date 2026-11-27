@@ -5,7 +5,7 @@ Syncs context packs, which are shared agent rules and docs kept in git repos, in
 <!-- context-packs:start -->
 ## Context Packs
 
-Context packs bring shared rules and docs in from elsewhere. Each pack has its rules and a table of its context docs here, and a doc may hold a table of its own. Before starting work that a row in any of these tables matches, read its doc. The paths in these tables start from the repo root. Look for a path a doc names in the doc's folder first, then from the repo root. The packs here, and everything under `context-packs/gen/`, are generated from `context-packs/`: change them there, never here.
+Context packs bring shared rules and docs in from elsewhere. Each pack has its pack rules and a table of its pack docs here, and a doc may hold a table of its own. Before starting work that a row in any of these tables matches, read its doc. The paths in these tables start from the repo root. Look for a path a doc names in the doc's folder first, then from the repo root. The packs here, and everything under `context-packs/gen/`, are generated from `context-packs/`: change them there, never here.
 
 ## Context
 
@@ -13,7 +13,6 @@ Context packs bring shared rules and docs in from elsewhere. Each pack has its r
 |---|---|
 | Changing how packs are written, pinned or updated | `context-packs/project/design.md` |
 | Releasing a new version to npm | `context-packs/project/releasing.md` |
-| Changing the `review/` action, how `pack-findings` runs in CI, or how `pack-review` reads a CI review | `context-packs/project/review.md` |
 
 <!-- context-packs:pack core -->
 ## Collaboration
@@ -117,14 +116,14 @@ Edit only files I own. Plugins, synced skills, and installed dependencies belong
 | Writing or changing tests, or fixing a bug | `context-packs/gen/core/testing.md` |
 | Writing commit messages, PR titles or descriptions, changelog entries, READMEs, or anything else others will read without session context | `context-packs/gen/core/writing-for-humans.md` |
 <!-- context-packs:pack-end core -->
-<!-- context-packs:end sha256:b343b63424ce -->
+<!-- context-packs:end sha256:f02f314c74ac -->
 
 ## Project
 
-- The CLI in `src/` and the review in `review/` are TypeScript, run by Node 22.18 or later, with no dependencies at runtime but `git`. The one exception is the review's `from-pr` step, which runs `gh` for the user's GitHub token. It reads a PR as the user, and `gh` gives their login without a token kept in their shell. Node runs the `.ts` files directly, so write only TypeScript it can strip, and name the `.ts` file in each import. `tsc` compiles `dist/` for the npm package, since Node won't run TypeScript from `node_modules`.
+- The CLI in `src/` is TypeScript, run by Node 22.18 or later, with no dependencies at runtime but `git`. Node runs the `.ts` files directly, so write only TypeScript it can strip, and name the `.ts` file in each import. `tsc` compiles `dist/` for the npm package, since Node won't run TypeScript from `node_modules`.
 - The skills in `skills/` are for anyone using the tool, so they rely on nothing from any one person's packs. A skill's scripts import nothing outside its folder, since an installed skill holds only that folder: they use Node's standard library, and copy what they need from `src/`. `npm run lint` fails on an import that breaks this.
 - Run `npm install` once, then `npm run typecheck`, `npm run lint` and `npm test`. The `test` workflow runs all three on every PR, on Node 22.18. The tests use `node:test`, and each runs a script as its own process and checks what it prints and writes, so moving code between modules never breaks one. `npm run format` fixes what Biome can, which is code, JSON and CSS, never Markdown.
 - A test file is `tests/<subject>.test.ts`. Each `describe` names what its tests cover in plain words, such as `describe('add and remove')`, and each test is a sentence saying what that does, such as `test('add with a ref pins the pack there')`.
 - A test gets what it runs in, such as a temp repo, from a case class: `await SyncCase.make(t)`. A suite that needs more setup subclasses the case and overrides `setUp`, starting with `await super.setUp()`. A case that several test files share lives in a `_case.ts` module beside them, since importing a `.test.ts` file runs its tests a second time. Setup that a whole suite shares, such as packing the npm package once, is a function the suite calls in its `describe`, which sets up in `before` and cleans up in `after`, such as `packedBin()`. Any other plain function is for a helper that keeps no state, such as `doc()`. Every temp folder comes from the tests' one temp-folder module: `tempDir(t, prefix)` for a test, and `suiteTempDir(prefix)` for a suite.
-- `GLOSSARY.md` holds the terms for the packs and the review. Use them in code, docs and skills. When a name settles, add or update its entry there.
+- `GLOSSARY.md` holds the terms for the packs. Use them in code, docs and skills. When a name settles, add or update its entry there.
 - This repo's own pack docs are in `context-packs/project/`, and its shared rules come from agent-config through the import pack `context-packs/core/`. After adding a doc or changing its `when:` line, run `node src/cli.ts` and commit the result.

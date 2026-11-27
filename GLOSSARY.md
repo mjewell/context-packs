@@ -1,6 +1,6 @@
 # context-packs
 
-Shared agent rules and docs, kept in git repos and synced into each repo's instruction file, and the review that checks a change against them.
+Shared agent rules and docs, kept in git repos and synced into each repo's instruction file.
 
 ## Packs
 
@@ -51,79 +51,3 @@ A doc the sync writes for a pack that isn't inlined, holding its pack rules and 
 
 **Check**:
 `context-packs check`, which fails when a sync would change anything.
-_Avoid_: CI check, for the review
-
-## Review
-
-**Review**:
-Checking a change against a repo's packs and instruction file, to produce findings. It's either a CI review or a local review.
-
-**CI review**:
-A review the workflow runs on a PR, which posts its findings for pack-review.
-_Avoid_: pack-review, review action, CI check
-
-**Local review**:
-A review pack-review runs in the author's session, through pack-findings, for a change that CI didn't review.
-
-**pack-review**:
-The skill an author runs locally to go through a PR's findings and decide each one.
-_Avoid_: using it for the CI review, or for the identity that posts the CI review's comments
-
-**Unit**:
-The docs one finder checks: the instruction file, or the docs one pack's table points at.
-
-**Finder**:
-An agent that checks a diff against one unit, or the uncovered finder.
-
-**Uncovered finder**:
-The finder with no unit, which reads the whole diff for uncovered choices and searches every unit's docs for a rule that settles each one.
-
-**Group**:
-The merging agent's answer for one finding: the ids of the finders' findings it merges, with its kind, headline and take.
-
-**Wizard**:
-The command an agent runs a review through, one step at a time: `context-packs review`, which the pack-findings skill runs in a local review and in CI alike. Each step prints what to do next, with every command in full. It's a state machine: its state is which files the run folder holds, and it refuses a step whose checks fail.
-_Avoid_: script, orchestrator (the agent that runs it)
-
-**Orchestrator**:
-The agent that runs the wizard's `init` and `next`, and starts the subagents they name.
-
-**Run folder**:
-The folder `init` makes for one review, in `pack-review-runs` under the temporary folder, which holds its state, the answers the wizard took and the findings. Every command the wizard prints names it. No agent writes in it.
-
-**Answers folder**:
-The folder beside a run folder, in `pack-review-answers`, where agents write their answers for the wizard to read. Each brief names the file its agent writes.
-
-**Brief**:
-The prompt the wizard gives one finder, or the merging agent: the skill's prompt for it, with the commands it reads through and where its answer goes.
-
-**Served doc**:
-A doc the wizard printed through `doc`. A unit's answer is taken only once every doc in the unit was served.
-
-**Finding**:
-One choice in a diff that the review reports. It is a deviation, a conflict or an uncovered choice.
-
-**Deviation**:
-A finding where the change goes against a written rule.
-
-**Conflict**:
-A finding where two rules point opposite ways at the same spot.
-
-**Uncovered choice**:
-A finding where the change makes a kind of decision that will come up again, another way would be reasonable, and no rule covers it.
-
-**Routed**:
-Said of a doc whose `when` matches the work in the diff.
-
-**Summary**:
-The one comment a CI review keeps on a PR, counting the findings and carrying every finding for pack-review.
-
-**Review thread**:
-A thread on the diff that a CI review opened for one finding.
-
-**Pairing**:
-Deciding, in one CI review, which finding is about the same issue as which review thread. Each finding and each thread is in at most one pair, and a thread pairs with a finding from each CI review that finds its issue again.
-_Avoid_: matching, continuing
-
-**Commentary**:
-What a CI review tells the author about a review thread's replies, when they give the author a reason to act.

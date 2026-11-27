@@ -7,7 +7,6 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { main as wizard } from '../review/wizard.ts';
 import { type Args, parse } from './args.ts';
 import { block, header, instructions, type Region, region, snapshot } from './blocks.ts';
 import * as evals from './evals.ts';
@@ -127,14 +126,8 @@ async function sync(args: Args): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const argv = process.argv.slice(2);
-  // The review's wizard has its own steps and arguments, so `review` hands everything after it on.
-  if (argv[0] === 'review') {
-    await wizard(argv.slice(1));
-    return;
-  }
   try {
-    await sync(parse(argv, process.cwd()));
+    await sync(parse(process.argv.slice(2), process.cwd()));
   } catch (error) {
     if (!(error instanceof Stop)) throw error;
     if (error.message) process.stderr.write(`${error.message}\n`);
